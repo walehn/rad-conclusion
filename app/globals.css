@@ -1,51 +1,60 @@
 @import "tailwindcss";
 
 @theme {
-  --color-background: #ffffff;
-  --color-foreground: #0a0a0a;
-  --color-muted: #f5f5f5;
-  --color-muted-foreground: #737373;
-  --color-border: #e5e5e5;
-  --color-input: #e5e5e5;
-  --color-ring: #0a0a0a;
-  --color-primary: #0a0a0a;
-  --color-primary-foreground: #fafafa;
-  --color-secondary: #f5f5f5;
-  --color-secondary-foreground: #0a0a0a;
-  --color-destructive: #ef4444;
-  --color-destructive-foreground: #fafafa;
-  --color-accent: #f5f5f5;
-  --color-accent-foreground: #0a0a0a;
-  --color-card: #ffffff;
-  --color-card-foreground: #0a0a0a;
-  --color-popover: #ffffff;
-  --color-popover-foreground: #0a0a0a;
-  --radius-sm: 0.25rem;
-  --radius-md: 0.375rem;
-  --radius-lg: 0.5rem;
+  /* Medical Professional Theme - Light Mode */
+  --color-background: #F8FAFB;
+  --color-foreground: #0F172A;
+  --color-muted: #F1F5F9;
+  --color-muted-foreground: #64748B;
+  --color-border: #CBD5E1;
+  --color-input: #CBD5E1;
+  --color-ring: #0F766E;
+  --color-primary: #0F766E;
+  --color-primary-foreground: #FFFFFF;
+  --color-secondary: #F0FDFA;
+  --color-secondary-foreground: #134E4A;
+  --color-destructive: #DC2626;
+  --color-destructive-foreground: #FFFFFF;
+  --color-accent: #F0FDFA;
+  --color-accent-foreground: #134E4A;
+  --color-card: #FFFFFF;
+  --color-card-foreground: #0F172A;
+  --color-popover: #FFFFFF;
+  --color-popover-foreground: #0F172A;
+  --color-success: #059669;
+  --color-success-foreground: #FFFFFF;
+  --color-warning: #D97706;
+  --color-warning-foreground: #FFFFFF;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
 }
 
 @layer base {
   .dark {
-    --color-background: #0a0a0a;
-    --color-foreground: #fafafa;
-    --color-muted: #262626;
-    --color-muted-foreground: #a3a3a3;
-    --color-border: #262626;
-    --color-input: #262626;
-    --color-ring: #d4d4d4;
-    --color-primary: #fafafa;
-    --color-primary-foreground: #0a0a0a;
-    --color-secondary: #262626;
-    --color-secondary-foreground: #fafafa;
-    --color-destructive: #dc2626;
-    --color-destructive-foreground: #fafafa;
-    --color-accent: #262626;
-    --color-accent-foreground: #fafafa;
-    --color-card: #0a0a0a;
-    --color-card-foreground: #fafafa;
-    --color-popover: #0a0a0a;
-    --color-popover-foreground: #fafafa;
+    --color-background: #0C1222;
+    --color-foreground: #E2E8F0;
+    --color-muted: #1E293B;
+    --color-muted-foreground: #94A3B8;
+    --color-border: #334155;
+    --color-input: #334155;
+    --color-ring: #2DD4BF;
+    --color-primary: #14B8A6;
+    --color-primary-foreground: #042F2E;
+    --color-secondary: #1E293B;
+    --color-secondary-foreground: #5EEAD4;
+    --color-destructive: #EF4444;
+    --color-destructive-foreground: #FFFFFF;
+    --color-accent: #1E293B;
+    --color-accent-foreground: #5EEAD4;
+    --color-card: #131B2E;
+    --color-card-foreground: #E2E8F0;
+    --color-popover: #131B2E;
+    --color-popover-foreground: #E2E8F0;
+    --color-success: #34D399;
+    --color-success-foreground: #042F2E;
+    --color-warning: #FBBF24;
+    --color-warning-foreground: #451A03;
   }
 }
 
@@ -54,6 +63,7 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 }

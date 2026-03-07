@@ -21,8 +21,8 @@ export function FindingsInput({ value, onChange, error }: FindingsInputProps) {
         >
           Findings
         </label>
-        <span className="text-xs text-muted-foreground">
-          {charCount.toLocaleString()} characters
+        <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground ring-1 ring-border/50">
+          {charCount.toLocaleString()} chars
         </span>
       </div>
       <Textarea
@@ -30,8 +30,8 @@ export function FindingsInput({ value, onChange, error }: FindingsInputProps) {
         placeholder="Paste the Findings section of the radiology report here..."
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`min-h-[300px] resize-y font-mono text-sm ${
-          error ? "border-destructive" : ""
+        className={`min-h-[300px] resize-y bg-card font-mono text-sm shadow-inner transition-colors focus:bg-background ${
+          error ? "border-destructive ring-1 ring-destructive/30" : ""
         }`}
       />
       {error && <p className="text-sm text-destructive">{error}</p>}

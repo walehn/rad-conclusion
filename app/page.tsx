@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useChat } from "@ai-sdk/react";
-import { Stethoscope, Send, Settings } from "lucide-react";
+import { Stethoscope, Send, Settings, Github } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FindingsInput } from "@/components/findings-input";
@@ -123,103 +123,131 @@ export default function Home() {
   const processedContent = rawContent ? postProcess(rawContent, title) : "";
 
   return (
-    <div className="mx-auto min-h-screen max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-      {/* Header */}
-      <header className="mb-8 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Stethoscope className="h-8 w-8 text-primary" />
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">
-              Rad Conclusion
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              AI-powered radiology conclusion generator
-            </p>
+    <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/30">
+      {/* Top Accent Bar */}
+      <div className="h-1 bg-gradient-to-r from-primary via-primary/80 to-primary/60" />
+
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        {/* Header */}
+        <header className="mb-8 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20">
+              <Stethoscope className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                Rad Conclusion
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                AI-powered radiology conclusion generator
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link href="/settings">
-            <Button variant="ghost" size="icon" aria-label="Settings">
-              <Settings className="h-5 w-5" />
-            </Button>
-          </Link>
-          <ThemeToggle />
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Left Column - Input */}
-        <div className="flex flex-col gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Configuration</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              <ModelSelector
-                providers={providers}
-                selectedProvider={provider}
-                selectedModel={model}
-                onProviderChange={setProvider}
-                onModelChange={setModel}
-              />
-              <OptionsPanel
-                style={style}
-                lang={lang}
-                title={title}
-                onStyleChange={setStyle}
-                onLangChange={setLang}
-                onTitleChange={setTitle}
-              />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Findings</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              <FindingsInput
-                value={findings}
-                onChange={(v) => {
-                  setFindings(v);
-                  if (inputError) setInputError("");
-                }}
-                error={inputError}
-              />
-              <Button
-                onClick={handleGenerate}
-                disabled={isLoading}
-                className="w-full"
-                size="lg"
-              >
-                {isLoading ? (
-                  "Generating..."
-                ) : (
-                  <>
-                    <Send className="mr-2 h-4 w-4" />
-                    Generate Conclusion
-                  </>
-                )}
+          <div className="flex items-center gap-2">
+            <Link href="/settings">
+              <Button variant="ghost" size="icon" aria-label="Settings" className="text-muted-foreground hover:text-foreground">
+                <Settings className="h-5 w-5" />
               </Button>
+            </Link>
+            <ThemeToggle />
+          </div>
+        </header>
+
+        {/* Main Content */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Left Column - Input */}
+          <div className="flex flex-col gap-6">
+            <Card className="shadow-sm ring-1 ring-border/50">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg font-semibold text-foreground">Configuration</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
+                <ModelSelector
+                  providers={providers}
+                  selectedProvider={provider}
+                  selectedModel={model}
+                  onProviderChange={setProvider}
+                  onModelChange={setModel}
+                />
+                <OptionsPanel
+                  style={style}
+                  lang={lang}
+                  title={title}
+                  onStyleChange={setStyle}
+                  onLangChange={setLang}
+                  onTitleChange={setTitle}
+                />
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-sm ring-1 ring-border/50">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg font-semibold text-foreground">Findings</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
+                <FindingsInput
+                  value={findings}
+                  onChange={(v) => {
+                    setFindings(v);
+                    if (inputError) setInputError("");
+                  }}
+                  error={inputError}
+                />
+                <Button
+                  onClick={handleGenerate}
+                  disabled={isLoading}
+                  className="w-full bg-gradient-to-r from-primary to-primary/90 shadow-md shadow-primary/20 transition-all hover:shadow-lg hover:shadow-primary/30 disabled:from-muted disabled:to-muted disabled:shadow-none"
+                  size="lg"
+                >
+                  {isLoading ? (
+                    "Generating..."
+                  ) : (
+                    <>
+                      <Send className="mr-2 h-4 w-4" />
+                      Generate Conclusion
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Right Column - Output */}
+          <Card className="flex flex-col shadow-sm ring-1 ring-border/50">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg font-semibold text-foreground">Result</CardTitle>
+            </CardHeader>
+            <CardContent className="flex-1">
+              <ConclusionOutput
+                content={processedContent}
+                isLoading={isLoading}
+                elapsedTime={elapsedTime}
+                error={apiError}
+              />
             </CardContent>
           </Card>
         </div>
 
-        {/* Right Column - Output */}
-        <Card className="flex flex-col">
-          <CardHeader>
-            <CardTitle className="text-lg">Result</CardTitle>
-          </CardHeader>
-          <CardContent className="flex-1">
-            <ConclusionOutput
-              content={processedContent}
-              isLoading={isLoading}
-              elapsedTime={elapsedTime}
-              error={apiError}
-            />
-          </CardContent>
-        </Card>
+        {/* Footer */}
+        <footer className="mt-12 border-t border-border/50 pt-6">
+          <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-between">
+            <p className="text-xs text-muted-foreground">
+              Rad Conclusion v0.1.0 &mdash; Clinical radiology report assistant. For professional use only.
+            </p>
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <span>Updated 2026-03-08</span>
+              <a
+                href="https://github.com/walehn/rad-conclusion"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
+              >
+                <Github className="h-3.5 w-3.5" />
+                GitHub
+              </a>
+            </div>
+          </div>
+        </footer>
       </div>
     </div>
   );

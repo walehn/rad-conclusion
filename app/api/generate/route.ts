@@ -21,6 +21,17 @@ const requestSchema = z.object({
 export async function POST(req: Request) {
   try {
     const body = await req.json();
+
+    // Extract findings from useChat messages format
+    if (!body.findings && Array.isArray(body.messages)) {
+      const lastUserMsg = [...body.messages].reverse().find(
+        (m: { role: string }) => m.role === "user"
+      );
+      if (lastUserMsg) {
+        body.findings = lastUserMsg.content;
+      }
+    }
+
     const parsed = requestSchema.safeParse(body);
 
     if (!parsed.success) {
