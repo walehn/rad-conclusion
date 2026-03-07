@@ -138,6 +138,10 @@ rad-conclusion/
 | 유효성 검증 | Zod |
 | UI | shadcn/ui 스타일 커스텀 컴포넌트, Lucide React |
 
+## 개발 도구
+
+이 프로젝트는 [Claude Code](https://claude.ai/claude-code)와 [MoAI-ADK](https://github.com/modu-ai/moai-adk) (Agentic Development Kit for Claude Code)를 사용하여 개발되었습니다.
+
 ## 주의사항
 
 - 로컬 LLM 사용 시 OpenAI 호환 서버(`/v1/chat/completions`)가 실행 중이어야 합니다

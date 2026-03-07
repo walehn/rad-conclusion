@@ -138,6 +138,10 @@ rad-conclusion/
 | Validation | Zod |
 | UI | Custom shadcn/ui-style components, Lucide React |
 
+## Built With
+
+This project was built using [Claude Code](https://claude.ai/claude-code) and [MoAI-ADK](https://github.com/modu-ai/moai-adk) (Agentic Development Kit for Claude Code).
+
 ## Notes
 
 - Local LLM requires an OpenAI-compatible server (`/v1/chat/completions`) running
