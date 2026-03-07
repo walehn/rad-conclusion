@@ -37,42 +37,32 @@ function stripBold(text: string, title: string, koTitle: string): string {
   return result;
 }
 
-function extractFromLastTitle(
-  text: string,
-  pattern: RegExp,
-  title: string,
-  koTitle: string
-): string | null {
-  const matches = [...text.matchAll(pattern)];
-  if (matches.length > 0) {
-    const last = matches[matches.length - 1];
-    const start = last.index ?? 0;
-    return stripBold(text.slice(start), title, koTitle);
+function removeTitleLine(text: string, title: string, koTitle: string): string {
+  // Build regex to match a title line like "Conclusion:" or "**Conclusion:**" at the start
+  let titlesPat = escapeRegex(title);
+  if (koTitle) {
+    titlesPat = `(?:${titlesPat}|${escapeRegex(koTitle)})`;
   }
-  return null;
+  // Remove title line (with optional bold markers) from beginning or anywhere
+  const pattern = new RegExp(`^\\s*(?:\\*+)?${titlesPat}(?:\\*+)?:\\s*\\n?`, "gm");
+  return text.replace(pattern, "");
 }
 
 export function postProcess(content: string, title: string): string {
   const koTitle = KO_ALIASES[title] || "";
 
-  // Build regex pattern matching title or Korean alias, with optional bold markers
-  let titlesPat = escapeRegex(title);
-  if (koTitle) {
-    titlesPat = `(?:${titlesPat}|${escapeRegex(koTitle)})`;
-  }
-  const pattern = new RegExp(`(?:^|\\*+)${titlesPat}(?:\\*+)?:`, "gm");
+  let result = content;
 
-  // 1) Try to find title in full content
-  let result = extractFromLastTitle(content, pattern, title, koTitle);
-
-  // 2) If not found and content starts with "thought\n", search inside thought block
-  if (result === null && content.startsWith("thought\n")) {
-    const rest = content.slice("thought\n".length);
-    result = extractFromLastTitle(rest, pattern, title, koTitle);
-    if (result === null) {
-      result = rest; // best-effort: return everything after thought\n
-    }
+  // Handle thought block: extract content after "thought\n"
+  if (result.startsWith("thought\n")) {
+    result = result.slice("thought\n".length);
   }
 
-  return (result ?? content).trim();
+  // Strip bold markers around title
+  result = stripBold(result, title, koTitle);
+
+  // Remove any title lines (e.g., "Conclusion:", "결론:")
+  result = removeTitleLine(result, title, koTitle);
+
+  return result.trim();
 }

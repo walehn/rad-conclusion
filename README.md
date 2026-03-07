@@ -1,224 +1,268 @@
-# rad-conclusion — Radiology Conclusion Generator
+# Rad Conclusion
 
-방사선 판독 소견(Findings)을 입력받아 임상적으로 자연스러운 Conclusion/Impression을 자동 생성하는 OpenClaw 스킬입니다. Gemini CLI 또는 로컬 LLM (gpt-oss-120b, OpenAI-compatible API) 두 가지 백엔드를 지원합니다.
+AI 기반 방사선 판독 결론(Conclusion/Impression) 생성기
 
----
-
-## 디렉토리 구조
-
-```
-skills/rad-conclusion/
-├── README.md                  # 이 파일
-├── SKILL.md                   # OpenClaw 스킬 메타데이터
-├── .env.example               # 환경변수 템플릿 (공개)
-├── .env                       # 실제 설정값 (로컬 전용, clawhubignore)
-├── .clawhubignore             # ClawHub 업로드 제외 목록
-└── scripts/
-    └── rad_conclusion         # 스킬 래퍼 (.env 자동 로드, local 백엔드 강제)
-
-scripts/
-└── rad_conclusion.sh          # 핵심 통합 스크립트 (gemini | local)
-```
+방사선 판독 소견(Findings) 텍스트를 입력하면, 임상적으로 자연스러운 Conclusion/Impression을 실시간 스트리밍으로 생성합니다. 4개의 LLM 제공자를 지원하며, 브라우저 기반 웹 애플리케이션으로 어디서든 사용할 수 있습니다.
 
 ---
 
-## 핵심 스크립트: `scripts/rad_conclusion.sh`
+## 주요 기능
 
-### 기본값
+- **실시간 스트리밍 생성** — LLM 응답을 토큰 단위로 스트리밍 출력
+- **4개 LLM 제공자 지원** — 로컬 LLM, OpenAI, Anthropic, Google AI
+- **다크/라이트 모드** — 의료 전문가용 틸(teal) 컬러 테마
+- **암호화 API 키 저장** — AES-GCM 암호화로 브라우저 로컬 저장 (서버 전송 없음)
+- **출력 스타일 선택** — Numbered, Short, Urgent-First
+- **다국어 출력** — 영어, 한국어, 혼용 모드
+- **Settings 페이지** — 제공자별 API 키 관리 및 연결 테스트
 
-| 항목 | 기본값 |
-|------|--------|
-| `--backend` | `local` |
-| `--model` (local) | `$RAD_LOCAL_MODEL` 또는 `gpt-oss-120b` |
-| `--model` (gemini) | `gemini-3.1-pro-preview` |
-| `--host` | `$RAD_LOCAL_HOST` 또는 `http://localhost:5100` |
-| `--style` | `numbered` |
-| `--lang` | `en` |
-| `--title` | `Conclusion` |
-| `--max-tokens` | `2000` (local 전용) |
+---
 
-### 의존성
+## 기술 스택
 
-| 백엔드 | 필요 조건 |
-|--------|-----------|
-| `local` | `curl`, `jq`, `python3`; OpenAI-compatible LLM 서버 실행 중 |
-| `gemini` | `gemini` CLI 설치 및 인증 완료 |
+| 분류 | 기술 |
+|------|------|
+| 프레임워크 | Next.js 15, React 19 |
+| 스타일링 | Tailwind CSS 4 |
+| AI/LLM | Vercel AI SDK 4 |
+| 제공자 SDK | @ai-sdk/openai, @ai-sdk/anthropic, @ai-sdk/google |
+| 언어 | TypeScript 5.8 |
+| 유효성 검증 | Zod |
+| UI 컴포넌트 | shadcn/ui 스타일 커스텀 컴포넌트, Lucide React |
 
-### 옵션 전체 목록
+---
 
-| 옵션 | 값 | 설명 |
-|------|----|------|
-| `--backend` | `local` \| `gemini` | 사용할 AI 백엔드 |
-| `--model` | 문자열 | 모델 이름 오버라이드 |
-| `--host` | URL | 로컬 LLM API 서버 주소 |
-| `--style` | `short` \| `numbered` \| `urgent-first` | 결론 출력 스타일 |
-| `--lang` | `en` \| `ko` \| `mixed` | 출력 언어 |
-| `--title` | 문자열 | 결론 섹션 헤더 레이블 |
-| `--max-tokens` | 정수 | 최대 출력 토큰 (local 전용) |
+## 지원 LLM 제공자
 
-### 스타일 옵션
+| 제공자 | 모델 | 비고 |
+|--------|------|------|
+| **Local LLM** | gpt-oss-120b | OpenAI 호환 API, 기본 호스트 `localhost:5100` |
+| **OpenAI** | gpt-4o, gpt-4o-mini, gpt-4.1 | API 키 필요 |
+| **Anthropic** | Claude Sonnet 4, Claude Opus 4 | API 키 필요 |
+| **Google AI** | Gemini 2.5 Flash, Gemini 2.5 Pro | API 키 필요 |
 
-- **`numbered`**: 번호형 Impression 목록 (`1.`, `2.`, `3.`), 임상적 우선순위 순
-- **`short`**: 2–4줄 이내 간결한 요약
-- **`urgent-first`**: 긴급/중증 소견을 (1)번으로 먼저 출력
+---
 
-### 언어 옵션
+## 설치 및 실행
 
-- **`en`**: 영어 전용 (공식 방사선 보고서 스타일)
-- **`ko`**: 한국어 주체, 표준 방사선 용어는 영어 유지
-- **`mixed`**: Findings 톤에 맞춘 한국어+영어 혼용
-
-### 사용 예시
+### 설치
 
 ```bash
-# 기본 (local / gpt-oss-120b / numbered / en)
-echo "Liver S8에 2.1cm 과혈관성 결절..." | ./scripts/rad_conclusion.sh
-
-# Gemini 백엔드로 한국어 짧게
-cat findings.txt | ./scripts/rad_conclusion.sh --backend gemini --lang ko --style short
-
-# 긴급 소견 우선, 토큰 상향
-echo "..." | ./scripts/rad_conclusion.sh --style urgent-first --max-tokens 3000
-
-# 제목 변경
-echo "..." | ./scripts/rad_conclusion.sh --title "Impression"
+git clone https://github.com/walehn/rad-conclusion.git
+cd rad-conclusion
+npm install
 ```
 
-### 출력 포맷
-
-```
-Conclusion:
-1. 주요 소견 요약 (임상적으로 가장 중요한 것 먼저)
-2. 두 번째 소견
-
-Elapsed: 7.30s  [backend: local, model: gpt-oss-120b]
-```
-
-> max_tokens 초과 시 stderr에 `[WARNING] Output truncated` 경고 출력.
-
----
-
-## 스킬 래퍼: `skills/rad-conclusion/scripts/rad_conclusion`
-
-local 백엔드를 강제하고 `.env`를 자동 로드. 두 가지 호출 방식 지원.
+### 개발 서버
 
 ```bash
-# 방식 1: 첫 번째 인자로 Findings 텍스트 전달 (legacy mode)
-skills/rad-conclusion/scripts/rad_conclusion "간 S8 병변 관찰됨..."
-
-# 방식 2: stdin
-echo "간 S8 병변 관찰됨..." | skills/rad-conclusion/scripts/rad_conclusion
-
-# 옵션 전달
-echo "..." | skills/rad-conclusion/scripts/rad_conclusion --lang ko --style short
+npm run dev
+# http://localhost:3957
 ```
 
-내부적으로 `rad_conclusion.sh --backend local`을 호출하며, 나머지 옵션은 그대로 전달.
-
----
-
-## 출력 정책
-
-스크립트 stdout을 **있는 그대로** 채팅에 전달. 에이전트가 임의로 수정, 요약, 생략하지 않음.
-
----
-
-## Telegram 채팅 사용법
-
-### 등록된 슬래시 명령어
-
-```
-/rad-conclusion <findings 텍스트>
-```
-
-또는 Findings 텍스트를 그냥 채팅으로 올려도 처리.
-
-### 자동 옵션 파싱 규칙
-
-옵션 미지정 시 기본값: `--style numbered --lang en`
-
-| 사용자 입력 | 적용 옵션 |
-|------------|----------|
-| "한국어", "한글", "ko" | `--lang ko` |
-| "영어", "English", "en" | `--lang en` |
-| "혼용", "mixed" | `--lang mixed` |
-| "짧게", "간단히", "short" | `--style short` |
-| "긴급 먼저", "urgent" | `--style urgent-first` |
-| "길게", "자세히", "토큰 늘려" | `--max-tokens` 상향 |
-
----
-
-## 시스템 프롬프트 (통합, 두 백엔드 공용)
-
-**콘텐츠 규칙:**
-1. Findings 합성 — 원문 복붙 금지, 임상적 의미로 변환
-2. 임상적 우선순위 배치
-3. Actionable language — 추가 검사 필요 시 명시
-4. 불확실한 소견 → "cannot exclude", "clinical correlation recommended" 등
-5. 임상적으로 의미 있는 음성 소견만 포함
-6. **No fabrication** — Findings에 없는 내용, 권고사항 추가 금지
-7. PII 금지
-
-**문체 규칙:**
-- Active voice, filler opener 금지 ("In summary", "Based on..." 등)
-- 메타 코멘트 금지
-- 일관된 용어 사용
-- 수치 원문 그대로 유지
-- 불확실할 때만 hedging 사용
-
----
-
-## 출력 후처리 파이프라인 (local 백엔드)
-
-LLM 출력 → Python 파서 → stdout
-
-**파서 동작:**
-1. `Conclusion:` 또는 `결론:` 패턴 탐색 (정규식, 마지막 occurrence 기준)
-2. `**Conclusion:**` / `**Conclusion**:` bold 마크업 자동 제거
-3. `thought\n` 접두사 블록 처리 — 블록 이후 타이틀 재탐색
-
----
-
-## 설치 및 환경 설정
+### 프로덕션 빌드
 
 ```bash
-cp skills/rad-conclusion/.env.example skills/rad-conclusion/.env
-# .env 파일에서 RAD_LOCAL_HOST, RAD_LOCAL_MODEL 설정
+npm run build
+npm run start
+# http://localhost:3957
 ```
 
+---
+
+## 환경변수 설정
+
+`.env.local` 파일을 생성하여 서버 측 환경변수를 설정할 수 있습니다. 또는 Settings 페이지에서 브라우저 로컬로 API 키를 관리할 수도 있습니다.
+
 ```bash
-# .env 예시
+# 로컬 LLM (OpenAI 호환 서버)
 RAD_LOCAL_HOST=http://localhost:5100
 RAD_LOCAL_MODEL=gpt-oss-120b
-```
 
-### 로컬 LLM 서버 요구사항
-
-- OpenAI-compatible chat completions API (`/v1/chat/completions`) 지원
-- 권장 모델: `gpt-oss-120b`
-
-### Gemini 백엔드 사용 시
-
-```bash
-gemini  # 최초 1회 인증
+# 상용 제공자 API 키 (선택)
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+GOOGLE_AI_API_KEY=AI...
 ```
 
 ---
 
-## 백엔드별 권장 용도
+## 설정 옵션
 
-| 용도 | 권장 백엔드 | 응답 속도 |
-|------|------------|---------|
-| 영어/혼용 소견 | `local` (기본) | ~5–9초 |
-| 한국어 소견 | `gemini` 또는 `local` | ~7s / ~17s |
-| 오프라인/프라이버시 | `local` | ~5–9초 |
-| 고품질 우선 | `gemini` | ~17초 |
+### 출력 스타일
+
+| 스타일 | 설명 |
+|--------|------|
+| **Numbered** | 번호형 Impression 목록 (1., 2., 3.), 임상적 우선순위 순 |
+| **Short** | 2-4줄 이내 간결한 요약 |
+| **Urgent-First** | 긴급/중증 소견을 1번으로 먼저 출력 |
+
+### 출력 언어
+
+| 언어 | 설명 |
+|------|------|
+| **English** | 영어 전용 (공식 방사선 보고서 스타일) |
+| **Korean** | 한국어 주체, 표준 방사선 용어는 영어 유지 |
+| **Mixed** | Findings 톤에 맞춘 한국어+영어 혼용 |
+
+---
+
+## 프로젝트 구조
+
+```
+rad-conclusion/
+├── app/
+│   ├── api/
+│   │   ├── generate/          # LLM 스트리밍 API 엔드포인트
+│   │   └── providers/         # 제공자 목록 및 유효성 검증 API
+│   ├── settings/              # 제공자 설정 페이지
+│   ├── page.tsx               # 메인 페이지
+│   ├── layout.tsx             # 루트 레이아웃
+│   └── globals.css            # 테마 정의
+├── components/
+│   ├── ui/                    # 기본 UI 컴포넌트 (Button, Card, Input 등)
+│   ├── settings/              # Settings 페이지 컴포넌트
+│   ├── findings-input.tsx     # Findings 입력 필드
+│   ├── conclusion-output.tsx  # 결론 출력 영역
+│   ├── model-selector.tsx     # 제공자/모델 선택
+│   ├── options-panel.tsx      # 스타일/언어 설정
+│   └── theme-toggle.tsx       # 다크/라이트 모드 전환
+├── lib/
+│   ├── providers/             # LLM 제공자 레지스트리 및 설정
+│   ├── prompts/               # 시스템 프롬프트 빌더
+│   ├── storage/               # 암호화 API 키 저장소
+│   └── post-process.ts        # LLM 출력 후처리
+└── package.json
+```
 
 ---
 
 ## 주의사항
 
-- 로컬 LLM 서버가 실행 중이어야 local 백엔드 사용 가능
-- 입력은 Findings 텍스트만 사용 (PII 제거 권장)
-- `thought\n` 블록 등 모델 내부 reasoning은 파서가 자동 제거
-- Gemini 백엔드 사용 시 `gemini` CLI 인증 필요
+- 로컬 LLM 사용 시 OpenAI 호환 서버(`/v1/chat/completions`)가 실행 중이어야 합니다
+- API 키는 AES-GCM으로 암호화되어 브라우저 로컬에만 저장됩니다
+- 탭을 닫으면 암호화 키가 소멸되어 API 키 재입력이 필요합니다
+- 입력에 환자 식별 정보(PII)를 포함하지 마세요
+
+---
+
+## 라이선스
+
+MIT
+
+---
+
+<details>
+<summary><h2>English Version</h2></summary>
+
+# Rad Conclusion
+
+AI-powered radiology conclusion/impression generator
+
+Enter radiological findings text to generate clinically natural Conclusion/Impression statements with real-time streaming. Supports 4 LLM providers as a browser-based web application.
+
+---
+
+### Key Features
+
+- **Real-time streaming** — Token-by-token streaming output from LLM
+- **4 LLM providers** — Local LLM, OpenAI, Anthropic, Google AI
+- **Dark/Light mode** — Medical-professional teal color theme
+- **Encrypted API key storage** — AES-GCM encryption, browser-local only (never sent to server)
+- **Output styles** — Numbered, Short, Urgent-First
+- **Multilingual output** — English, Korean, Mixed mode
+- **Settings page** — Per-provider API key management and connection testing
+
+---
+
+### Tech Stack
+
+| Category | Technology |
+|----------|-----------|
+| Framework | Next.js 15, React 19 |
+| Styling | Tailwind CSS 4 |
+| AI/LLM | Vercel AI SDK 4 |
+| Provider SDKs | @ai-sdk/openai, @ai-sdk/anthropic, @ai-sdk/google |
+| Language | TypeScript 5.8 |
+| Validation | Zod |
+| UI Components | shadcn/ui-style custom components, Lucide React |
+
+---
+
+### Supported LLM Providers
+
+| Provider | Models | Notes |
+|----------|--------|-------|
+| **Local LLM** | gpt-oss-120b | OpenAI-compatible API, default host `localhost:5100` |
+| **OpenAI** | gpt-4o, gpt-4o-mini, gpt-4.1 | API key required |
+| **Anthropic** | Claude Sonnet 4, Claude Opus 4 | API key required |
+| **Google AI** | Gemini 2.5 Flash, Gemini 2.5 Pro | API key required |
+
+---
+
+### Installation & Running
+
+```bash
+git clone https://github.com/walehn/rad-conclusion.git
+cd rad-conclusion
+npm install
+
+# Development
+npm run dev          # http://localhost:3957
+
+# Production
+npm run build
+npm run start        # http://localhost:3957
+```
+
+---
+
+### Environment Variables
+
+Create a `.env.local` file for server-side configuration, or manage API keys via the Settings page.
+
+```bash
+# Local LLM (OpenAI-compatible server)
+RAD_LOCAL_HOST=http://localhost:5100
+RAD_LOCAL_MODEL=gpt-oss-120b
+
+# Commercial provider API keys (optional)
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+GOOGLE_AI_API_KEY=AI...
+```
+
+---
+
+### Output Styles
+
+| Style | Description |
+|-------|-------------|
+| **Numbered** | Numbered impression list (1., 2., 3.), ordered by clinical priority |
+| **Short** | Concise summary in 2-4 lines |
+| **Urgent-First** | Critical/urgent findings listed first |
+
+### Output Languages
+
+| Language | Description |
+|----------|-------------|
+| **English** | English only (formal radiology report style) |
+| **Korean** | Korean with standard radiology terms kept in English |
+| **Mixed** | Korean+English blend matching Findings tone |
+
+---
+
+### Notes
+
+- Local LLM requires an OpenAI-compatible server (`/v1/chat/completions`) running
+- API keys are AES-GCM encrypted and stored browser-locally only
+- Closing the browser tab invalidates the encryption key; re-entry required
+- Do not include patient identifiable information (PII) in input
+
+---
+
+### License
+
+MIT
+
+</details>

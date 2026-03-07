@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useChat } from "@ai-sdk/react";
 import { Stethoscope, Send, Settings, Github } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,10 +17,10 @@ import type { ConclusionStyle, ConclusionLang } from "@/lib/prompts/system-promp
 import type { ProviderInfo, ProviderName, ProviderSettings } from "@/lib/providers/types";
 
 export default function Home() {
+  const router = useRouter();
   const [findings, setFindings] = React.useState("");
   const [style, setStyle] = React.useState<ConclusionStyle>("numbered");
   const [lang, setLang] = React.useState<ConclusionLang>("en");
-  const [title, setTitle] = React.useState("Conclusion");
   const [provider, setProvider] = React.useState<ProviderName>("local");
   const [model, setModel] = React.useState("gpt-oss-120b");
   const [providers, setProviders] = React.useState<ProviderInfo[]>([]);
@@ -80,7 +80,6 @@ export default function Home() {
     body: {
       style,
       lang,
-      title,
       provider,
       model,
       apiKey: currentClientSettings?.apiKey,
@@ -120,7 +119,7 @@ export default function Home() {
   // Extract the assistant's latest message content and post-process it
   const rawContent =
     messages.filter((m) => m.role === "assistant").pop()?.content || "";
-  const processedContent = rawContent ? postProcess(rawContent, title) : "";
+  const processedContent = rawContent ? postProcess(rawContent, "Conclusion") : "";
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/30">
@@ -144,11 +143,15 @@ export default function Home() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Link href="/settings">
-              <Button variant="ghost" size="icon" aria-label="Settings" className="text-muted-foreground hover:text-foreground">
-                <Settings className="h-5 w-5" />
-              </Button>
-            </Link>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Settings"
+              className="text-muted-foreground hover:text-foreground"
+              onClick={() => router.push("/settings")}
+            >
+              <Settings className="h-5 w-5" />
+            </Button>
             <ThemeToggle />
           </div>
         </header>
@@ -172,10 +175,8 @@ export default function Home() {
                 <OptionsPanel
                   style={style}
                   lang={lang}
-                  title={title}
                   onStyleChange={setStyle}
                   onLangChange={setLang}
-                  onTitleChange={setTitle}
                 />
               </CardContent>
             </Card>

@@ -179,3 +179,8 @@ dist-ssr/
 .vercel/
 .netlify/
 .firebase/
+
+# ===========================================
+# Project-specific exclusions
+# ===========================================
+rad_conclusion.sh

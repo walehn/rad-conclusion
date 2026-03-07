@@ -53,8 +53,7 @@ export function buildSystemPrompt(options: SystemPromptOptions): string {
 13. Hedging — use appropriate radiologic hedging only when genuinely uncertain ("likely", "compatible with", "cannot exclude"). Do not over-hedge clear findings.
 
 === OUTPUT FORMAT ===
-- First line: "${title}:" — nothing before it, no markdown bold/italic.
-- Then the conclusion content.
+- Do NOT include a title line like "${title}:" or "Impression:" — output the conclusion content directly.
 - When numbered style is requested, format each item as 1. ..., 2. ..., 3. ... (NOT (1) style, NOT bullets).
 - No preamble, no postscript. No reasoning. Output the conclusion directly.
 

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ProviderCard } from "@/components/settings/provider-card";
@@ -12,6 +12,7 @@ import {
 import type { ProviderSettings, ProviderName } from "@/lib/providers/types";
 
 export default function SettingsPage() {
+  const router = useRouter();
   const [settings, setSettings] = React.useState<ProviderSettings[]>([]);
   const [loading, setLoading] = React.useState(true);
 
@@ -97,11 +98,14 @@ export default function SettingsPage() {
     <div className="mx-auto min-h-screen max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
       {/* Header */}
       <header className="mb-8 flex items-center gap-4">
-        <Link href="/">
-          <Button variant="ghost" size="icon" aria-label="Back to home">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-        </Link>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Back to home"
+          onClick={() => router.back()}
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
         <div className="flex items-center gap-3">
           <Settings className="h-7 w-7 text-primary" />
           <div>
