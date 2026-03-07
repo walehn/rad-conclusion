@@ -1,0 +1,14 @@
+services:
+  rad-conclusion:
+    build: .
+    ports:
+      - "3957:3957"
+    environment:
+      - NODE_ENV=production
+      # Uncomment and set API keys as needed
+      # - RAD_LOCAL_HOST=http://host.docker.internal:5100
+      # - RAD_LOCAL_MODEL=gpt-oss-120b
+      # - OPENAI_API_KEY=
+      # - ANTHROPIC_API_KEY=
+      # - GOOGLE_AI_API_KEY=
+    restart: unless-stopped
