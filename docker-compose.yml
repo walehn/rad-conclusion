@@ -3,11 +3,13 @@ services:
     build: .
     ports:
       - "3957:3957"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       - NODE_ENV=production
+      - RAD_LOCAL_HOST=http://host.docker.internal:5100
+      - RAD_LOCAL_MODEL=gpt-oss-120b
       # Uncomment and set API keys as needed
-      # - RAD_LOCAL_HOST=http://host.docker.internal:5100
-      # - RAD_LOCAL_MODEL=gpt-oss-120b
       # - OPENAI_API_KEY=
       # - ANTHROPIC_API_KEY=
       # - GOOGLE_AI_API_KEY=

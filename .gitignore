@@ -184,3 +184,8 @@ dist-ssr/
 # Project-specific exclusions
 # ===========================================
 rad_conclusion.sh
+.moai/
+DEPLOYMENT.md
+Dockerfile
+docker-compose.yml
+.dockerignore
