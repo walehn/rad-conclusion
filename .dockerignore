@@ -1,9 +1,0 @@
-node_modules
-.next
-.git
-.claude
-.moai
-*.md
-rad_conclusion.sh
-.env*
-!.env.example
