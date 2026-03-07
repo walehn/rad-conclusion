@@ -14,6 +14,8 @@ const requestSchema = z.object({
     .enum(["local", "openai", "anthropic", "google"])
     .default("local"),
   model: z.string().optional(),
+  apiKey: z.string().optional(),
+  hostUrl: z.string().optional(),
 });
 
 export async function POST(req: Request) {
@@ -28,9 +30,10 @@ export async function POST(req: Request) {
       );
     }
 
-    const { findings, style, lang, title, provider, model } = parsed.data;
+    const { findings, style, lang, title, provider, model, apiKey, hostUrl } =
+      parsed.data;
 
-    const llmModel = getModel(provider as ProviderName, model);
+    const llmModel = getModel(provider as ProviderName, model, apiKey, hostUrl);
 
     const systemPrompt = buildSystemPrompt({
       style: style as ConclusionStyle,

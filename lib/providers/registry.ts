@@ -3,32 +3,37 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import type { ProviderName, ProviderInfo } from "./types";
 
-export function getModel(provider: ProviderName, modelId?: string) {
+export function getModel(
+  provider: ProviderName,
+  modelId?: string,
+  clientApiKey?: string,
+  clientHostUrl?: string
+) {
   switch (provider) {
     case "local": {
+      const baseHost =
+        clientHostUrl || process.env.RAD_LOCAL_HOST || "http://localhost:5100";
       const local = createOpenAI({
-        baseURL:
-          (process.env.RAD_LOCAL_HOST || "http://localhost:5100") +
-          "/v1",
+        baseURL: baseHost + "/v1",
         apiKey: "not-needed",
       });
       return local(modelId || process.env.RAD_LOCAL_MODEL || "gpt-oss-120b");
     }
     case "openai": {
       const openai = createOpenAI({
-        apiKey: process.env.OPENAI_API_KEY,
+        apiKey: clientApiKey || process.env.OPENAI_API_KEY,
       });
       return openai(modelId || "gpt-4o");
     }
     case "anthropic": {
       const anthropic = createAnthropic({
-        apiKey: process.env.ANTHROPIC_API_KEY,
+        apiKey: clientApiKey || process.env.ANTHROPIC_API_KEY,
       });
       return anthropic(modelId || "claude-sonnet-4-20250514");
     }
     case "google": {
       const google = createGoogleGenerativeAI({
-        apiKey: process.env.GOOGLE_AI_API_KEY,
+        apiKey: clientApiKey || process.env.GOOGLE_AI_API_KEY,
       });
       return google(modelId || "gemini-2.5-flash");
     }

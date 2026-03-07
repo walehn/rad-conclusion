@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useChat } from "@ai-sdk/react";
-import { Stethoscope, Send } from "lucide-react";
+import { Stethoscope, Send, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FindingsInput } from "@/components/findings-input";
@@ -11,8 +12,9 @@ import { ModelSelector } from "@/components/model-selector";
 import { ConclusionOutput } from "@/components/conclusion-output";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { postProcess } from "@/lib/post-process";
+import { loadProviderSettings } from "@/lib/storage/settings-store";
 import type { ConclusionStyle, ConclusionLang } from "@/lib/prompts/system-prompt";
-import type { ProviderInfo, ProviderName } from "@/lib/providers/types";
+import type { ProviderInfo, ProviderName, ProviderSettings } from "@/lib/providers/types";
 
 export default function Home() {
   const [findings, setFindings] = React.useState("");
@@ -22,28 +24,56 @@ export default function Home() {
   const [provider, setProvider] = React.useState<ProviderName>("local");
   const [model, setModel] = React.useState("gpt-oss-120b");
   const [providers, setProviders] = React.useState<ProviderInfo[]>([]);
+  const [clientSettings, setClientSettings] = React.useState<ProviderSettings[]>([]);
   const [inputError, setInputError] = React.useState("");
   const [elapsedTime, setElapsedTime] = React.useState<number | null>(null);
   const [apiError, setApiError] = React.useState("");
   const startTimeRef = React.useRef<number | null>(null);
 
-  // Fetch available providers on mount
-  React.useEffect(() => {
-    fetch("/api/providers")
-      .then((res) => res.json())
-      .then((data: ProviderInfo[]) => {
-        setProviders(data);
-        // Select first available provider
-        const firstAvailable = data.find((p) => p.available);
+  // Fetch available providers on mount and merge with client settings
+  const refreshProviders = React.useCallback(async () => {
+    try {
+      const [serverRes, localSettings] = await Promise.all([
+        fetch("/api/providers").then((r) => r.json() as Promise<ProviderInfo[]>),
+        loadProviderSettings(),
+      ]);
+
+      setClientSettings(localSettings);
+
+      // Merge: a provider is available if server has env var OR client has configured it
+      const merged = serverRes.map((sp) => {
+        const cs = localSettings.find((c) => c.id === sp.name);
+        const clientAvailable = cs?.enabled && (cs.id === "local" ? !!cs.hostUrl : !!cs.apiKey);
+        return {
+          ...sp,
+          available: sp.available || !!clientAvailable,
+        };
+      });
+
+      setProviders(merged);
+
+      // Select first available provider if current one is not available
+      const currentAvailable = merged.find((p) => p.name === provider && p.available);
+      if (!currentAvailable) {
+        const firstAvailable = merged.find((p) => p.available);
         if (firstAvailable) {
           setProvider(firstAvailable.name);
           setModel(firstAvailable.defaultModel);
         }
-      })
-      .catch(() => {
-        // Use defaults if fetch fails
-      });
-  }, []);
+      }
+    } catch {
+      // Use defaults if fetch fails
+    }
+  }, [provider]);
+
+  React.useEffect(() => {
+    refreshProviders();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Resolve client-side API key/hostUrl for the current provider
+  const currentClientSettings = clientSettings.find(
+    (s) => s.id === provider && s.enabled
+  );
 
   const { messages, isLoading, append, setMessages } = useChat({
     api: "/api/generate",
@@ -53,6 +83,8 @@ export default function Home() {
       title,
       provider,
       model,
+      apiKey: currentClientSettings?.apiKey,
+      hostUrl: currentClientSettings?.hostUrl,
     },
     onFinish: () => {
       if (startTimeRef.current) {
@@ -105,7 +137,14 @@ export default function Home() {
             </p>
           </div>
         </div>
-        <ThemeToggle />
+        <div className="flex items-center gap-2">
+          <Link href="/settings">
+            <Button variant="ghost" size="icon" aria-label="Settings">
+              <Settings className="h-5 w-5" />
+            </Button>
+          </Link>
+          <ThemeToggle />
+        </div>
       </header>
 
       {/* Main Content */}
