@@ -27,8 +27,15 @@ export default function Home() {
   const [clientSettings, setClientSettings] = React.useState<ProviderSettings[]>([]);
   const [inputError, setInputError] = React.useState("");
   const [elapsedTime, setElapsedTime] = React.useState<number | null>(null);
+  const [compareMode, setCompareMode] = React.useState(true);
   const [apiError, setApiError] = React.useState("");
+  const [apiErrorV1, setApiErrorV1] = React.useState("");
+  const [apiErrorV2, setApiErrorV2] = React.useState("");
+  const [elapsedTimeV1, setElapsedTimeV1] = React.useState<number | null>(null);
+  const [elapsedTimeV2, setElapsedTimeV2] = React.useState<number | null>(null);
   const startTimeRef = React.useRef<number | null>(null);
+  const startTimeV1Ref = React.useRef<number | null>(null);
+  const startTimeV2Ref = React.useRef<number | null>(null);
 
   // Fetch available providers on mount and merge with client settings
   const refreshProviders = React.useCallback(async () => {
@@ -84,6 +91,7 @@ export default function Home() {
       model,
       apiKey: currentClientSettings?.apiKey,
       hostUrl: currentClientSettings?.hostUrl,
+      promptVersion: "v1",
     },
     onFinish: () => {
       if (startTimeRef.current) {
@@ -98,6 +106,57 @@ export default function Home() {
     },
   });
 
+  // A/B Compare mode hooks (always declared to satisfy React rules of hooks)
+  const chatV1 = useChat({
+    id: "chat-v1",
+    api: "/api/generate",
+    body: {
+      style,
+      lang,
+      provider,
+      model,
+      apiKey: currentClientSettings?.apiKey,
+      hostUrl: currentClientSettings?.hostUrl,
+      promptVersion: "v1",
+    },
+    onFinish: () => {
+      if (startTimeV1Ref.current) {
+        setElapsedTimeV1((performance.now() - startTimeV1Ref.current) / 1000);
+      }
+    },
+    onError: (err) => {
+      setApiErrorV1(err.message || "An error occurred while generating.");
+      if (startTimeV1Ref.current) {
+        setElapsedTimeV1((performance.now() - startTimeV1Ref.current) / 1000);
+      }
+    },
+  });
+
+  const chatV2 = useChat({
+    id: "chat-v2",
+    api: "/api/generate",
+    body: {
+      style,
+      lang,
+      provider,
+      model,
+      apiKey: currentClientSettings?.apiKey,
+      hostUrl: currentClientSettings?.hostUrl,
+      promptVersion: "v2",
+    },
+    onFinish: () => {
+      if (startTimeV2Ref.current) {
+        setElapsedTimeV2((performance.now() - startTimeV2Ref.current) / 1000);
+      }
+    },
+    onError: (err) => {
+      setApiErrorV2(err.message || "An error occurred while generating.");
+      if (startTimeV2Ref.current) {
+        setElapsedTimeV2((performance.now() - startTimeV2Ref.current) / 1000);
+      }
+    },
+  });
+
   const handleGenerate = () => {
     const trimmed = findings.trim();
     if (!trimmed) {
@@ -106,20 +165,48 @@ export default function Home() {
     }
     setInputError("");
     setApiError("");
-    setElapsedTime(null);
-    setMessages([]);
-    startTimeRef.current = performance.now();
 
-    append({
-      role: "user",
-      content: trimmed,
-    });
+    if (compareMode) {
+      // A/B Compare mode: fire both V1 and V2 simultaneously
+      setApiErrorV1("");
+      setApiErrorV2("");
+      setElapsedTimeV1(null);
+      setElapsedTimeV2(null);
+      chatV1.setMessages([]);
+      chatV2.setMessages([]);
+      const now = performance.now();
+      startTimeV1Ref.current = now;
+      startTimeV2Ref.current = now;
+
+      chatV1.append({ role: "user", content: trimmed });
+      chatV2.append({ role: "user", content: trimmed });
+    } else {
+      // Normal mode: single generation
+      setElapsedTime(null);
+      setMessages([]);
+      startTimeRef.current = performance.now();
+
+      append({ role: "user", content: trimmed });
+    }
   };
 
   // Extract the assistant's latest message content and post-process it
   const rawContent =
     messages.filter((m) => m.role === "assistant").pop()?.content || "";
   const processedContent = rawContent ? postProcess(rawContent, "Conclusion") : "";
+
+  // A/B Compare mode: extract content from V1 and V2
+  const rawV1 =
+    chatV1.messages.filter((m) => m.role === "assistant").pop()?.content || "";
+  const processedV1 = rawV1 ? postProcess(rawV1, "Conclusion") : "";
+
+  const rawV2 =
+    chatV2.messages.filter((m) => m.role === "assistant").pop()?.content || "";
+  const processedV2 = rawV2 ? postProcess(rawV2, "Conclusion") : "";
+
+  const isAnyLoading = compareMode
+    ? chatV1.isLoading || chatV2.isLoading
+    : isLoading;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/30">
@@ -175,8 +262,10 @@ export default function Home() {
                 <OptionsPanel
                   style={style}
                   lang={lang}
+                  compareMode={compareMode}
                   onStyleChange={setStyle}
                   onLangChange={setLang}
+                  onCompareModeChange={setCompareMode}
                 />
               </CardContent>
             </Card>
@@ -196,11 +285,11 @@ export default function Home() {
                 />
                 <Button
                   onClick={handleGenerate}
-                  disabled={isLoading}
+                  disabled={isAnyLoading}
                   className="w-full bg-gradient-to-r from-primary to-primary/90 shadow-md shadow-primary/20 transition-all hover:shadow-lg hover:shadow-primary/30 disabled:from-muted disabled:to-muted disabled:shadow-none"
                   size="lg"
                 >
-                  {isLoading ? (
+                  {isAnyLoading ? (
                     "Generating..."
                   ) : (
                     <>
@@ -214,19 +303,54 @@ export default function Home() {
           </div>
 
           {/* Right Column - Output */}
-          <Card className="flex flex-col shadow-sm ring-1 ring-border/50">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-lg font-semibold text-foreground">Result</CardTitle>
-            </CardHeader>
-            <CardContent className="flex-1">
-              <ConclusionOutput
-                content={processedContent}
-                isLoading={isLoading}
-                elapsedTime={elapsedTime}
-                error={apiError}
-              />
-            </CardContent>
-          </Card>
+          {compareMode ? (
+            <div className="flex flex-col gap-4">
+              <Card className="flex flex-col shadow-sm ring-1 ring-border/50">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg font-semibold text-foreground">
+                    V1 — Basic
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="flex-1">
+                  <ConclusionOutput
+                    content={processedV1}
+                    isLoading={chatV1.isLoading}
+                    elapsedTime={elapsedTimeV1}
+                    error={apiErrorV1}
+                  />
+                </CardContent>
+              </Card>
+              <Card className="flex flex-col shadow-sm ring-1 ring-border/50">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg font-semibold text-foreground">
+                    V2 — Advanced (Dx/DDx)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="flex-1">
+                  <ConclusionOutput
+                    content={processedV2}
+                    isLoading={chatV2.isLoading}
+                    elapsedTime={elapsedTimeV2}
+                    error={apiErrorV2}
+                  />
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
+            <Card className="flex flex-col shadow-sm ring-1 ring-border/50">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg font-semibold text-foreground">Result</CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1">
+                <ConclusionOutput
+                  content={processedContent}
+                  isLoading={isLoading}
+                  elapsedTime={elapsedTime}
+                  error={apiError}
+                />
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Footer */}
@@ -236,7 +360,7 @@ export default function Home() {
               Rad Conclusion v0.1.0 &mdash; Clinical radiology report assistant. For professional use only.
             </p>
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              <span>Updated 2026-03-08</span>
+              <span>Updated 2026-03-17</span>
               <a
                 href="https://github.com/walehn/rad-conclusion"
                 target="_blank"

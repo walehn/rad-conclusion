@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getModel } from "@/lib/providers/registry";
 import { buildSystemPrompt, buildUserPrompt } from "@/lib/prompts/system-prompt";
 import type { ProviderName } from "@/lib/providers/types";
-import type { ConclusionStyle, ConclusionLang } from "@/lib/prompts/system-prompt";
+import type { ConclusionStyle, ConclusionLang, PromptVersion } from "@/lib/prompts/system-prompt";
 
 const requestSchema = z.object({
   findings: z.string().min(1, "Findings text is required"),
@@ -16,6 +16,7 @@ const requestSchema = z.object({
   model: z.string().optional(),
   apiKey: z.string().optional(),
   hostUrl: z.string().optional(),
+  promptVersion: z.enum(["v1", "v2"]).default("v1"),
 });
 
 export async function POST(req: Request) {
@@ -41,7 +42,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const { findings, style, lang, title, provider, model, apiKey, hostUrl } =
+    const { findings, style, lang, title, provider, model, apiKey, hostUrl, promptVersion } =
       parsed.data;
 
     const llmModel = getModel(provider as ProviderName, model, apiKey, hostUrl);
@@ -50,6 +51,7 @@ export async function POST(req: Request) {
       style: style as ConclusionStyle,
       lang: lang as ConclusionLang,
       title,
+      version: promptVersion as PromptVersion,
     });
 
     const userPrompt = buildUserPrompt({ findings, title });
