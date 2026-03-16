@@ -190,3 +190,4 @@ Dockerfile
 docker-compose.yml
 .dockerignore
 CLAUDE.md
+.mcp.json
