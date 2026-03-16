@@ -33,6 +33,7 @@ export default function Home() {
   const [apiErrorV2, setApiErrorV2] = React.useState("");
   const [elapsedTimeV1, setElapsedTimeV1] = React.useState<number | null>(null);
   const [elapsedTimeV2, setElapsedTimeV2] = React.useState<number | null>(null);
+  const [voted, setVoted] = React.useState<string | null>(null);
   const startTimeRef = React.useRef<number | null>(null);
   const startTimeV1Ref = React.useRef<number | null>(null);
   const startTimeV2Ref = React.useRef<number | null>(null);
@@ -157,6 +158,25 @@ export default function Home() {
     },
   });
 
+  const handleVote = async (vote: "v1" | "v2" | "tie") => {
+    setVoted(vote);
+    try {
+      await fetch("/api/vote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          vote,
+          style,
+          lang,
+          model,
+          findingsLength: findings.length,
+        }),
+      });
+    } catch {
+      // Silent fail - voting is non-critical
+    }
+  };
+
   const handleGenerate = () => {
     const trimmed = findings.trim();
     if (!trimmed) {
@@ -168,6 +188,7 @@ export default function Home() {
 
     if (compareMode) {
       // A/B Compare mode: fire both V1 and V2 simultaneously
+      setVoted(null);
       setApiErrorV1("");
       setApiErrorV2("");
       setElapsedTimeV1(null);
@@ -335,6 +356,28 @@ export default function Home() {
                   />
                 </CardContent>
               </Card>
+              {!chatV1.isLoading && !chatV2.isLoading && processedV1 && processedV2 && (
+                <div className="flex items-center justify-center gap-3 pt-2">
+                  {voted ? (
+                    <span className="text-sm text-muted-foreground">
+                      Voted: {voted === "v1" ? "V1 Basic" : voted === "v2" ? "V2 Advanced" : "Tie"}
+                    </span>
+                  ) : (
+                    <>
+                      <span className="text-sm text-muted-foreground mr-2">Which is better?</span>
+                      <Button variant="outline" size="sm" onClick={() => handleVote("v1")}>
+                        V1
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => handleVote("v2")}>
+                        V2
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => handleVote("tie")}>
+                        Tie
+                      </Button>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             <Card className="flex flex-col shadow-sm ring-1 ring-border/50">
@@ -357,7 +400,7 @@ export default function Home() {
         <footer className="mt-12 border-t border-border/50 pt-6">
           <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-between">
             <p className="text-xs text-muted-foreground">
-              Rad Conclusion v0.1.0 &mdash; Clinical radiology report assistant. For professional use only.
+              Rad Conclusion v0.2.0 &mdash; Clinical radiology report assistant. For professional use only.
             </p>
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <span>Updated 2026-03-17</span>

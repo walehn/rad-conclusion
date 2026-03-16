@@ -56,12 +56,17 @@ export async function POST(req: Request) {
 
     const userPrompt = buildUserPrompt({ findings, title });
 
+    const reasoningEffort = promptVersion === "v2" ? "medium" : "low";
+
     const result = streamText({
       model: llmModel,
       system: systemPrompt,
       prompt: userPrompt,
       temperature: 0.3,
       topP: 0.9,
+      providerOptions: {
+        openai: { reasoningEffort },
+      },
     });
 
     return result.toDataStreamResponse();
