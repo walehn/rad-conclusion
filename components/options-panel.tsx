@@ -39,7 +39,7 @@ export function OptionsPanel({
         <div className="min-w-[140px] flex-1">
           <Select
             id="lang"
-            label="Language"
+            label="Output Language"
             value={lang}
             onChange={(e) => onLangChange(e.target.value as ConclusionLang)}
           >

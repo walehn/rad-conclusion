@@ -400,7 +400,7 @@ export default function Home() {
         <footer className="mt-12 border-t border-border/50 pt-6">
           <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-between">
             <p className="text-xs text-muted-foreground">
-              Rad Conclusion v0.2.0 &mdash; Clinical radiology report assistant. For professional use only.
+              Rad Conclusion v0.2.0 &mdash; Clinical radiology report assistant. Powered by vLLM. For professional use only.
             </p>
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <span>Updated 2026-03-17</span>
