@@ -192,4 +192,5 @@ docker-compose.yml
 CLAUDE.md
 .mcp.json
 data/
+scripts/
 lib/prompts/system-prompt.ts.bak

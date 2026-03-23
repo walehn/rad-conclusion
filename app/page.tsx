@@ -94,9 +94,24 @@ export default function Home() {
       hostUrl: currentClientSettings?.hostUrl,
       promptVersion: "v1",
     },
-    onFinish: () => {
+    onFinish: (message) => {
       if (startTimeRef.current) {
         setElapsedTime((performance.now() - startTimeRef.current) / 1000);
+      }
+      // Fire-and-forget evaluation
+      if (message.content) {
+        fetch("/api/evaluate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            findings: findings.trim(),
+            conclusion: message.content,
+            promptVersion: "v1",
+            style,
+            lang,
+            model,
+          }),
+        }).catch(() => {}); // Silent fail
       }
     },
     onError: (err) => {
@@ -120,9 +135,24 @@ export default function Home() {
       hostUrl: currentClientSettings?.hostUrl,
       promptVersion: "v1",
     },
-    onFinish: () => {
+    onFinish: (message) => {
       if (startTimeV1Ref.current) {
         setElapsedTimeV1((performance.now() - startTimeV1Ref.current) / 1000);
+      }
+      // Fire-and-forget evaluation
+      if (message.content) {
+        fetch("/api/evaluate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            findings: findings.trim(),
+            conclusion: message.content,
+            promptVersion: "v1",
+            style,
+            lang,
+            model,
+          }),
+        }).catch(() => {}); // Silent fail
       }
     },
     onError: (err) => {
@@ -145,9 +175,24 @@ export default function Home() {
       hostUrl: currentClientSettings?.hostUrl,
       promptVersion: "v2",
     },
-    onFinish: () => {
+    onFinish: (message) => {
       if (startTimeV2Ref.current) {
         setElapsedTimeV2((performance.now() - startTimeV2Ref.current) / 1000);
+      }
+      // Fire-and-forget evaluation
+      if (message.content) {
+        fetch("/api/evaluate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            findings: findings.trim(),
+            conclusion: message.content,
+            promptVersion: "v2",
+            style,
+            lang,
+            model,
+          }),
+        }).catch(() => {}); // Silent fail
       }
     },
     onError: (err) => {
