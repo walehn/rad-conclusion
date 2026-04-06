@@ -24,11 +24,13 @@ Enter radiological **Findings** text and generate clinically natural **Conclusio
 ## Key Features
 
 - **Real-time streaming** — Token-by-token streaming output from LLM
+- **A/B Compare mode** — Side-by-side V1 (Basic) vs V2 (Advanced Dx/DDx) prompt comparison with voting
+- **LLM-as-Judge evaluation** — Automated quality scoring of generated conclusions
 - **4 LLM providers** — Local LLM, OpenAI, Anthropic, Google AI
 - **Dark / Light mode** — Medical-professional teal color theme
-- **Encrypted API key storage** — AES-GCM encryption, browser-local only (never sent to server)
 - **Output styles** — Numbered, Short, Urgent-First
 - **Multilingual output** — English, Korean, Mixed mode
+- **Docker deployment** — Production-ready with host network mode for local LLM access
 - **Settings page** — Per-provider API key management and connection testing
 
 ## Supported LLM Providers
@@ -38,7 +40,7 @@ Enter radiological **Findings** text and generate clinically natural **Conclusio
 | **Local LLM** | gpt-oss-120b | OpenAI-compatible API, default host `localhost:5100` |
 | **OpenAI** | gpt-4o, gpt-4o-mini, gpt-4.1 | API key required |
 | **Anthropic** | Claude Sonnet 4, Claude Opus 4 | API key required |
-| **Google AI** | Gemini 2.5 Flash, Gemini 2.5 Pro | API key required |
+| **Google AI** | Gemini 3.1 Flash-Lite (Preview), Gemini 2.5 Flash/Pro, Gemini 3 Flash (Preview) | API key required |
 
 ## Getting Started
 
@@ -57,7 +59,14 @@ npm run dev
 # http://localhost:3957
 ```
 
-### Production
+### Production (Docker)
+
+```bash
+docker compose up -d --build
+# http://localhost:3957
+```
+
+### Production (Manual)
 
 ```bash
 npm run build
@@ -105,9 +114,11 @@ rad-conclusion/
 ├── app/
 │   ├── api/
 │   │   ├── generate/          # LLM streaming API endpoint
+│   │   ├── evaluate/          # LLM-as-Judge evaluation endpoint
+│   │   ├── vote/              # A/B vote collection endpoint
 │   │   └── providers/         # Provider list & validation API
 │   ├── settings/              # Provider settings page
-│   ├── page.tsx               # Main page
+│   ├── page.tsx               # Main page (with A/B compare mode)
 │   ├── layout.tsx             # Root layout
 │   └── globals.css            # Theme definitions
 ├── components/
@@ -120,9 +131,11 @@ rad-conclusion/
 │   └── theme-toggle.tsx       # Dark/light mode toggle
 ├── lib/
 │   ├── providers/             # LLM provider registry & config
-│   ├── prompts/               # System prompt builder
+│   ├── prompts/               # System prompt builder (V1 & V2)
 │   ├── storage/               # Encrypted API key store
 │   └── post-process.ts        # LLM output post-processing
+├── docker-compose.yml         # Docker deployment config
+├── Dockerfile                 # Multi-stage production build
 └── package.json
 ```
 
@@ -145,8 +158,8 @@ This project was built using [Claude Code](https://claude.ai/claude-code) and [M
 ## Notes
 
 - Local LLM requires an OpenAI-compatible server (`/v1/chat/completions`) running
-- API keys are AES-GCM encrypted and stored in the browser only
-- Closing the browser tab invalidates the encryption key; re-entry required
+- When deploying with Docker, use `network_mode: host` to access local LLM bound to `127.0.0.1`
+- API keys are managed via server environment variables (Docker) or the Settings page (browser)
 - Do not include patient identifiable information (PII) in input
 
 ## License

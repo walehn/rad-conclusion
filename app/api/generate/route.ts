@@ -14,8 +14,8 @@ const requestSchema = z.object({
     .enum(["local", "openai", "anthropic", "google"])
     .default("local"),
   model: z.string().optional(),
-  apiKey: z.string().optional(),
-  hostUrl: z.string().optional(),
+  // API keys are now managed via server environment variables only
+  // apiKey and hostUrl no longer accepted from client
   promptVersion: z.enum(["v1", "v2"]).default("v1"),
 });
 
@@ -42,10 +42,10 @@ export async function POST(req: Request) {
       );
     }
 
-    const { findings, style, lang, title, provider, model, apiKey, hostUrl, promptVersion } =
+    const { findings, style, lang, title, provider, model, promptVersion } =
       parsed.data;
 
-    const llmModel = getModel(provider as ProviderName, model, apiKey, hostUrl);
+    const llmModel = getModel(provider as ProviderName, model);
 
     const systemPrompt = buildSystemPrompt({
       style: style as ConclusionStyle,
@@ -67,9 +67,17 @@ export async function POST(req: Request) {
       providerOptions: {
         openai: { reasoningEffort },
       },
+      onError: ({ error }) => {
+        console.error("[generate] streamText error:", error);
+      },
     });
 
-    return result.toDataStreamResponse();
+    return result.toDataStreamResponse({
+      getErrorMessage: (error) => {
+        if (error instanceof Error) return error.message;
+        return "Unknown streaming error";
+      },
+    });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Internal server error";

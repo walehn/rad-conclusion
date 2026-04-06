@@ -75,6 +75,7 @@
     "padding": 0,
     "refreshInterval": 300
   },
+  "model": "opusplan",
   "outputStyle": "MoAI",
   "cleanupPeriodDays": 30,
   "env": {

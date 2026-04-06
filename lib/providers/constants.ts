@@ -44,11 +44,11 @@ export const PROVIDER_DEFAULTS: ProviderSettings[] = [
     enabled: false,
     validationStatus: "none",
     models: [
-      { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", isDefault: true },
+      { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", isDefault: false },
       { id: "gemini-2.5-flash-lite", name: "Gemini 2.5 Flash-Lite", isDefault: false },
       { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", isDefault: false },
-      { id: "gemini-3-flash", name: "Gemini 3 Flash (Preview)", isDefault: false },
-      { id: "gemini-3.1-flash-lite", name: "Gemini 3.1 Flash-Lite (Preview)", isDefault: false },
+      { id: "gemini-3-flash-preview", name: "Gemini 3 Flash (Preview)", isDefault: false },
+      { id: "gemini-3.1-flash-lite-preview", name: "Gemini 3.1 Flash-Lite (Preview)", isDefault: true },
     ],
   },
 ];

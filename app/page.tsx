@@ -90,8 +90,6 @@ export default function Home() {
       lang,
       provider,
       model,
-      apiKey: currentClientSettings?.apiKey,
-      hostUrl: currentClientSettings?.hostUrl,
       promptVersion: "v1",
     },
     onFinish: (message) => {
@@ -131,8 +129,6 @@ export default function Home() {
       lang,
       provider,
       model,
-      apiKey: currentClientSettings?.apiKey,
-      hostUrl: currentClientSettings?.hostUrl,
       promptVersion: "v1",
     },
     onFinish: (message) => {
@@ -171,8 +167,6 @@ export default function Home() {
       lang,
       provider,
       model,
-      apiKey: currentClientSettings?.apiKey,
-      hostUrl: currentClientSettings?.hostUrl,
       promptVersion: "v2",
     },
     onFinish: (message) => {

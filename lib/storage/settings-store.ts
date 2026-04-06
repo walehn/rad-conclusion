@@ -7,8 +7,8 @@ const CRYPTO_KEY_NAME = "rad-conclusion-crypto-key";
 // -- Encryption helpers (Web Crypto API, client-side only) --
 
 async function getEncryptionKey(): Promise<CryptoKey> {
-  // Try to retrieve from sessionStorage (persists for tab lifetime)
-  const stored = globalThis.sessionStorage?.getItem(CRYPTO_KEY_NAME);
+  // Try to retrieve from localStorage (persists for tab lifetime)
+  const stored = globalThis.localStorage?.getItem(CRYPTO_KEY_NAME);
   if (stored) {
     const raw = Uint8Array.from(atob(stored), (c) => c.charCodeAt(0));
     return crypto.subtle.importKey("raw", raw, "AES-GCM", true, [
@@ -24,10 +24,10 @@ async function getEncryptionKey(): Promise<CryptoKey> {
     ["encrypt", "decrypt"]
   );
 
-  // Export and store in sessionStorage
+  // Export and store in localStorage
   const exported = await crypto.subtle.exportKey("raw", key);
   const b64 = btoa(String.fromCharCode(...new Uint8Array(exported)));
-  globalThis.sessionStorage?.setItem(CRYPTO_KEY_NAME, b64);
+  globalThis.localStorage?.setItem(CRYPTO_KEY_NAME, b64);
 
   return key;
 }
