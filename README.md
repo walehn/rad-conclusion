@@ -39,8 +39,8 @@ Enter radiological **Findings** text and generate clinically natural **Conclusio
 |----------|--------|-------|
 | **Local LLM** | Qwen3.6 35B (A3B-FP8) | OpenAI-compatible API (e.g. vLLM), default host `localhost:8080` |
 | **OpenAI** | gpt-4o, gpt-4o-mini, gpt-4.1 | API key required |
-| **Anthropic** | Claude Sonnet 4, Claude Opus 4 | API key required |
-| **Google AI** | Gemini 3.1 Flash-Lite (Preview), Gemini 2.5 Flash/Pro, Gemini 3 Flash (Preview) | API key required |
+| **Anthropic** | Claude Sonnet 4, Claude Opus 4, Claude Haiku 4 | API key required |
+| **Google AI** | Gemini 2.5 Flash, Gemini 2.5 Flash-Lite, Gemini 2.5 Pro, Gemini 3 Flash (Preview), Gemini 3.1 Flash-Lite (Preview) | API key required |
 
 ## Getting Started
 
@@ -134,6 +134,7 @@ rad-conclusion/
 │   ├── prompts/               # System prompt builder (V1 & V2)
 │   ├── storage/               # Encrypted API key store
 │   └── post-process.ts        # LLM output post-processing
+├── middleware.ts               # IP allowlist access control
 ├── docker-compose.yml         # Docker deployment config
 ├── Dockerfile                 # Multi-stage production build
 └── package.json

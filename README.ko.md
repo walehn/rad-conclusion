@@ -24,12 +24,14 @@
 ## 주요 기능
 
 - **실시간 스트리밍 생성** — LLM 응답을 토큰 단위로 스트리밍 출력
+- **A/B 비교 모드** — V1(기본)과 V2(Dx/DDx 포함) 프롬프트를 나란히 비교하고 투표
+- **LLM-as-Judge 평가** — 생성된 결론의 품질을 자동 점수화
 - **4개 LLM 제공자 지원** — 로컬 LLM, OpenAI, Anthropic, Google AI
 - **다크/라이트 모드** — 의료 전문가용 틸(teal) 컬러 테마
-- **암호화 API 키 저장** — AES-GCM 암호화로 브라우저 로컬 저장 (서버 전송 없음)
 - **출력 스타일 선택** — Numbered, Short, Urgent-First
 - **다국어 출력** — 영어, 한국어, 혼용 모드
-- **Settings 페이지** — 제공자별 API 키 관리 및 연결 테스트
+- **IP 접속 제한** — 허용 IP 기반 미들웨어 접근 제어
+- **Settings 페이지** — 제공자별 연결 테스트
 
 ## 지원 LLM 제공자
 
@@ -37,8 +39,8 @@
 |--------|------|------|
 | **Local LLM** | Qwen3.6 35B (A3B-FP8) | OpenAI 호환 API (예: vLLM), 기본 호스트 `localhost:8080` |
 | **OpenAI** | gpt-4o, gpt-4o-mini, gpt-4.1 | API 키 필요 |
-| **Anthropic** | Claude Sonnet 4, Claude Opus 4 | API 키 필요 |
-| **Google AI** | Gemini 2.5 Flash, Gemini 2.5 Pro | API 키 필요 |
+| **Anthropic** | Claude Sonnet 4, Claude Opus 4, Claude Haiku 4 | API 키 필요 |
+| **Google AI** | Gemini 2.5 Flash, Gemini 2.5 Flash-Lite, Gemini 2.5 Pro, Gemini 3 Flash (Preview), Gemini 3.1 Flash-Lite (Preview) | API 키 필요 |
 
 ## 시작하기
 
@@ -105,6 +107,8 @@ rad-conclusion/
 ├── app/
 │   ├── api/
 │   │   ├── generate/          # LLM 스트리밍 API 엔드포인트
+│   │   ├── evaluate/          # LLM-as-Judge 평가 엔드포인트
+│   │   ├── vote/              # A/B 투표 수집 엔드포인트
 │   │   └── providers/         # 제공자 목록 및 유효성 검증 API
 │   ├── settings/              # 제공자 설정 페이지
 │   ├── page.tsx               # 메인 페이지
@@ -123,6 +127,7 @@ rad-conclusion/
 │   ├── prompts/               # 시스템 프롬프트 빌더
 │   ├── storage/               # 암호화 API 키 저장소
 │   └── post-process.ts        # LLM 출력 후처리
+├── middleware.ts               # IP 허용 목록 접근 제어
 └── package.json
 ```
 
@@ -145,8 +150,8 @@ rad-conclusion/
 ## 주의사항
 
 - 로컬 LLM 사용 시 OpenAI 호환 서버(`/v1/chat/completions`)가 실행 중이어야 합니다
-- API 키는 AES-GCM으로 암호화되어 브라우저 로컬에만 저장됩니다
-- 탭을 닫으면 암호화 키가 소멸되어 API 키 재입력이 필요합니다
+- Docker 배포 시 로컬 LLM 접근을 위해 `network_mode: host`를 사용합니다
+- API 키는 서버 환경변수(Docker) 또는 Settings 페이지(브라우저)로 관리합니다
 - 입력에 환자 식별 정보(PII)를 포함하지 마세요
 
 ## 라이선스
