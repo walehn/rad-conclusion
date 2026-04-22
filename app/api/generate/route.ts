@@ -4,6 +4,8 @@ import { getModel } from "@/lib/providers/registry";
 import { buildSystemPrompt, buildUserPrompt } from "@/lib/prompts/system-prompt";
 import type { ProviderName } from "@/lib/providers/types";
 import type { ConclusionStyle, ConclusionLang, PromptVersion } from "@/lib/prompts/system-prompt";
+import { requireApiSession } from "@/lib/auth/guard";
+import { validateCsrfOrFail } from "@/lib/auth/csrf";
 
 const requestSchema = z.object({
   findings: z.string().min(1, "Findings text is required"),
@@ -20,6 +22,12 @@ const requestSchema = z.object({
 });
 
 export async function POST(req: Request) {
+  const { response } = await requireApiSession();
+  if (response) return response;
+
+  const csrfFailure = await validateCsrfOrFail(req);
+  if (csrfFailure) return csrfFailure;
+
   try {
     const body = await req.json();
 

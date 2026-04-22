@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "node:fs";
 import path from "node:path";
 import { z } from "zod";
+import { requireApiSession } from "@/lib/auth/guard";
+import { validateCsrfOrFail } from "@/lib/auth/csrf";
 
 const VOTES_DIR = path.join(process.cwd(), "data");
 const VOTES_FILE = path.join(VOTES_DIR, "votes.jsonl");
@@ -43,6 +45,12 @@ function countVotes(): { v1: number; v2: number; tie: number } {
 }
 
 export async function POST(request: NextRequest) {
+  const { response } = await requireApiSession();
+  if (response) return response;
+
+  const csrfFailure = await validateCsrfOrFail(request);
+  if (csrfFailure) return csrfFailure;
+
   try {
     const body = await request.json();
     const parsed = VoteSchema.safeParse(body);
@@ -78,6 +86,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
+  const { response } = await requireApiSession();
+  if (response) return response;
+
   try {
     const total = countVotes();
     return NextResponse.json({ total });

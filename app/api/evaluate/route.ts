@@ -3,6 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { z } from "zod";
+import { requireApiSession } from "@/lib/auth/guard";
+import { validateCsrfOrFail } from "@/lib/auth/csrf";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const PENDING_FILE = path.join(DATA_DIR, "pending-evaluations.jsonl");
@@ -22,6 +24,12 @@ const EvaluateRequestSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const { response } = await requireApiSession();
+  if (response) return response;
+
+  const csrfFailure = await validateCsrfOrFail(request);
+  if (csrfFailure) return csrfFailure;
+
   try {
     const body = await request.json();
     const parsed = EvaluateRequestSchema.safeParse(body);
@@ -59,6 +67,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  const { response } = await requireApiSession();
+  if (response) return response;
+
   try {
     const { searchParams } = new URL(request.url);
     const limit = Math.min(

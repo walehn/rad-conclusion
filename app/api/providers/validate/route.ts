@@ -1,6 +1,8 @@
 import { z } from "zod";
 import type { ProviderName } from "@/lib/providers/types";
 import { LOCAL_PROVIDER_DEFAULTS } from "@/lib/providers/local-config";
+import { requireApiSession } from "@/lib/auth/guard";
+import { validateCsrfOrFail } from "@/lib/auth/csrf";
 
 const validateSchema = z.object({
   provider: z.enum(["local", "openai", "anthropic", "google"]),
@@ -90,6 +92,12 @@ const validators: Record<
 };
 
 export async function POST(req: Request) {
+  const { response } = await requireApiSession();
+  if (response) return response;
+
+  const csrfFailure = await validateCsrfOrFail(req);
+  if (csrfFailure) return csrfFailure;
+
   try {
     const body = await req.json();
     const parsed = validateSchema.safeParse(body);
