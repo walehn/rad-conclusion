@@ -15,6 +15,7 @@ import { postProcess } from "@/lib/post-process";
 import { loadProviderSettings } from "@/lib/storage/settings-store";
 import type { ConclusionStyle, ConclusionLang } from "@/lib/prompts/system-prompt";
 import type { ProviderInfo, ProviderName, ProviderSettings } from "@/lib/providers/types";
+import { LOCAL_PROVIDER_DEFAULTS } from "@/lib/providers/local-config";
 
 export default function Home() {
   const router = useRouter();
@@ -22,7 +23,7 @@ export default function Home() {
   const [style, setStyle] = React.useState<ConclusionStyle>("numbered");
   const [lang, setLang] = React.useState<ConclusionLang>("en");
   const [provider, setProvider] = React.useState<ProviderName>("local");
-  const [model, setModel] = React.useState("gpt-oss-120b");
+  const [model, setModel] = React.useState<string>(LOCAL_PROVIDER_DEFAULTS.modelId);
   const [providers, setProviders] = React.useState<ProviderInfo[]>([]);
   const [clientSettings, setClientSettings] = React.useState<ProviderSettings[]>([]);
   const [inputError, setInputError] = React.useState("");

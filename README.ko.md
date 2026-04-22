@@ -35,7 +35,7 @@
 
 | 제공자 | 모델 | 비고 |
 |--------|------|------|
-| **Local LLM** | gpt-oss-120b | OpenAI 호환 API, 기본 호스트 `localhost:5100` |
+| **Local LLM** | Qwen3.6 35B (A3B-FP8) | OpenAI 호환 API (예: vLLM), 기본 호스트 `localhost:8080` |
 | **OpenAI** | gpt-4o, gpt-4o-mini, gpt-4.1 | API 키 필요 |
 | **Anthropic** | Claude Sonnet 4, Claude Opus 4 | API 키 필요 |
 | **Google AI** | Gemini 2.5 Flash, Gemini 2.5 Pro | API 키 필요 |
@@ -73,8 +73,8 @@ npm run start
 
 ```bash
 # 로컬 LLM (OpenAI 호환 서버)
-RAD_LOCAL_HOST=http://localhost:5100
-RAD_LOCAL_MODEL=gpt-oss-120b
+RAD_LOCAL_HOST=http://localhost:8080
+RAD_LOCAL_MODEL=Qwen/Qwen3.6-35B-A3B-FP8
 
 # 상용 제공자 API 키 (선택)
 OPENAI_API_KEY=sk-...

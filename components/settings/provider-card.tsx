@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { ApiKeyInput } from "./api-key-input";
 import { ModelList } from "./model-list";
 import type { ProviderSettings, ValidationStatus } from "@/lib/providers/types";
+import { LOCAL_PROVIDER_DEFAULTS } from "@/lib/providers/local-config";
 
 interface ProviderCardProps {
   settings: ProviderSettings;
@@ -89,7 +90,7 @@ export function ProviderCard({
             label="Host URL"
             value={settings.hostUrl || ""}
             onChange={handleHostUrlChange}
-            placeholder="http://localhost:5100"
+            placeholder={LOCAL_PROVIDER_DEFAULTS.host}
             disabled={!settings.enabled}
           />
         ) : (

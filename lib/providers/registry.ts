@@ -2,6 +2,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import type { ProviderName, ProviderInfo } from "./types";
+import { LOCAL_PROVIDER_DEFAULTS } from "./local-config";
 
 export function getModel(
   provider: ProviderName,
@@ -9,12 +10,12 @@ export function getModel(
 ) {
   switch (provider) {
     case "local": {
-      const baseHost = process.env.RAD_LOCAL_HOST || "http://localhost:5100";
+      const baseHost = process.env.RAD_LOCAL_HOST || LOCAL_PROVIDER_DEFAULTS.host;
       const local = createOpenAI({
         baseURL: baseHost + "/v1",
         apiKey: "not-needed",
       });
-      return local(modelId || process.env.RAD_LOCAL_MODEL || "gpt-oss-120b");
+      return local(modelId || process.env.RAD_LOCAL_MODEL || LOCAL_PROVIDER_DEFAULTS.modelId);
     }
     case "openai": {
       const openai = createOpenAI({
@@ -44,8 +45,8 @@ export function getAvailableProviders(): ProviderInfo[] {
     {
       name: "local",
       label: "Local LLM",
-      defaultModel: process.env.RAD_LOCAL_MODEL || "gpt-oss-120b",
-      models: [process.env.RAD_LOCAL_MODEL || "gpt-oss-120b"],
+      defaultModel: process.env.RAD_LOCAL_MODEL || LOCAL_PROVIDER_DEFAULTS.modelId,
+      models: [process.env.RAD_LOCAL_MODEL || LOCAL_PROVIDER_DEFAULTS.modelId],
       available: true,
     },
     {

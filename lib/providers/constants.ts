@@ -1,13 +1,20 @@
 import type { ProviderSettings } from "./types";
+import { LOCAL_PROVIDER_DEFAULTS } from "./local-config";
 
 export const PROVIDER_DEFAULTS: ProviderSettings[] = [
   {
     id: "local",
     name: "Local LLM",
     enabled: false,
-    hostUrl: "http://localhost:5100",
+    hostUrl: LOCAL_PROVIDER_DEFAULTS.host,
     validationStatus: "none",
-    models: [{ id: "gpt-oss-120b", name: "GPT-OSS 120B", isDefault: true }],
+    models: [
+      {
+        id: LOCAL_PROVIDER_DEFAULTS.modelId,
+        name: LOCAL_PROVIDER_DEFAULTS.label,
+        isDefault: true,
+      },
+    ],
   },
   {
     id: "openai",

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { ProviderName } from "@/lib/providers/types";
+import { LOCAL_PROVIDER_DEFAULTS } from "@/lib/providers/local-config";
 
 const validateSchema = z.object({
   provider: z.enum(["local", "openai", "anthropic", "google"]),
@@ -82,7 +83,7 @@ const validators: Record<
   ProviderName,
   (apiKey: string, hostUrl?: string) => Promise<{ valid: boolean; error?: string }>
 > = {
-  local: (_apiKey, hostUrl) => validateLocal(hostUrl || "http://localhost:5100"),
+  local: (_apiKey, hostUrl) => validateLocal(hostUrl || LOCAL_PROVIDER_DEFAULTS.host),
   openai: (apiKey) => validateOpenAI(apiKey),
   anthropic: (apiKey) => validateAnthropic(apiKey),
   google: (apiKey) => validateGoogle(apiKey),
