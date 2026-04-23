@@ -17,6 +17,13 @@ import type { ConclusionStyle, ConclusionLang } from "@/lib/prompts/system-promp
 import type { ProviderInfo, ProviderName, ProviderSettings } from "@/lib/providers/types";
 import { LOCAL_PROVIDER_DEFAULTS } from "@/lib/providers/local-config";
 
+function getCsrfToken(): string {
+  return document.cookie
+    .split("; ")
+    .find((c) => c.startsWith("csrf_token="))
+    ?.split("=")[1] ?? "";
+}
+
 export default function HomeClient() {
   const router = useRouter();
   const [findings, setFindings] = React.useState("");
@@ -86,6 +93,7 @@ export default function HomeClient() {
 
   const { messages, isLoading, append, setMessages } = useChat({
     api: "/api/generate",
+    headers: { "x-csrf-token": getCsrfToken() },
     body: {
       style,
       lang,
@@ -101,7 +109,7 @@ export default function HomeClient() {
       if (message.content) {
         fetch("/api/evaluate", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "x-csrf-token": getCsrfToken() },
           body: JSON.stringify({
             findings: findings.trim(),
             conclusion: message.content,
@@ -125,6 +133,7 @@ export default function HomeClient() {
   const chatV1 = useChat({
     id: "chat-v1",
     api: "/api/generate",
+    headers: { "x-csrf-token": getCsrfToken() },
     body: {
       style,
       lang,
@@ -140,7 +149,7 @@ export default function HomeClient() {
       if (message.content) {
         fetch("/api/evaluate", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "x-csrf-token": getCsrfToken() },
           body: JSON.stringify({
             findings: findings.trim(),
             conclusion: message.content,
@@ -163,6 +172,7 @@ export default function HomeClient() {
   const chatV2 = useChat({
     id: "chat-v2",
     api: "/api/generate",
+    headers: { "x-csrf-token": getCsrfToken() },
     body: {
       style,
       lang,
@@ -178,7 +188,7 @@ export default function HomeClient() {
       if (message.content) {
         fetch("/api/evaluate", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "x-csrf-token": getCsrfToken() },
           body: JSON.stringify({
             findings: findings.trim(),
             conclusion: message.content,
@@ -203,7 +213,7 @@ export default function HomeClient() {
     try {
       await fetch("/api/vote", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-csrf-token": getCsrfToken() },
         body: JSON.stringify({
           vote,
           style,
