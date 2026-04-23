@@ -66,8 +66,9 @@ function buildV2Prompt(title: string, langInstr: string, styleInstr: string): st
 1. Distill — extract only the clinical essentials from Findings: lesion count, location, size, and interval change. Strip away imaging descriptors.
    INCLUDE: "2.3 cm right hepatic lobe mass, increased from 1.5 cm"
    INCLUDE: "Left pleural effusion, decreased"
-   INCLUDE: "2.9 cm pancreatic cystic lesion, little change" (if Findings say "little change", "stable", "unchanged", "new", "resolved", "increased", or "decreased", always carry it into the Conclusion)
+   INCLUDE: "2.9 cm pancreatic cystic lesion, little change" (only if Findings explicitly state "little change", "stable", "unchanged", "new", "resolved", "increased", or "decreased")
    EXCLUDE: "2.3 cm T2 hyperintense, arterial-enhancing, washout-showing right hepatic lobe mass with restricted diffusion"
+   NEVER add stability or interval-change words ("stable", "unchanged", "no change", etc.) unless the Findings explicitly state them. Do NOT infer or assume interval change status.
    The Findings section already contains the imaging details — the Conclusion restates WHAT, WHERE, and HOW IT CHANGED, not HOW it looks on imaging.
 2. Prioritize — lead with the most clinically significant finding. Minor/incidental findings come last.
 3. Recommendations — reserve for findings that change patient management.
@@ -90,9 +91,24 @@ function buildV2Prompt(title: string, langInstr: string, styleInstr: string): st
 8. Phrase style — write in concise, telegram-style phrases. Drop unnecessary articles, conjunctions, and filler words. Avoid semantic redundancy within a single item — pick ONE stability term:
    REDUNDANT: "stable, no interval change" / "stable, no significant change" / "stable, unchanged"
    CORRECT: "stable" or "unchanged" (one word is enough)
-   Full reasoning example: "1. 2.3 cm right hepatic lobe mass, most consistent with HCC; DDx: cholangiocarcinoma, metastasis — contrast-enhanced MRI recommended"
-   Descriptive-only example: "2. Small bilateral pleural effusions, unchanged"
-   Simple example: "3. Degenerative changes, thoracolumbar spine"
+   Comma limit — use at most ONE comma per item, reserved for [finding], [change]. Never chain multiple comma-separated clauses:
+   WRONG: "6 cm hepatic mass, significantly increased, with bile duct dilatation"
+   CORRECT: "6 cm hepatic mass with bile duct dilatation, significantly increased"
+   Leading status adjective — for simple interval change items, place the status word at the front instead of using a trailing comma:
+   PREFERRED: "Stable small bilateral pleural effusions."
+   ACCEPTABLE: "Small bilateral pleural effusions, unchanged."
+   Use "Stable", "New", "Resolved", "Progressive", "Worsening", "Improving" as leading words.
+   Avoid "Increased"/"Decreased" as leading adjectives — use "Enlarging"/"Shrinking" or keep trailing.
+   Punctuation roles — each punctuation mark has one job:
+   ,  → [finding], [change] only (max 1 per item)
+   ;  → separates Dx from DDx, or major clauses within an item
+   —  → recommendation only
+   Examples by complexity:
+   Change only:       "Stable small bilateral pleural effusions."
+   Finding + change:  "2.3 cm hepatic cyst, unchanged."
+   + Dx:              "6 cm hepatic mass, enlarged; most consistent with HCC."
+   + Dx + Rec:        "6 cm hepatic mass, enlarged; most consistent with HCC — MRI recommended."
+   + DDx + Rec:       "6 cm hepatic mass, enlarged; most consistent with HCC; DDx: cholangiocarcinoma — MRI recommended."
 9. No filler openers — do not start with "In summary", "Overall", "Based on the above findings".
 10. Consistent terminology — use the same term throughout (e.g., do not switch between "mass" and "lesion").
 11. Confidence language — match hedging to diagnostic certainty:
