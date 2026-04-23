@@ -27,6 +27,7 @@ Enter radiological **Findings** text and generate clinically natural **Conclusio
 - **A/B Compare mode** — Side-by-side V1 (Basic) vs V2 (Advanced Dx/DDx) prompt comparison with voting
 - **LLM-as-Judge evaluation** — Automated quality scoring of generated conclusions
 - **4 LLM providers** — Local LLM, OpenAI, Anthropic, Google AI
+- **Session-based authentication** — Email/password login with server-side session management and CSRF protection
 - **Dark / Light mode** — Medical-professional teal color theme
 - **Output styles** — Numbered, Short, Urgent-First
 - **Multilingual output** — English, Korean, Mixed mode
@@ -116,7 +117,9 @@ rad-conclusion/
 │   │   ├── generate/          # LLM streaming API endpoint
 │   │   ├── evaluate/          # LLM-as-Judge evaluation endpoint
 │   │   ├── vote/              # A/B vote collection endpoint
+│   │   ├── auth/              # Login / logout API routes
 │   │   └── providers/         # Provider list & validation API
+│   ├── login/                 # Login page
 │   ├── settings/              # Provider settings page
 │   ├── page.tsx               # Main page (with A/B compare mode)
 │   ├── layout.tsx             # Root layout
@@ -130,6 +133,7 @@ rad-conclusion/
 │   ├── options-panel.tsx      # Style/language options
 │   └── theme-toggle.tsx       # Dark/light mode toggle
 ├── lib/
+│   ├── auth/                  # Session management, CSRF, and auth guard
 │   ├── providers/             # LLM provider registry & config
 │   ├── prompts/               # System prompt builder (V1 & V2)
 │   ├── storage/               # Encrypted API key store
@@ -161,6 +165,7 @@ This project was built using [Claude Code](https://claude.ai/claude-code) and [M
 - Local LLM requires an OpenAI-compatible server (`/v1/chat/completions`) running
 - When deploying with Docker, use `network_mode: host` to access local LLM bound to `127.0.0.1`
 - API keys are managed via server environment variables (Docker) or the Settings page (browser)
+- Authentication uses server-side sessions with a CSRF double-submit cookie pattern; set `AUTH_EMAIL` and `AUTH_PASSWORD_HASH` in `.env.local`
 - Do not include patient identifiable information (PII) in input
 
 ## License

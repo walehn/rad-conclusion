@@ -27,6 +27,7 @@
 - **A/B 비교 모드** — V1(기본)과 V2(Dx/DDx 포함) 프롬프트를 나란히 비교하고 투표
 - **LLM-as-Judge 평가** — 생성된 결론의 품질을 자동 점수화
 - **4개 LLM 제공자 지원** — 로컬 LLM, OpenAI, Anthropic, Google AI
+- **세션 기반 인증** — 이메일/비밀번호 로그인, 서버 사이드 세션 관리 및 CSRF 보호
 - **다크/라이트 모드** — 의료 전문가용 틸(teal) 컬러 테마
 - **출력 스타일 선택** — Numbered, Short, Urgent-First
 - **다국어 출력** — 영어, 한국어, 혼용 모드
@@ -109,7 +110,9 @@ rad-conclusion/
 │   │   ├── generate/          # LLM 스트리밍 API 엔드포인트
 │   │   ├── evaluate/          # LLM-as-Judge 평가 엔드포인트
 │   │   ├── vote/              # A/B 투표 수집 엔드포인트
+│   │   ├── auth/              # 로그인/로그아웃 API 라우트
 │   │   └── providers/         # 제공자 목록 및 유효성 검증 API
+│   ├── login/                 # 로그인 페이지
 │   ├── settings/              # 제공자 설정 페이지
 │   ├── page.tsx               # 메인 페이지
 │   ├── layout.tsx             # 루트 레이아웃
@@ -123,11 +126,14 @@ rad-conclusion/
 │   ├── options-panel.tsx      # 스타일/언어 설정
 │   └── theme-toggle.tsx       # 다크/라이트 모드 전환
 ├── lib/
+│   ├── auth/                  # 세션 관리, CSRF, 인증 가드
 │   ├── providers/             # LLM 제공자 레지스트리 및 설정
 │   ├── prompts/               # 시스템 프롬프트 빌더
 │   ├── storage/               # 암호화 API 키 저장소
 │   └── post-process.ts        # LLM 출력 후처리
 ├── middleware.ts               # IP 허용 목록 접근 제어
+├── docker-compose.yml         # Docker 배포 설정
+├── Dockerfile                 # 멀티스테이지 프로덕션 빌드
 └── package.json
 ```
 
@@ -152,6 +158,7 @@ rad-conclusion/
 - 로컬 LLM 사용 시 OpenAI 호환 서버(`/v1/chat/completions`)가 실행 중이어야 합니다
 - Docker 배포 시 로컬 LLM 접근을 위해 `network_mode: host`를 사용합니다
 - API 키는 서버 환경변수(Docker) 또는 Settings 페이지(브라우저)로 관리합니다
+- 인증은 서버 사이드 세션과 CSRF 이중 쿠키 방식으로 동작합니다. `.env.local`에 `AUTH_EMAIL`과 `AUTH_PASSWORD_HASH`를 설정하세요
 - 입력에 환자 식별 정보(PII)를 포함하지 마세요
 
 ## 라이선스

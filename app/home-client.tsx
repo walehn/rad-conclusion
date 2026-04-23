@@ -453,7 +453,7 @@ export default function HomeClient() {
               Rad Conclusion v0.2.0 &mdash; Clinical radiology report assistant. Powered by vLLM. For professional use only.
             </p>
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              <span>Updated 2026-03-17</span>
+              <span>Updated 2026-04-24</span>
               <a
                 href="https://github.com/walehn/rad-conclusion"
                 target="_blank"
