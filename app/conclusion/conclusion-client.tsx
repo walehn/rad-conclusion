@@ -24,7 +24,7 @@ function getCsrfToken(): string {
     ?.split("=")[1] ?? "";
 }
 
-export default function HomeClient() {
+export function ConclusionClient() {
   const router = useRouter();
   const [findings, setFindings] = React.useState("");
   const [style, setStyle] = React.useState<ConclusionStyle>("numbered");
