@@ -28,22 +28,21 @@ describe('lib/auth/session', () => {
   describe('SESSION_SECRET guard', () => {
     it('throws when SESSION_SECRET is undefined', async () => {
       const original = process.env.SESSION_SECRET;
-      vi.resetModules();
       delete process.env.SESSION_SECRET;
-      await expect(import('@/lib/auth/session')).rejects.toThrow(/SESSION_SECRET/);
+      const { getSession } = await import('@/lib/auth/session');
+      await expect(getSession()).rejects.toThrow(/SESSION_SECRET/);
       process.env.SESSION_SECRET = original;
     });
 
     it('throws when SESSION_SECRET is shorter than 32 characters', async () => {
       const original = process.env.SESSION_SECRET;
-      vi.resetModules();
       process.env.SESSION_SECRET = 'tooshort';
-      await expect(import('@/lib/auth/session')).rejects.toThrow(/SESSION_SECRET/);
+      const { getSession } = await import('@/lib/auth/session');
+      await expect(getSession()).rejects.toThrow(/SESSION_SECRET/);
       process.env.SESSION_SECRET = original;
     });
 
     it('imports successfully with a valid 64-char secret', async () => {
-      vi.resetModules();
       const mod = await import('@/lib/auth/session');
       expect(mod.sessionOptions.cookieName).toBe('rad_conclusion_session');
     });

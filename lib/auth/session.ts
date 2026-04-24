@@ -8,16 +8,9 @@ export interface SessionData {
   issuedAt: number;
 }
 
-const SESSION_SECRET = process.env.SESSION_SECRET;
-if (!SESSION_SECRET || SESSION_SECRET.length < 32) {
-  throw new Error(
-    'SESSION_SECRET env var must be set and at least 32 characters long (use `openssl rand -hex 32`).'
-  );
-}
-
-/** iron-session configuration for the rad_conclusion auth cookie. */
+/** iron-session configuration (static fields only; password resolved at request time). */
 export const sessionOptions: SessionOptions = {
-  password: SESSION_SECRET,
+  password: '',
   cookieName: 'rad_conclusion_session',
   cookieOptions: {
     secure: process.env.NODE_ENV === 'production',
@@ -30,11 +23,21 @@ export const sessionOptions: SessionOptions = {
 
 /** Returns the live iron-session handle for the current request's cookies. */
 export async function getSession(): Promise<IronSession<SessionData>> {
-  return getIronSession<SessionData>(await cookies(), sessionOptions);
+  const secret = process.env.SESSION_SECRET;
+  if (!secret || secret.length < 32) {
+    throw new Error(
+      'SESSION_SECRET env var must be set and at least 32 characters long (use `openssl rand -hex 32`).'
+    );
+  }
+  return getIronSession<SessionData>(await cookies(), { ...sessionOptions, password: secret });
 }
 
-/** Returns the current user payload, or null if the session is missing/invalid. */
+/** Returns the current user payload, or null if the session is missing/invalid/unconfigured. */
 export async function getCurrentUser(): Promise<SessionData | null> {
+  // SESSION_SECRET may be absent during Next.js build-time static rendering; treat as no session.
+  if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 32) {
+    return null;
+  }
   const session = await getSession();
   if (!session.userId || !session.email) {
     return null;
