@@ -6,6 +6,7 @@ const ALLOWED_IPS = new Set([
   "116.35.186.20",
   "127.0.0.1",
   "::1",
+  "::ffff:127.0.0.1",
 ]);
 
 function generateCsrfToken(): string {
