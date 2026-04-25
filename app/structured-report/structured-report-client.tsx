@@ -5,10 +5,15 @@ import { Send, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
-import { FindingsInput } from "@/components/findings-input";
+import { TabbedFindingsInput } from "@/components/tabbed-findings-input";
+import type { ActiveTab } from "@/components/tabbed-findings-input";
 import { ModelSelector } from "@/components/model-selector";
 import { DiseaseCategoryIndicator } from "@/components/disease-category-indicator";
 import { StructuredReportOutput } from "@/components/structured-report-output";
+import {
+  serializeRccStructuredInput,
+} from "@/lib/prompts/disease-templates/rcc-serializer";
+import type { RccStructuredInput } from "@/lib/prompts/disease-templates/rcc-serializer";
 import { loadProviderSettings } from "@/lib/storage/settings-store";
 import type { DiseaseCategory } from "@/lib/prompts/disease-registry";
 import type {
@@ -40,6 +45,7 @@ const LANG_OPTIONS: ReadonlyArray<{ value: RccReportLang; label: string }> = [
 
 const SESSION_KEY_PROVIDER = "rad:last-provider";
 const SESSION_KEY_MODEL = "rad:last-model";
+const SESSION_KEY_ACTIVE_TAB = "rad:srep:active-tab";
 
 function getCsrfToken(): string {
   return (
@@ -74,7 +80,9 @@ function appendStreamChunk(accumulated: string, rawLine: string): string {
 }
 
 export function StructuredReportClient() {
-  const [findings, setFindings] = React.useState("");
+  const [freeTextFindings, setFreeTextFindings] = React.useState("");
+  const [structuredInput, setStructuredInput] = React.useState<RccStructuredInput>({});
+  const [activeTab, setActiveTab] = React.useState<ActiveTab>("free-text");
   const [modality, setModality] = React.useState<RccModality>("Auto");
   const [lang, setLang] = React.useState<RccReportLang>("en");
   const [provider, setProvider] = React.useState<ProviderName>("local");
@@ -139,8 +147,12 @@ export function StructuredReportClient() {
     try {
       const savedProvider = sessionStorage.getItem(SESSION_KEY_PROVIDER);
       const savedModel = sessionStorage.getItem(SESSION_KEY_MODEL);
+      const savedTab = sessionStorage.getItem(SESSION_KEY_ACTIVE_TAB);
       if (savedProvider) setProvider(savedProvider as ProviderName);
       if (savedModel) setModel(savedModel);
+      if (savedTab === "free-text" || savedTab === "rcc-structured") {
+        setActiveTab(savedTab);
+      }
     } catch {
       // sessionStorage unavailable (private mode, SSR boundary) — ignore.
     }
@@ -169,10 +181,22 @@ export function StructuredReportClient() {
     }
   }, [model]);
 
+  React.useEffect(() => {
+    try {
+      sessionStorage.setItem(SESSION_KEY_ACTIVE_TAB, activeTab);
+    } catch {
+      /* noop */
+    }
+  }, [activeTab]);
+
   // --- Generation handler --------------------------------------------------
   const handleGenerate = React.useCallback(async () => {
-    const trimmed = findings.trim();
-    if (!trimmed) {
+    const findingsText =
+      activeTab === "rcc-structured"
+        ? serializeRccStructuredInput(structuredInput)
+        : freeTextFindings.trim();
+
+    if (activeTab === "free-text" && !findingsText) {
       setInputError("Please enter the Findings text.");
       return;
     }
@@ -194,7 +218,7 @@ export function StructuredReportClient() {
           "x-csrf-token": getCsrfToken(),
         },
         body: JSON.stringify({
-          findings: trimmed,
+          findings: findingsText,
           diseaseCategory: DISEASE_CATEGORY,
           modality,
           lang,
@@ -264,7 +288,7 @@ export function StructuredReportClient() {
       setIsStreaming(false);
       abortRef.current = null;
     }
-  }, [findings, modality, lang, provider, model]);
+  }, [freeTextFindings, structuredInput, activeTab, modality, lang, provider, model]);
 
   const handleCancel = React.useCallback(() => {
     abortRef.current?.abort();
@@ -277,8 +301,13 @@ export function StructuredReportClient() {
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <header className="mb-6">
         <div>
+          <DiseaseCategoryIndicator
+            category={DISEASE_CATEGORY}
+            variant="overline"
+            index={1}
+          />
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
             구조화 리포트 생성기
           </h1>
@@ -288,7 +317,6 @@ export function StructuredReportClient() {
             구조화된 리포트를 생성합니다.
           </p>
         </div>
-        <DiseaseCategoryIndicator category={DISEASE_CATEGORY} />
       </header>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -372,13 +400,20 @@ export function StructuredReportClient() {
               <CardTitle className="text-lg font-semibold">Findings</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
-              <FindingsInput
-                value={findings}
-                onChange={(v) => {
-                  setFindings(v);
+              <TabbedFindingsInput
+                freeTextValue={freeTextFindings}
+                onFreeTextChange={(v) => {
+                  setFreeTextFindings(v);
                   if (inputError) setInputError("");
                 }}
-                error={inputError}
+                freeTextError={inputError}
+                structuredValue={structuredInput}
+                onStructuredChange={setStructuredInput}
+                activeTab={activeTab}
+                onActiveTabChange={(tab) => {
+                  setActiveTab(tab);
+                  if (inputError) setInputError("");
+                }}
               />
               {isStreaming ? (
                 <Button
@@ -393,7 +428,7 @@ export function StructuredReportClient() {
               ) : (
                 <Button
                   onClick={handleGenerate}
-                  disabled={!findings.trim()}
+                  disabled={activeTab === "free-text" && !freeTextFindings.trim()}
                   className="w-full bg-gradient-to-r from-primary to-primary/90 shadow-md shadow-primary/20 transition-all hover:shadow-lg hover:shadow-primary/30 disabled:from-muted disabled:to-muted disabled:shadow-none"
                   size="lg"
                 >
