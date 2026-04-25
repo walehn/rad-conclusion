@@ -1,7 +1,7 @@
 <h1 align="center">Rad Conclusion</h1>
 
 <p align="center">
-  <strong>AI 기반 방사선 판독 결론 생성기</strong>
+  <strong>AI 기반 방사선 보고서 생성기</strong>
 </p>
 
 <p align="center">
@@ -19,20 +19,23 @@
 
 ---
 
-방사선 판독 소견(**Findings**) 텍스트를 입력하면, 임상적으로 자연스러운 **Conclusion/Impression**을 실시간 스트리밍으로 생성합니다. 4개의 LLM 제공자를 지원하며, 브라우저 기반 웹 애플리케이션으로 어디서든 사용할 수 있습니다.
+두 가지 도구를 제공하는 브라우저 기반 방사선 AI 어시스턴트입니다. **결론 생성기**는 Findings 텍스트를 실시간 스트리밍으로 임상적으로 자연스러운 Impression 문장으로 변환하며, **구조화 보고서 생성기**는 SAR §3.3 형식에 따라 질환별(현재 RCC) 구조화 보고서를 생성합니다. 4개의 LLM 제공자를 지원합니다.
 
 ## 주요 기능
 
 - **실시간 스트리밍 생성** — LLM 응답을 토큰 단위로 스트리밍 출력
-- **A/B 비교 모드** — V1(기본)과 V2(Dx/DDx 포함) 프롬프트를 나란히 비교하고 투표
+- **결론 생성기** — V1(기본)과 V2(Dx/DDx 포함) 프롬프트를 나란히 비교하는 A/B 비교 모드 및 투표 기능
 - **LLM-as-Judge 평가** — 생성된 결론의 품질을 자동 점수화
+- **구조화 보고서 생성기** — 질환별(RCC) 구조화 입력 폼, SAR §3.3 직렬화; 자유 텍스트와 RCC 구조화 입력 간 탭 전환
+- **질환 대시보드** — 루트(`/`)에 기능 선택 카드 레이아웃; 결론 생성기는 `/conclusion`으로 이동
+- **공통 네비게이션 바** — 인증된 모든 페이지에 걸쳐 표시되는 고정 네비게이션
 - **4개 LLM 제공자 지원** — 로컬 LLM, OpenAI, Anthropic, Google AI
 - **세션 기반 인증** — 이메일/비밀번호 로그인, 서버 사이드 세션 관리 및 CSRF 보호
 - **다크/라이트 모드** — 의료 전문가용 틸(teal) 컬러 테마
 - **출력 스타일 선택** — Numbered, Short, Urgent-First
 - **다국어 출력** — 영어, 한국어, 혼용 모드
-- **IP 접속 제한** — 허용 IP 기반 미들웨어 접근 제어
-- **Settings 페이지** — 제공자별 연결 테스트
+- **Docker 배포** — 로컬 LLM 접근을 위한 host 네트워크 모드 지원
+- **Settings 페이지** — 제공자별 API 키 관리 및 연결 테스트
 
 ## 지원 LLM 제공자
 
@@ -60,7 +63,14 @@ npm run dev
 # http://localhost:3957
 ```
 
-### 프로덕션 빌드
+### 프로덕션 빌드 (Docker)
+
+```bash
+docker compose up -d --build
+# http://localhost:3957
+```
+
+### 프로덕션 빌드 (수동)
 
 ```bash
 npm run build
@@ -107,20 +117,29 @@ GOOGLE_AI_API_KEY=AI...
 rad-conclusion/
 ├── app/
 │   ├── api/
-│   │   ├── generate/          # LLM 스트리밍 API 엔드포인트
-│   │   ├── evaluate/          # LLM-as-Judge 평가 엔드포인트
-│   │   ├── vote/              # A/B 투표 수집 엔드포인트
-│   │   ├── auth/              # 로그인/로그아웃 API 라우트
-│   │   └── providers/         # 제공자 목록 및 유효성 검증 API
+│   │   ├── generate/          # 결론 생성 스트리밍 API
+│   │   ├── evaluate/          # LLM-as-Judge 평가 API
+│   │   ├── vote/              # A/B 투표 수집 API
+│   │   ├── auth/              # 로그인/로그아웃 API
+│   │   ├── providers/         # 제공자 목록 및 유효성 검증 API
+│   │   └── structured-report/ # 구조화 보고서 스트리밍 API
+│   ├── conclusion/            # 결론 생성기 페이지
+│   ├── structured-report/     # 구조화 보고서 생성기 페이지
+│   ├── dashboard-cards.tsx    # 기능 선택 카드 컴포넌트
 │   ├── login/                 # 로그인 페이지
 │   ├── settings/              # 제공자 설정 페이지
-│   ├── page.tsx               # 메인 페이지
+│   ├── page.tsx               # 대시보드 (기능 선택)
 │   ├── layout.tsx             # 루트 레이아웃
 │   └── globals.css            # 테마 정의
 ├── components/
-│   ├── ui/                    # 기본 UI 컴포넌트 (Button, Card, Input 등)
+│   ├── ui/                    # 기본 UI 컴포넌트
 │   ├── settings/              # Settings 페이지 컴포넌트
-│   ├── findings-input.tsx     # Findings 입력 필드
+│   ├── app-nav.tsx            # 공통 고정 네비게이션 바
+│   ├── disease-category-indicator.tsx  # 질환 카테고리 배지 (pill/overline)
+│   ├── rcc-structured-form.tsx         # RCC 14개 필드 구조화 입력 폼
+│   ├── tabbed-findings-input.tsx       # 탭 전환: 자유 텍스트 | RCC 구조화
+│   ├── structured-report-output.tsx    # 6섹션 스트리밍 출력
+│   ├── findings-input.tsx     # 자유 텍스트 Findings 입력 필드
 │   ├── conclusion-output.tsx  # 결론 출력 영역
 │   ├── model-selector.tsx     # 제공자/모델 선택
 │   ├── options-panel.tsx      # 스타일/언어 설정
@@ -128,7 +147,8 @@ rad-conclusion/
 ├── lib/
 │   ├── auth/                  # 세션 관리, CSRF, 인증 가드
 │   ├── providers/             # LLM 제공자 레지스트리 및 설정
-│   ├── prompts/               # 시스템 프롬프트 빌더
+│   ├── prompts/               # 구조화 보고서 프롬프트 + 질환 레지스트리
+│   │   └── disease-templates/ # RCC 필드 enum + SAR §3.3 직렬화
 │   ├── storage/               # 암호화 API 키 저장소
 │   └── post-process.ts        # LLM 출력 후처리
 ├── middleware.ts               # IP 허용 목록 접근 제어
