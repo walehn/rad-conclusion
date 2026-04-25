@@ -7,28 +7,41 @@ import { getDiseaseCategoryMetadata } from "@/lib/prompts/disease-registry";
 import { cn } from "@/lib/utils";
 
 interface DiseaseCategoryIndicatorProps {
-  /** Currently active disease category. v0.1.0 is always 'RCC'. */
   category: DiseaseCategory;
-  /** Optional extra class names for layout composition. */
   className?: string;
+  variant?: "pill" | "overline";
+  index?: number;
 }
 
-/**
- * Visual indicator for the currently active DiseaseCategory.
- *
- * v0.1.0 behavior: display-only (no selection UI). The component is structured
- * so it can later be upgraded to a dropdown or tab switcher without changes to
- * consumers.
- *
- * Accessibility: uses role="status" + aria-label so screen readers announce
- * the active category when this region is reached. The Korean display name is
- * prominent; the English scientific name is paired as a secondary label.
- */
 export function DiseaseCategoryIndicator({
   category,
   className,
+  variant = "pill",
+  index,
 }: DiseaseCategoryIndicatorProps) {
   const meta = getDiseaseCategoryMetadata(category);
+
+  if (variant === "overline") {
+    return (
+      <div
+        role="status"
+        aria-label={`현재 질병 카테고리: ${index !== undefined ? `#${index} ` : ""}${meta.displayNameKo} (${meta.displayName})`}
+        className={cn("inline-flex items-center gap-1.5", className)}
+      >
+        {index !== undefined && (
+          <span className="font-mono text-xs font-semibold text-primary">
+            #{index}
+          </span>
+        )}
+        <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+          {meta.displayNameKo}
+        </span>
+        <span className="text-xs font-normal text-muted-foreground/70">
+          {meta.displayName}
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -39,11 +52,11 @@ export function DiseaseCategoryIndicator({
         className
       )}
     >
-      <Stethoscope
-        aria-hidden="true"
-        className="h-4 w-4 text-primary"
-      />
-      <span>{meta.displayNameKo}</span>
+      <Stethoscope aria-hidden="true" className="h-4 w-4 text-primary" />
+      <span>
+        {index !== undefined ? `#${index} ` : ""}
+        {meta.displayNameKo}
+      </span>
       <span className="text-xs font-normal text-muted-foreground">
         {meta.displayName}
       </span>
