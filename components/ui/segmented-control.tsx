@@ -5,9 +5,14 @@
  *
  * SPEC-UI-001
  *
- * Visual: a single rounded pill container with adjacent buttons. The active
- * option is rendered with an absolutely positioned indicator that slides via
- * CSS `transform: translateX(...)` + `transition`, similar to Linear/Vercel.
+ * Visual: a single rounded pill container holding adjacent option buttons.
+ * The active option is highlighted in place via background + ring + shadow
+ * (no separate sliding indicator), so option widths can be content-sized and
+ * the group can wrap onto multiple lines when the container is narrow without
+ * breaking indicator geometry. Long labels (e.g. ">=50% exophytic") are NEVER
+ * truncated — full label text is always visible. Width-uneven layout follows
+ * the gap-based pattern used by Linear / Radix Toggle Group when option text
+ * lengths vary.
  *
  * Accessibility:
  *   - role="radiogroup" on the wrapper, role="radio" on each option button.
@@ -16,7 +21,9 @@
  *   - Keyboard: Arrow keys cycle (skipping when group is disabled), Home/End
  *     jump to first/last, Space/Enter selects the focused option. Tab/Shift+Tab
  *     enters and exits the group via the active option's tabindex=0; inactive
- *     options are tabindex=-1 (roving tabindex pattern).
+ *     options are tabindex=-1 (roving tabindex pattern). Wrapping does not
+ *     change the linear keyboard order (Arrow keys traverse options in DOM
+ *     order regardless of which visual line they sit on).
  */
 
 import * as React from "react";
@@ -28,12 +35,18 @@ import { cn } from "@/lib/utils";
 // ---------------------------------------------------------------------------
 
 const containerVariants = cva(
-  "relative inline-grid auto-cols-fr grid-flow-col rounded-md bg-muted/60 p-0.5 text-foreground/90 ring-1 ring-inset ring-border/60",
+  // inline-flex + flex-wrap allows the group to break onto a second line on
+  // narrow viewports rather than truncating any option label. `items-stretch`
+  // keeps every wrapped row aligned at equal height. Container height is no
+  // longer fixed because wrapped rows must be free to stack vertically.
+  "relative inline-flex flex-wrap items-stretch gap-0.5 rounded-md bg-muted/60 p-0.5 text-foreground/90 ring-1 ring-inset ring-border/60",
   {
     variants: {
       size: {
-        sm: "h-8 text-xs",
-        md: "h-9 text-sm",
+        // `min-h-*` (not `h-*`) reserves the prior single-row height while
+        // still permitting growth when wrapping kicks in.
+        sm: "min-h-8 text-xs",
+        md: "min-h-9 text-sm",
       },
     },
     defaultVariants: {
@@ -43,15 +56,20 @@ const containerVariants = cva(
 );
 
 const optionVariants = cva(
-  "relative z-10 inline-flex items-center justify-center whitespace-nowrap rounded-[5px] font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:cursor-not-allowed",
+  // `whitespace-nowrap` keeps each individual option label on a single line
+  // (no in-label wrapping) while the parent flex-wrap pushes overflowing
+  // options to the next row. Active state is applied directly to the button
+  // (background + ring + shadow) instead of via a separate sliding indicator,
+  // so width-uneven option lists render correctly.
+  "relative inline-flex items-center justify-center whitespace-nowrap rounded-[5px] font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:cursor-not-allowed",
   {
     variants: {
       size: {
-        sm: "px-2.5",
-        md: "px-3",
+        sm: "px-2.5 py-1",
+        md: "px-3 py-1",
       },
       active: {
-        true: "text-foreground",
+        true: "bg-background text-foreground shadow-sm ring-1 ring-inset ring-border/40",
         false: "text-muted-foreground hover:text-foreground",
       },
     },
@@ -156,10 +174,10 @@ export function SegmentedControl<T extends string>({
     }
   };
 
-  // Slide-indicator geometry. Uses `style` (transform+width via grid template)
-  // so the visual indicator follows the active option without per-option
-  // measurement. The indicator spans the full cell width of the active option.
-  const indicatorVisible = activeIdx >= 0 && count > 0;
+  // Active highlight is rendered by the button itself (see optionVariants
+  // `active: true` branch) — no separately positioned slide indicator. This
+  // keeps width-uneven option lists and wrapped rows visually correct without
+  // per-option measurement / ResizeObserver.
 
   return (
     <div
@@ -172,28 +190,7 @@ export function SegmentedControl<T extends string>({
         disabled && "opacity-60",
         className
       )}
-      style={{
-        gridTemplateColumns: `repeat(${count}, minmax(0, 1fr))`,
-      }}
     >
-      {/* Slide indicator: a single absolutely positioned element that translates
-          to the active cell. Width is 1/count of the inner area minus padding. */}
-      {indicatorVisible && (
-        <span
-          aria-hidden="true"
-          className={cn(
-            "pointer-events-none absolute inset-y-0.5 left-0.5 rounded-[5px] bg-background shadow-sm ring-1 ring-inset ring-border/40",
-            "transition-transform duration-200 ease-out"
-          )}
-          style={{
-            // The indicator covers (1/count) of (100% - 4px padding); we step
-            // it via translate by the same fraction.
-            width: `calc((100% - 4px) / ${count})`,
-            transform: `translateX(calc(${activeIdx} * 100%))`,
-          }}
-        />
-      )}
-
       {options.map((opt, idx) => {
         const active = idx === activeIdx;
         return (
@@ -213,7 +210,11 @@ export function SegmentedControl<T extends string>({
             onKeyDown={(event) => handleKeyDown(event, idx)}
             className={optionVariants({ size, active })}
           >
-            <span className="truncate">{opt.label}</span>
+            {/* Render the label as plain text — no `truncate` class — so long
+                option labels (e.g. ">=50% exophytic") are always visible in
+                full. `whitespace-nowrap` on the button keeps each individual
+                label on one line; the parent flex-wrap handles overflow. */}
+            <span>{opt.label}</span>
           </button>
         );
       })}

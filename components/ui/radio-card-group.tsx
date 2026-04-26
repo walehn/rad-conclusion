@@ -275,12 +275,18 @@ export function RadioCardGroup<T extends string>({
                   via the surrounding ring + bg from cardToneVariants. */}
               <span aria-hidden="true" className={accentVariants({ tone })} />
 
-              <span className="flex flex-1 flex-col gap-0.5 pl-2">
-                <span className="text-sm font-semibold leading-tight">
+              {/* `min-w-0` lets this flex child shrink below its content size
+                  so the label can wrap/break correctly inside narrow columns
+                  (without it, long labels would force horizontal overflow on
+                  mobile). `break-words` permits breaking very long single
+                  tokens at any character if needed (e.g. URLs / code names),
+                  while `leading-tight` keeps the visual rhythm tight. */}
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5 pl-2">
+                <span className="text-sm font-semibold leading-tight break-words">
                   {opt.label}
                 </span>
                 {opt.sublabel && (
-                  <span className="text-xs leading-tight text-muted-foreground">
+                  <span className="text-xs leading-tight text-muted-foreground break-words">
                     {opt.sublabel}
                   </span>
                 )}
