@@ -2,10 +2,8 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
-/** Cookie name that carries the double-submit CSRF token (non-httpOnly so the client can echo it). */
-export const CSRF_COOKIE_NAME = 'csrf_token';
-/** Header name the client uses to echo the CSRF token on state-changing requests. */
-export const CSRF_HEADER_NAME = 'x-csrf-token';
+export { CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from './csrf-constants';
+import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from './csrf-constants';
 
 /** Generates a 32-byte hex CSRF token. */
 export function generateCsrfToken(): string {

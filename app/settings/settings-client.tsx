@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ProviderCard } from "@/components/settings/provider-card";
 import { loadProviderSettings } from "@/lib/storage/settings-store";
 import type { ProviderSettings, ProviderName } from "@/lib/providers/types";
-import { CSRF_COOKIE_NAME } from "@/lib/auth/csrf";
+import { CSRF_COOKIE_NAME } from "@/lib/auth/csrf-constants";
 
 /** Reads the double-submit CSRF token from the non-httpOnly cookie. */
 function getCsrfToken(): string {
