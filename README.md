@@ -35,7 +35,7 @@ A browser-based radiology AI assistant with two tools: a **Conclusion Generator*
 - **Output styles** — Numbered, Short, Urgent-First
 - **Multilingual output** — English, Korean, Mixed mode
 - **Docker deployment** — Production-ready with host network mode for local LLM access
-- **Settings page** — Per-provider API key management and connection testing
+- **Settings page** — Per-account API key management with server-side encrypted storage; keys persist across sessions and devices
 
 ## Supported LLM Providers
 
@@ -85,11 +85,14 @@ npm run start
 Create a `.env.local` file for server-side configuration, or manage API keys via the Settings page in the browser.
 
 ```bash
+# Server-side API key encryption (required for Settings page key storage)
+API_KEY_ENCRYPTION_SECRET=your-32-byte-or-longer-secret
+
 # Local LLM (OpenAI-compatible server)
 RAD_LOCAL_HOST=http://localhost:8080
 RAD_LOCAL_MODEL=Qwen/Qwen3.6-35B-A3B-FP8
 
-# Commercial provider API keys (optional)
+# Commercial provider API keys (server-side fallback; optional if set via Settings page)
 OPENAI_API_KEY=sk-...
 ANTHROPIC_API_KEY=sk-ant-...
 GOOGLE_AI_API_KEY=AI...
@@ -122,7 +125,8 @@ rad-conclusion/
 │   │   ├── vote/              # A/B vote collection
 │   │   ├── auth/              # Login / logout API
 │   │   ├── providers/         # Provider list & validation
-│   │   └── structured-report/ # Structured report streaming API
+│   │   ├── structured-report/ # Structured report streaming API
+│   │   └── user/api-keys/     # Per-account API key CRUD (GET/POST/DELETE)
 │   ├── conclusion/            # Conclusion generator page
 │   ├── structured-report/     # Structured report generator page
 │   ├── dashboard-cards.tsx    # Feature-selection cards
@@ -149,7 +153,10 @@ rad-conclusion/
 │   ├── providers/             # LLM provider registry & config
 │   ├── prompts/               # Structured report prompts + disease registry
 │   │   └── disease-templates/ # RCC fields enum + SAR §3.3 serializer
-│   ├── storage/               # Encrypted API key store
+│   ├── crypto/                # Server-side AES-256-GCM API key encrypt/decrypt
+│   ├── api-keys/              # resolveApiKey() — DB lookup with env var fallback
+│   ├── db/                    # Drizzle ORM schema + SQLite client
+│   ├── storage/               # Legacy client-side encrypted key store
 │   └── post-process.ts        # LLM output post-processing
 ├── middleware.ts               # IP allowlist access control
 ├── docker-compose.yml         # Docker deployment config
