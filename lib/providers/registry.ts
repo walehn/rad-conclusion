@@ -4,6 +4,22 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import type { ProviderName, ProviderInfo } from "./types";
 import { LOCAL_PROVIDER_DEFAULTS } from "./local-config";
 
+// vLLM (Qwen) emits empty content when its <think> channel exhausts max_tokens.
+// We force-disable thinking via the OpenAI-compat `chat_template_kwargs` field,
+// which @ai-sdk/openai 1.3 does not expose. Inject it via a fetch middleware.
+const localFetch: typeof fetch = async (input, init) => {
+  if (init?.body && typeof init.body === "string" && init.body.includes('"messages"')) {
+    try {
+      const parsed = JSON.parse(init.body);
+      parsed.chat_template_kwargs = { ...(parsed.chat_template_kwargs ?? {}), enable_thinking: false };
+      init = { ...init, body: JSON.stringify(parsed) };
+    } catch {
+      /* leave body untouched if not JSON */
+    }
+  }
+  return fetch(input as RequestInfo, init);
+};
+
 export function getModel(
   provider: ProviderName,
   modelId?: string,
@@ -14,6 +30,7 @@ export function getModel(
       const local = createOpenAI({
         baseURL: baseHost + "/v1",
         apiKey: "not-needed",
+        fetch: localFetch,
       });
       return local(modelId || process.env.RAD_LOCAL_MODEL || LOCAL_PROVIDER_DEFAULTS.modelId);
     }
@@ -56,6 +73,7 @@ export function getModelWithKey(
       const local = createOpenAI({
         baseURL: baseHost + "/v1",
         apiKey: "not-needed",
+        fetch: localFetch,
       });
       return local(modelId || process.env.RAD_LOCAL_MODEL || LOCAL_PROVIDER_DEFAULTS.modelId);
     }

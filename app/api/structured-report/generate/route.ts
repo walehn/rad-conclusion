@@ -108,6 +108,7 @@ export async function POST(req: Request) {
       prompt: userPrompt,
       temperature: 0.3,
       topP: 0.9,
+      maxTokens: 2048,
       onError: ({ error }) => {
         console.error(
           "[structured-report/generate] streamText error:",

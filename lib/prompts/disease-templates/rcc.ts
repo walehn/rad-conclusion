@@ -172,6 +172,7 @@ ${langInstr}
 6. Bosniak classification applies ONLY to cystic masses. For solid (or not-explicitly-cystic) masses, the Bosniak bullet MUST read "Not applicable (solid mass)".
 7. IMPRESSION is a numbered list (1., 2., 3., ...), MAXIMUM 5 items, prioritized by clinical significance — lead with the staging summary and the most critical finding.
 8. Do NOT provide treatment recommendations (surgery, chemotherapy, radiation, immunotherapy, ablation). This is a radiology report. Follow-up imaging suggestions are permitted only when directly supported by a finding (e.g., "short-interval MRI suggested for indeterminate cystic lesion").
+9. Output ONLY the final 6-section report. Do NOT include reasoning, deliberation, self-questions, or hedging phrases such as "Let's check", "Wait", "Actually", "On the other hand" inside any section. STAGING items must contain ONLY the final classification followed by a single short parenthetical justification: ONE clause, MAXIMUM 15 words, no semicolons, no "but"/"however"/"although", no comparison between alternative categories. When a finding is ambiguous between two T/N/M categories, pick the more conservative one and append "(strict interpretation)"; never narrate the decision process in the report body.
 
 === FEW-SHOT ===
 Example (compact excerpt):
@@ -186,7 +187,22 @@ STAGING:
 
 IMPRESSION:
 1. 4.8 cm enhancing exophytic solid mass, right upper pole, consistent with renal cell carcinoma (clinical staging T1b N0 M0, Stage I).
-2. No evidence of venous thrombus or regional lymphadenopathy.`;
+2. No evidence of venous thrombus or regional lymphadenopathy.
+
+Example 2 (compact excerpt — ambiguous IVC staging; demonstrates rule 9):
+Input Findings: "7.5 cm right renal mass; IVC tumor thrombus extending below hepatic veins; caval wall enhancement suspected; para-aortic node 1.5 cm; no distant lesions."
+Output excerpt:
+STAGING:
+- T: T3b (IVC extension below diaphragm, wall invasion not confirmed) (strict interpretation)
+- N: N1 (para-aortic node 1.5 cm, regional metastasis present)
+- M: M0 (no distant metastasis on available imaging — limited by scope of study)
+- Venous thrombus: Neves-Mayo Level II
+- AJCC Stage Grouping (8th edition): Stage III
+
+IMPRESSION:
+1. 7.5 cm right renal mass with Neves-Mayo Level II IVC tumor thrombus, consistent with renal cell carcinoma (clinical staging T3b N1 M0, Stage III).
+2. Para-aortic lymphadenopathy (1.5 cm), suspicious for regional metastasis.
+3. Caval wall invasion suspected on imaging but not definitively determined; T3c upgrade cannot be confirmed on current study.`;
 }
 
 /**
