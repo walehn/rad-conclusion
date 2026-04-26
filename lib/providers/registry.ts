@@ -40,6 +40,48 @@ export function getModel(
   }
 }
 
+/**
+ * Like getModel() but accepts an explicit apiKey to inject directly into the
+ * provider SDK instance. Falls back to env vars when apiKey is null.
+ * Used by generation endpoints that resolve per-user keys from the database.
+ */
+export function getModelWithKey(
+  provider: ProviderName,
+  modelId: string | undefined,
+  apiKey: string | null,
+) {
+  switch (provider) {
+    case "local": {
+      const baseHost = process.env.RAD_LOCAL_HOST || LOCAL_PROVIDER_DEFAULTS.host;
+      const local = createOpenAI({
+        baseURL: baseHost + "/v1",
+        apiKey: "not-needed",
+      });
+      return local(modelId || process.env.RAD_LOCAL_MODEL || LOCAL_PROVIDER_DEFAULTS.modelId);
+    }
+    case "openai": {
+      const openai = createOpenAI({
+        apiKey: apiKey ?? process.env.OPENAI_API_KEY,
+      });
+      return openai(modelId || "gpt-4o");
+    }
+    case "anthropic": {
+      const anthropic = createAnthropic({
+        apiKey: apiKey ?? process.env.ANTHROPIC_API_KEY,
+      });
+      return anthropic(modelId || "claude-sonnet-4-20250514");
+    }
+    case "google": {
+      const google = createGoogleGenerativeAI({
+        apiKey: apiKey ?? process.env.GOOGLE_AI_API_KEY,
+      });
+      return google(modelId || "gemini-3.1-flash-lite-preview");
+    }
+    default:
+      throw new Error(`Unknown provider: ${provider}`);
+  }
+}
+
 export function getAvailableProviders(): ProviderInfo[] {
   const providers: ProviderInfo[] = [
     {

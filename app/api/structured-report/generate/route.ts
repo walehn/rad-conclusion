@@ -19,7 +19,7 @@
 
 import { streamText } from "ai";
 import { z } from "zod";
-import { getModel } from "@/lib/providers/registry";
+import { getModelWithKey } from "@/lib/providers/registry";
 import type { ProviderName } from "@/lib/providers/types";
 import {
   buildReportSystemPrompt,
@@ -27,6 +27,7 @@ import {
 } from "@/lib/prompts/structured-report-prompt";
 import { requireApiSession } from "@/lib/auth/guard";
 import { validateCsrfOrFail } from "@/lib/auth/csrf";
+import { resolveApiKey } from "@/lib/api-keys/resolve";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,7 +56,7 @@ const requestSchema = z.object({
 });
 
 export async function POST(req: Request) {
-  const { response } = await requireApiSession();
+  const { session, response } = await requireApiSession();
   if (response) return response;
 
   const csrfFailure = await validateCsrfOrFail(req);
@@ -85,7 +86,8 @@ export async function POST(req: Request) {
       findingsLength: findings.length,
     };
 
-    const llmModel = getModel(provider as ProviderName, model);
+    const apiKey = await resolveApiKey(session.userId, provider as ProviderName);
+    const llmModel = getModelWithKey(provider as ProviderName, model, apiKey);
 
     const systemPrompt = buildReportSystemPrompt({
       diseaseCategory,
