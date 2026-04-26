@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 import {
   RCC_SIDES,
   RCC_MASS_TYPES,
-  RCC_BOSNIAK,
   RCC_PRESENT_ABSENT_INDET,
   RCC_AXIAL,
   RCC_CRANIO,
@@ -15,7 +14,6 @@ import {
   RCC_THROMBUS_KINDS,
   RCC_NEVES_MAYO,
   RCC_PRESENT_ABSENT,
-  RCC_TRAJECTORY,
   type RccNevesMayo,
 } from "@/lib/prompts/disease-templates/rcc-fields";
 
@@ -39,74 +37,46 @@ import type { RccMass } from "@/lib/prompts/disease-templates/rcc-serializer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
+import {
+  SegmentedControl,
+  toSegmentedOptions,
+} from "@/components/ui/segmented-control";
+import { RadioCardGroup } from "@/components/ui/radio-card-group";
+import {
+  RCC_BOSNIAK_RADIO_OPTIONS,
+  RCC_TRAJECTORY_RADIO_OPTIONS,
+} from "@/lib/ui/rcc-options-meta";
 
 // ---------------------------------------------------------------------------
-// Internal sub-components (file-local)
+// File-local field-row helper
 // ---------------------------------------------------------------------------
 
-interface RadioGroupProps<T extends string> {
-  id: string;
-  legend: string;
-  options: readonly T[];
-  selected: T | undefined;
-  onSelect: (opt: T) => void;
-  disabled?: boolean;
-  disabledNote?: string;
-}
-
-function RadioGroup<T extends string>({
-  id,
-  legend,
-  options,
-  selected,
-  onSelect,
-  disabled = false,
-  disabledNote,
-}: RadioGroupProps<T>) {
+/**
+ * FieldRow — uniform vertical wrapper that renders a label above any control
+ * (SegmentedControl, RadioCardGroup, or arbitrary children). Replaces the
+ * legacy fieldset/legend wrapper from the previous local RadioGroup helper so
+ * the new SegmentedControl/RadioCardGroup keep the same visual rhythm with
+ * NumberField / DateInput inside the same grid cell.
+ */
+function FieldRow({
+  label,
+  children,
+  className,
+}: {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <fieldset
-      role="radiogroup"
-      aria-labelledby={`${id}-legend`}
-      aria-disabled={disabled ? "true" : undefined}
+    <div
       className={cn(
         "rounded-lg border border-border p-3 flex flex-col gap-2",
-        disabled && "opacity-50"
+        className
       )}
     >
-      <legend
-        id={`${id}-legend`}
-        className="px-1 text-sm font-medium text-foreground"
-      >
-        {legend}
-      </legend>
-
-      <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-        {options.map((opt) => (
-          <label
-            key={opt}
-            className={cn(
-              "flex items-center gap-2",
-              disabled ? "cursor-not-allowed" : "cursor-pointer"
-            )}
-          >
-            <input
-              type="radio"
-              name={id}
-              value={opt}
-              checked={selected === opt}
-              onChange={() => onSelect(opt)}
-              disabled={disabled}
-              className="h-4 w-4 text-primary"
-            />
-            <span className="text-sm">{opt}</span>
-          </label>
-        ))}
-      </div>
-
-      {disabled && disabledNote && (
-        <p className="text-xs text-muted-foreground">{disabledNote}</p>
-      )}
-    </fieldset>
+      <span className="px-1 text-sm font-medium text-foreground">{label}</span>
+      {children}
+    </div>
   );
 }
 
@@ -250,13 +220,15 @@ export function RccMassCard({
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* 1. Side */}
-          <RadioGroup
-            id={fieldId("side")}
-            legend="Side"
-            options={RCC_SIDES}
-            selected={value.side}
-            onSelect={(opt) => onChange({ ...value, side: opt })}
-          />
+          <FieldRow label="Side">
+            <SegmentedControl
+              name={fieldId("side")}
+              ariaLabel="Side"
+              value={value.side}
+              options={toSegmentedOptions(RCC_SIDES)}
+              onChange={(opt) => onChange({ ...value, side: opt })}
+            />
+          </FieldRow>
 
           {/* 2. Mass size */}
           <NumberField
@@ -287,13 +259,16 @@ export function RccMassCard({
           />
 
           {/* 2c. Size comparison — trajectory */}
-          <RadioGroup
-            id={fieldId("trajectory")}
-            legend="Trajectory"
-            options={RCC_TRAJECTORY}
-            selected={value.trajectory}
-            onSelect={(opt) => onChange({ ...value, trajectory: opt })}
-          />
+          <FieldRow label="Trajectory">
+            <RadioCardGroup
+              name={fieldId("trajectory")}
+              ariaLabel="Trajectory"
+              value={value.trajectory}
+              options={RCC_TRAJECTORY_RADIO_OPTIONS}
+              onChange={(opt) => onChange({ ...value, trajectory: opt })}
+              columns={2}
+            />
+          </FieldRow>
 
           {/* 3. Growth rate */}
           <NumberField
@@ -305,37 +280,42 @@ export function RccMassCard({
           />
 
           {/* 4. Mass type */}
-          <RadioGroup
-            id={fieldId("massType")}
-            legend="Mass type"
-            options={RCC_MASS_TYPES}
-            selected={value.massType}
-            onSelect={(opt) => {
-              // Cystic → Solid transition: auto-clear cysticPredominant so a
-              // later switch back to Cystic starts fresh (standard alignment
-              // with Bosniak v2019 binary classification).
-              if (opt === "Solid" && value.massType === "Cystic") {
-                onChange({
-                  ...value,
-                  massType: opt,
-                  cysticPredominant: undefined,
-                });
-              } else {
-                onChange({ ...value, massType: opt });
-              }
-            }}
-          />
+          <FieldRow label="Mass type">
+            <SegmentedControl
+              name={fieldId("massType")}
+              ariaLabel="Mass type"
+              value={value.massType}
+              options={toSegmentedOptions(RCC_MASS_TYPES)}
+              onChange={(opt) => {
+                // Cystic → Solid transition: auto-clear cysticPredominant so a
+                // later switch back to Cystic starts fresh (standard alignment
+                // with Bosniak v2019 binary classification).
+                if (opt === "Solid" && value.massType === "Cystic") {
+                  onChange({
+                    ...value,
+                    massType: opt,
+                    cysticPredominant: undefined,
+                  });
+                } else {
+                  onChange({ ...value, massType: opt });
+                }
+              }}
+            />
+          </FieldRow>
 
           {/* 5. Bosniak — disabled when mass type is Solid */}
-          <RadioGroup
-            id={fieldId("bosniak")}
-            legend="Bosniak"
-            options={RCC_BOSNIAK}
-            selected={value.bosniak}
-            onSelect={(opt) => onChange({ ...value, bosniak: opt })}
-            disabled={isSolid}
-            disabledNote="Not applicable (solid mass)"
-          />
+          <FieldRow label="Bosniak">
+            <RadioCardGroup
+              name={fieldId("bosniak")}
+              ariaLabel="Bosniak"
+              value={value.bosniak}
+              options={RCC_BOSNIAK_RADIO_OPTIONS}
+              onChange={(opt) => onChange({ ...value, bosniak: opt })}
+              disabled={isSolid}
+              disabledNote="Not applicable (solid mass)"
+              columns={3}
+            />
+          </FieldRow>
 
           {/* 5a. Predominantly cystic — disabled when mass type is Solid */}
           <fieldset
@@ -383,58 +363,70 @@ export function RccMassCard({
           </fieldset>
 
           {/* 6. Macroscopic fat */}
-          <RadioGroup
-            id={fieldId("macroFat")}
-            legend="Macroscopic fat"
-            options={RCC_PRESENT_ABSENT_INDET}
-            selected={value.macroFat}
-            onSelect={(opt) => onChange({ ...value, macroFat: opt })}
-          />
+          <FieldRow label="Macroscopic fat">
+            <SegmentedControl
+              name={fieldId("macroFat")}
+              ariaLabel="Macroscopic fat"
+              value={value.macroFat}
+              options={toSegmentedOptions(RCC_PRESENT_ABSENT_INDET)}
+              onChange={(opt) => onChange({ ...value, macroFat: opt })}
+            />
+          </FieldRow>
 
           {/* 7. Solid enhancement */}
-          <RadioGroup
-            id={fieldId("solidEnhancement")}
-            legend="Solid enhancement"
-            options={RCC_PRESENT_ABSENT_INDET}
-            selected={value.solidEnhancement}
-            onSelect={(opt) => onChange({ ...value, solidEnhancement: opt })}
-          />
+          <FieldRow label="Solid enhancement">
+            <SegmentedControl
+              name={fieldId("solidEnhancement")}
+              ariaLabel="Solid enhancement"
+              value={value.solidEnhancement}
+              options={toSegmentedOptions(RCC_PRESENT_ABSENT_INDET)}
+              onChange={(opt) => onChange({ ...value, solidEnhancement: opt })}
+            />
+          </FieldRow>
 
           {/* 8. Axial location */}
-          <RadioGroup
-            id={fieldId("axial")}
-            legend="Axial location"
-            options={RCC_AXIAL}
-            selected={value.axial}
-            onSelect={(opt) => onChange({ ...value, axial: opt })}
-          />
+          <FieldRow label="Axial location">
+            <SegmentedControl
+              name={fieldId("axial")}
+              ariaLabel="Axial location"
+              value={value.axial}
+              options={toSegmentedOptions(RCC_AXIAL)}
+              onChange={(opt) => onChange({ ...value, axial: opt })}
+            />
+          </FieldRow>
 
           {/* 9. Cranio-caudal location */}
-          <RadioGroup
-            id={fieldId("cranio")}
-            legend="Cranio-caudal location"
-            options={RCC_CRANIO}
-            selected={value.cranio}
-            onSelect={(opt) => onChange({ ...value, cranio: opt })}
-          />
+          <FieldRow label="Cranio-caudal location">
+            <SegmentedControl
+              name={fieldId("cranio")}
+              ariaLabel="Cranio-caudal location"
+              value={value.cranio}
+              options={toSegmentedOptions(RCC_CRANIO)}
+              onChange={(opt) => onChange({ ...value, cranio: opt })}
+            />
+          </FieldRow>
 
           {/* 10. Margins */}
-          <RadioGroup
-            id={fieldId("margins")}
-            legend="Margins"
-            options={RCC_MARGINS}
-            selected={value.margins}
-            onSelect={(opt) => onChange({ ...value, margins: opt })}
-          />
+          <FieldRow label="Margins">
+            <SegmentedControl
+              name={fieldId("margins")}
+              ariaLabel="Margins"
+              value={value.margins}
+              options={toSegmentedOptions(RCC_MARGINS)}
+              onChange={(opt) => onChange({ ...value, margins: opt })}
+            />
+          </FieldRow>
 
           {/* 11. Exophytic ratio */}
-          <RadioGroup
-            id={fieldId("exophytic")}
-            legend="Exophytic ratio"
-            options={RCC_EXOPHYTIC}
-            selected={value.exophytic}
-            onSelect={(opt) => onChange({ ...value, exophytic: opt })}
-          />
+          <FieldRow label="Exophytic ratio">
+            <SegmentedControl
+              name={fieldId("exophytic")}
+              ariaLabel="Exophytic ratio"
+              value={value.exophytic}
+              options={toSegmentedOptions(RCC_EXOPHYTIC)}
+              onChange={(opt) => onChange({ ...value, exophytic: opt })}
+            />
+          </FieldRow>
 
           {/* 12. Distance to collecting system */}
           <NumberField
@@ -446,42 +438,44 @@ export function RccMassCard({
           />
 
           {/* 13. Venous tumor thrombus kind */}
-          <RadioGroup
-            id={fieldId("thrombusKind")}
-            legend="Venous tumor thrombus kind"
-            options={RCC_THROMBUS_KINDS}
-            selected={value.thrombusKind}
-            onSelect={(opt) => {
-              if (opt === "None") {
-                // Clear all thrombus detail fields when set to None
-                onChange({
-                  ...value,
-                  thrombusKind: opt,
-                  thrombusLevel: undefined,
-                  blandThrombus: undefined,
-                });
-              } else if (opt === "Renal vein") {
-                // Renal vein thrombus is by definition Neves-Mayo Level 0.
-                // Auto-set the level so the data model stays consistent.
-                onChange({
-                  ...value,
-                  thrombusKind: opt,
-                  thrombusLevel: "0",
-                });
-              } else {
-                // IVC: clear a stale Level 0 (only valid for renal vein) so
-                // the user is forced to pick an IVC-extent level (I–IV).
-                onChange({
-                  ...value,
-                  thrombusKind: opt,
-                  thrombusLevel:
-                    value.thrombusLevel === "0"
-                      ? undefined
-                      : value.thrombusLevel,
-                });
-              }
-            }}
-          />
+          <FieldRow label="Venous tumor thrombus kind">
+            <SegmentedControl
+              name={fieldId("thrombusKind")}
+              ariaLabel="Venous tumor thrombus kind"
+              value={value.thrombusKind}
+              options={toSegmentedOptions(RCC_THROMBUS_KINDS)}
+              onChange={(opt) => {
+                if (opt === "None") {
+                  // Clear all thrombus detail fields when set to None
+                  onChange({
+                    ...value,
+                    thrombusKind: opt,
+                    thrombusLevel: undefined,
+                    blandThrombus: undefined,
+                  });
+                } else if (opt === "Renal vein") {
+                  // Renal vein thrombus is by definition Neves-Mayo Level 0.
+                  // Auto-set the level so the data model stays consistent.
+                  onChange({
+                    ...value,
+                    thrombusKind: opt,
+                    thrombusLevel: "0",
+                  });
+                } else {
+                  // IVC: clear a stale Level 0 (only valid for renal vein) so
+                  // the user is forced to pick an IVC-extent level (I–IV).
+                  onChange({
+                    ...value,
+                    thrombusKind: opt,
+                    thrombusLevel:
+                      value.thrombusLevel === "0"
+                        ? undefined
+                        : value.thrombusLevel,
+                  });
+                }
+              }}
+            />
+          </FieldRow>
 
           {/* 14. Neves-Mayo Level — Renal vein: auto Level 0 (info only).
                                      IVC: user-selected I–IV. */}
@@ -524,13 +518,15 @@ export function RccMassCard({
 
           {/* 15. Bland (non-tumor) thrombus — conditional on thrombusKind */}
           {showThrombusDetails && (
-            <RadioGroup
-              id={fieldId("blandThrombus")}
-              legend="Bland (non-tumor) thrombus"
-              options={RCC_PRESENT_ABSENT}
-              selected={value.blandThrombus}
-              onSelect={(opt) => onChange({ ...value, blandThrombus: opt })}
-            />
+            <FieldRow label="Bland (non-tumor) thrombus">
+              <SegmentedControl
+                name={fieldId("blandThrombus")}
+                ariaLabel="Bland (non-tumor) thrombus"
+                value={value.blandThrombus}
+                options={toSegmentedOptions(RCC_PRESENT_ABSENT)}
+                onChange={(opt) => onChange({ ...value, blandThrombus: opt })}
+              />
+            </FieldRow>
           )}
         </div>
       </CardContent>

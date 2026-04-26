@@ -12,55 +12,39 @@ import {
 } from "@/lib/prompts/disease-templates/rcc-fields";
 import type { RccStructuredInput } from "@/lib/prompts/disease-templates/rcc-serializer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  SegmentedControl,
+  toSegmentedOptions,
+} from "@/components/ui/segmented-control";
 
 // ---------------------------------------------------------------------------
 // Internal sub-components (file-local)
 // ---------------------------------------------------------------------------
 
-interface RadioGroupProps<T extends string> {
-  id: string;
-  legend: string;
-  options: readonly T[];
-  selected: T | undefined;
-  onSelect: (opt: T) => void;
-}
-
-function RadioGroup<T extends string>({
-  id,
-  legend,
-  options,
-  selected,
-  onSelect,
-}: RadioGroupProps<T>) {
+/**
+ * FieldRow — uniform vertical wrapper that renders a label above any control.
+ * Mirrors the same helper in rcc-mass-card.tsx so the two cards keep visual
+ * rhythm.
+ */
+function FieldRow({
+  label,
+  children,
+  className,
+}: {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <fieldset
-      role="radiogroup"
-      aria-labelledby={`${id}-legend`}
-      className="rounded-lg border border-border p-3 flex flex-col gap-2"
+    <div
+      className={cn(
+        "rounded-lg border border-border p-3 flex flex-col gap-2",
+        className
+      )}
     >
-      <legend
-        id={`${id}-legend`}
-        className="px-1 text-sm font-medium text-foreground"
-      >
-        {legend}
-      </legend>
-
-      <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-        {options.map((opt) => (
-          <label key={opt} className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              name={id}
-              value={opt}
-              checked={selected === opt}
-              onChange={() => onSelect(opt)}
-              className="h-4 w-4 text-primary"
-            />
-            <span className="text-sm">{opt}</span>
-          </label>
-        ))}
-      </div>
-    </fieldset>
+      <span className="px-1 text-sm font-medium text-foreground">{label}</span>
+      {children}
+    </div>
   );
 }
 
@@ -74,8 +58,9 @@ interface CheckboxGroupProps<T extends string> {
 
 /**
  * CheckboxGroup<T> — multi-select chip toggle group.
- * Mirrors the RadioGroup<T> visual style but uses <input type="checkbox">
- * with an array toggle handler.
+ * Mirrors the legacy radio chip style but uses <input type="checkbox"> with an
+ * array toggle handler. Multi-select semantics intentionally remain outside
+ * SPEC-UI-001 scope.
  */
 function CheckboxGroup<T extends string>({
   id,
@@ -236,13 +221,15 @@ export function RccStudyLevelCard({ value, onChange }: RccStudyLevelCardProps) {
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Regional lymph nodes */}
-          <RadioGroup
-            id="study-lymphNodes"
-            legend="Regional lymph nodes"
-            options={RCC_LN_M}
-            selected={value.lymphNodes}
-            onSelect={handleLnChange}
-          />
+          <FieldRow label="Regional lymph nodes">
+            <SegmentedControl
+              name="study-lymphNodes"
+              ariaLabel="Regional lymph nodes"
+              value={value.lymphNodes}
+              options={toSegmentedOptions(RCC_LN_M)}
+              onChange={handleLnChange}
+            />
+          </FieldRow>
 
           {/* LN site multiselect — conditional on Present */}
           {showLnDetails && (
@@ -272,13 +259,15 @@ export function RccStudyLevelCard({ value, onChange }: RccStudyLevelCardProps) {
           )}
 
           {/* Distant metastases */}
-          <RadioGroup
-            id="study-distantMetastases"
-            legend="Distant metastases"
-            options={RCC_LN_M}
-            selected={value.distantMetastases}
-            onSelect={handleMetChange}
-          />
+          <FieldRow label="Distant metastases">
+            <SegmentedControl
+              name="study-distantMetastases"
+              ariaLabel="Distant metastases"
+              value={value.distantMetastases}
+              options={toSegmentedOptions(RCC_LN_M)}
+              onChange={handleMetChange}
+            />
+          </FieldRow>
 
           {/* Metastasis site multiselect — conditional on Present */}
           {showMetDetails && (

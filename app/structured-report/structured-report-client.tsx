@@ -29,7 +29,10 @@ import type {
   ProviderSettings,
 } from "@/lib/providers/types";
 import { LOCAL_PROVIDER_DEFAULTS } from "@/lib/providers/local-config";
-import { cn } from "@/lib/utils";
+import {
+  SegmentedControl,
+  toSegmentedOptions,
+} from "@/components/ui/segmented-control";
 
 const DISEASE_CATEGORY: DiseaseCategory = "RCC";
 
@@ -354,35 +357,18 @@ export function StructuredReportClient() {
                 <label
                   className="mb-1.5 block text-sm font-medium text-foreground"
                   id="modality-hint-label"
+                  htmlFor="modality-hint-control"
                 >
                   Modality hint
                 </label>
-                <div
-                  role="radiogroup"
-                  aria-labelledby="modality-hint-label"
-                  className="inline-flex rounded-full bg-muted/50 p-1"
-                >
-                  {MODALITY_OPTIONS.map((opt) => {
-                    const active = modality === opt;
-                    return (
-                      <button
-                        key={opt}
-                        type="button"
-                        role="radio"
-                        aria-checked={active}
-                        onClick={() => setModality(opt)}
-                        className={cn(
-                          "rounded-full px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
-                          active
-                            ? "bg-background text-foreground shadow-sm"
-                            : "text-muted-foreground hover:text-foreground"
-                        )}
-                      >
-                        {opt}
-                      </button>
-                    );
-                  })}
-                </div>
+                <SegmentedControl
+                  name="modality-hint-control"
+                  ariaLabel="Modality hint"
+                  size="sm"
+                  value={modality}
+                  options={toSegmentedOptions(MODALITY_OPTIONS)}
+                  onChange={(opt) => setModality(opt)}
+                />
                 <p className="mt-1.5 text-xs text-muted-foreground">
                   Auto: 입력 텍스트에서 modality를 자동 유추합니다. 구체적인
                   modality를 선택하면 프롬프트에 hint로 전달됩니다.

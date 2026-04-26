@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus } from "lucide-react";
+import { Info, Plus } from "lucide-react";
 import type {
   RccMass,
   RccStructuredInput,
@@ -58,6 +58,27 @@ export function RccStructuredForm({
 
   return (
     <div className="flex flex-col gap-6">
+      {/*
+        SPEC-UI-001 R3 disclaimer banner.
+        Color-coded radio cards (Bosniak, Trajectory) are visual aids only;
+        clinical decisions remain the radiologist's responsibility.
+      */}
+      <div
+        role="note"
+        className="flex items-start gap-2 rounded-md border border-border/50 bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
+      >
+        <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+        <p>
+          색상 표기는 시각 보조이며, 진단·치료 결정은 영상의학 전문의의 판단을
+          따릅니다.
+          <span className="sr-only">
+            {" "}
+            Color coding is a visual aid; clinical decisions are the
+            radiologist&apos;s responsibility.
+          </span>
+        </p>
+      </div>
+
       {error && (
         <p
           role="alert"
