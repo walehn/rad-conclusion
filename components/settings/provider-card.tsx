@@ -12,12 +12,14 @@ interface ProviderCardProps {
   settings: ProviderSettings;
   onChange: (updated: ProviderSettings) => void;
   onValidate: (providerId: string) => void;
+  hasStoredKey?: boolean;
 }
 
 export function ProviderCard({
   settings,
   onChange,
   onValidate,
+  hasStoredKey = false,
 }: ProviderCardProps) {
   const isLocal = settings.id === "local";
   const hasKey = isLocal ? !!settings.hostUrl : !!settings.apiKey;
@@ -100,6 +102,7 @@ export function ProviderCard({
             onValidate={() => onValidate(settings.id)}
             validationStatus={settings.validationStatus}
             disabled={!settings.enabled}
+            hasStoredKey={hasStoredKey}
           />
         )}
 
