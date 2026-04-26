@@ -15,6 +15,7 @@ import {
 } from "@/lib/prompts/disease-templates/rcc-serializer";
 import type { RccStructuredInput } from "@/lib/prompts/disease-templates/rcc-serializer";
 import { loadProviderSettings } from "@/lib/storage/settings-store";
+import { genClientId } from "@/lib/utils";
 import type { DiseaseCategory } from "@/lib/prompts/disease-registry";
 import type {
   RccModality,
@@ -81,7 +82,9 @@ function appendStreamChunk(accumulated: string, rawLine: string): string {
 
 export function StructuredReportClient() {
   const [freeTextFindings, setFreeTextFindings] = React.useState("");
-  const [structuredInput, setStructuredInput] = React.useState<RccStructuredInput>({});
+  const [structuredInput, setStructuredInput] = React.useState<RccStructuredInput>(
+    () => ({ masses: [{ id: genClientId() }] })
+  );
   const [activeTab, setActiveTab] = React.useState<ActiveTab>("free-text");
   const [modality, setModality] = React.useState<RccModality>("Auto");
   const [lang, setLang] = React.useState<RccReportLang>("en");
@@ -95,6 +98,7 @@ export function StructuredReportClient() {
   const [content, setContent] = React.useState("");
   const [isStreaming, setIsStreaming] = React.useState(false);
   const [elapsedMs, setElapsedMs] = React.useState<number | null>(null);
+  const [streamStartedAt, setStreamStartedAt] = React.useState<number | null>(null);
   const [apiError, setApiError] = React.useState<string | null>(null);
   const abortRef = React.useRef<AbortController | null>(null);
 
@@ -209,6 +213,7 @@ export function StructuredReportClient() {
     abortRef.current = controller;
     setIsStreaming(true);
     const startedAt = performance.now();
+    setStreamStartedAt(startedAt);
 
     try {
       const response = await fetch("/api/structured-report/generate", {
@@ -286,6 +291,7 @@ export function StructuredReportClient() {
       );
     } finally {
       setIsStreaming(false);
+      setStreamStartedAt(null);
       abortRef.current = null;
     }
   }, [freeTextFindings, structuredInput, activeTab, modality, lang, provider, model]);
@@ -446,6 +452,7 @@ export function StructuredReportClient() {
             content={content}
             isStreaming={isStreaming}
             elapsedMs={elapsedMs}
+            streamStartedAt={streamStartedAt}
             error={apiError}
             onRetry={handleRetry}
           />

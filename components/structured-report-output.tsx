@@ -16,6 +16,8 @@ interface StructuredReportOutputProps {
   isStreaming: boolean;
   /** Total generation time in milliseconds (once streaming ends). */
   elapsedMs?: number | null;
+  /** performance.now() timestamp of when the current stream started. */
+  streamStartedAt?: number | null;
   /** Retry callback; shown when error is non-empty. */
   onRetry?: () => void;
   /** Error message from the last generation attempt. */
@@ -142,8 +144,21 @@ function parseSections(content: string): ParsedSections {
  * decimal places for consistency with the Conclusion Generator.
  */
 function formatElapsed(ms: number): string {
-  if (ms < 1000) return `${ms} ms`;
-  return `${(ms / 1000).toFixed(2)} s`;
+  if (ms < 1000) return `${Math.round(ms)} ms`;
+  return `${(ms / 1000).toFixed(1)} s`;
+}
+
+function LiveElapsed({ startedAt }: { startedAt: number }) {
+  const [now, setNow] = React.useState(() => performance.now());
+  React.useEffect(() => {
+    const id = window.setInterval(() => setNow(performance.now()), 100);
+    return () => window.clearInterval(id);
+  }, []);
+  return (
+    <span className="ml-auto text-xs tabular-nums text-muted-foreground">
+      {formatElapsed(now - startedAt)}
+    </span>
+  );
 }
 
 /**
@@ -158,6 +173,7 @@ export function StructuredReportOutput({
   content,
   isStreaming,
   elapsedMs,
+  streamStartedAt,
   onRetry,
   error,
 }: StructuredReportOutputProps) {
@@ -240,6 +256,22 @@ export function StructuredReportOutput({
           )}
         </div>
       </div>
+
+      {/* Live generation status: spinner + elapsed timer + indeterminate progress bar */}
+      {isStreaming && (
+        <div className="flex flex-col gap-2 rounded-md border border-primary/20 bg-primary/5 p-3">
+          <div className="flex items-center gap-2 text-sm text-foreground">
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            <span className="font-medium">Generating structured report</span>
+            {typeof streamStartedAt === "number" && (
+              <LiveElapsed startedAt={streamStartedAt} />
+            )}
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-primary/10">
+            <div className="h-full w-1/4 rounded-full bg-primary animate-indeterminate-progress" />
+          </div>
+        </div>
+      )}
 
       {/* Error banner (preserves any partial output below) */}
       {error && (
@@ -337,13 +369,6 @@ export function StructuredReportOutput({
         </div>
       )}
 
-      {/* Global streaming hint below the section stack */}
-      {isStreaming && hasAnyContent && (
-        <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-          <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-          <span>Streaming...</span>
-        </div>
-      )}
     </div>
   );
 }

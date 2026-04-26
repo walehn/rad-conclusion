@@ -130,9 +130,19 @@ describe("StructuredReportClient — tab integration", () => {
       );
       expect(generateCall).toBeDefined();
       const body = JSON.parse(generateCall!.options.body as string);
-      // serializeRccStructuredInput always emits these two lines
+      // serializeRccStructuredInput always emits these two lines, prefixed
+      // with a `Mass 1:` header even for a single-mass payload.
+      expect(body.findings).toContain("Mass 1:");
       expect(body.findings).toContain("- Side:");
       expect(body.findings).toContain("- Mass size:");
+      // Bosniak v2019 alignment: the Predominantly cystic line is always
+      // emitted (NA for Solid masses, Yes/No/Not specified otherwise). In the
+      // default state the massType is undefined → "Not specified in input".
+      expect(body.findings).toContain("- Predominantly cystic:");
+      // Regression guard: study-level block must be omitted when no
+      // lymphNodes / distantMetastases fields are set in the default state.
+      expect(body.findings).not.toContain("Regional lymph nodes");
+      expect(body.findings).not.toContain("Distant metastases");
       expect(body.diseaseCategory).toBe("RCC");
     });
   });

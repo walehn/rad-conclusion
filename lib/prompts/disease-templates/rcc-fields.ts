@@ -15,9 +15,9 @@
 // Constant arrays (as const tuples for type inference)
 // ---------------------------------------------------------------------------
 
-export const RCC_SIDES = ["Right", "Left", "Bilateral"] as const;
+export const RCC_SIDES = ["Right", "Left"] as const;
 
-export const RCC_MASS_TYPES = ["Solid", "Cystic", "Predominantly cystic"] as const;
+export const RCC_MASS_TYPES = ["Solid", "Cystic"] as const;
 
 export const RCC_BOSNIAK = ["I", "II", "IIF", "III", "IV"] as const;
 
@@ -45,8 +45,59 @@ export const RCC_EXOPHYTIC = [
 
 export const RCC_THROMBUS_KINDS = ["None", "Renal vein", "IVC"] as const;
 
+/**
+ * Lymph node / metastasis presence enum (study-level).
+ * Used for both Regional lymph nodes and Distant metastases.
+ */
+export const RCC_LN_M = ["Absent", "Present", "Indeterminate"] as const;
+
+/**
+ * Mass-level size comparison trajectory category.
+ * Captures the change pattern between current and prior study.
+ */
+export const RCC_TRAJECTORY = [
+  "New",
+  "Increasing",
+  "Stable",
+  "Decreasing",
+] as const;
+
+/**
+ * Regional lymph node station enum (RCC drainage anatomy).
+ * Shown when `lymphNodes === "Present"`.
+ */
+export const RCC_LN_SITES = [
+  "Renal hilar",
+  "Retroperitoneal",
+  "Pelvic",
+  "Mediastinal",
+  "Other",
+] as const;
+
+/**
+ * Distant metastasis site enum (RCC clinical distribution).
+ * Shown when `distantMetastases === "Present"`.
+ */
+export const RCC_MET_SITES = [
+  "Lung",
+  "Liver",
+  "Bone",
+  "Adrenal",
+  "Brain",
+  "Pancreas",
+  "Other",
+] as const;
+
 /** Sentinel value shown in the Bosniak selector when the mass is solid. */
 export const BOSNIAK_NA_SOLID = "Not applicable (solid mass)" as const;
+
+/**
+ * Sentinel value shown in the Predominantly cystic selector when the mass is
+ * solid. The string matches BOSNIAK_NA_SOLID, but is exported separately to
+ * preserve semantic separation between the two NA contexts (Bosniak v2019
+ * cyst classification vs. cystic-predominant pathology indicator).
+ */
+export const PRED_CYSTIC_NA_SOLID = "Not applicable (solid mass)" as const;
 
 // ---------------------------------------------------------------------------
 // Union types derived from the constant arrays
@@ -63,3 +114,7 @@ export type RccCranio = (typeof RCC_CRANIO)[number];
 export type RccMargins = (typeof RCC_MARGINS)[number];
 export type RccExophytic = (typeof RCC_EXOPHYTIC)[number];
 export type RccThrombus = (typeof RCC_THROMBUS_KINDS)[number];
+export type RccLnM = (typeof RCC_LN_M)[number];
+export type RccTrajectory = (typeof RCC_TRAJECTORY)[number];
+export type RccLnSite = (typeof RCC_LN_SITES)[number];
+export type RccMetSite = (typeof RCC_MET_SITES)[number];

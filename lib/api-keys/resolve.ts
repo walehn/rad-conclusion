@@ -16,6 +16,12 @@ export async function resolveApiKey(
   userId: number,
   provider: ProviderName
 ): Promise<string | null> {
+  // Local provider needs no API key; skip DB lookup so this works even when
+  // the user_api_keys migration has not been applied.
+  if (provider === 'local') {
+    return null;
+  }
+
   // 1. Look up user's stored key
   const rows = await db
     .select()
@@ -41,9 +47,6 @@ export async function resolveApiKey(
       return process.env.ANTHROPIC_API_KEY ?? null;
     case 'google':
       return process.env.GOOGLE_AI_API_KEY ?? null;
-    case 'local':
-      // Local provider does not require an API key
-      return null;
     default:
       return null;
   }
