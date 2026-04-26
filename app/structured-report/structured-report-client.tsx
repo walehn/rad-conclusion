@@ -9,7 +9,9 @@ import { TabbedFindingsInput } from "@/components/tabbed-findings-input";
 import type { ActiveTab } from "@/components/tabbed-findings-input";
 import { ModelSelector } from "@/components/model-selector";
 import { DiseaseCategoryIndicator } from "@/components/disease-category-indicator";
+import { ReferencesDialog } from "@/components/references-dialog";
 import { StructuredReportOutput } from "@/components/structured-report-output";
+import { getDiseaseCategoryMetadata } from "@/lib/prompts/disease-registry";
 import {
   serializeRccStructuredInput,
 } from "@/lib/prompts/disease-templates/rcc-serializer";
@@ -309,11 +311,16 @@ export function StructuredReportClient() {
     <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <header className="mb-6">
         <div>
-          <DiseaseCategoryIndicator
-            category={DISEASE_CATEGORY}
-            variant="overline"
-            index={1}
-          />
+          <div className="flex items-center gap-3">
+            <DiseaseCategoryIndicator
+              category={DISEASE_CATEGORY}
+              variant="overline"
+              index={1}
+            />
+            <ReferencesDialog
+              citations={getDiseaseCategoryMetadata("RCC").standardReferences}
+            />
+          </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
             구조화 리포트 생성기
           </h1>
