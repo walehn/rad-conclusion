@@ -20,3 +20,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **DiseaseCategoryIndicator overline variant**: New `variant="overline"` with `index` prop for above-H1 placement (backward compatible with existing `variant="pill"`)
 - **Disease registry**: `lib/prompts/disease-registry.ts` + RCC-specific prompt builder in `lib/prompts/disease-templates/rcc.ts`
 - **IPv6 loopback support** (`middleware.ts`): Added `::ffff:127.0.0.1` to ALLOWED_IPS
+- **SegmentedControl component** (`components/ui/segmented-control.tsx`): Generic, accessible radio-style toggle with CVA size variants (sm/md), full ARIA radiogroup semantics, roving tabindex, and keyboard navigation (arrows/Home/End/Space/Enter). Active option highlighted via direct background+ring (Radix Toggle Group / Linear / Vercel pattern). (SPEC-UI-001)
+- **RadioCardGroup component** (`components/ui/radio-card-group.tsx`): Generic radio card grid with semantic tone variants (`neutral` | `success` | `warning` | `orange` | `destructive`), responsive `columns 1|2|3`, left accent bar, optional sublabel, and disabled-state lock icon with `aria-describedby` note.
+- **Semantic color coding for clinical radios**: Bosniak v2019 grades (I/II → success "Benign", IIF → warning "Surveillance", III → orange "Surgical", IV → destructive "Malignant") and Trajectory (New/Increasing → destructive "Active growth", Stable → neutral, Decreasing → success "Regression"). Color is always paired with text label and sublabel (WCAG 1.4.1 — never color-alone).
+- **`--color-orange` design token** in `app/globals.css` (light + dark) for the Bosniak III tone.
+- **Color-coding disclaimer banner** at the top of `RccStructuredForm`: notifies users that color is a visual aid and clinical decisions remain the radiologist's responsibility (Korean visible + sr-only English).
+- **`lib/ui/rcc-options-meta.ts`**: Tone/sublabel mapping for Bosniak and Trajectory radio options.
+
+### Changed
+- **Migrated 14 radio inputs** in the structured input form to the unified primitives: (SPEC-UI-001)
+  - `rcc-mass-card.tsx` — 11 radios (Bosniak + Trajectory as `RadioCardGroup`; Side, Mass type, Margins, Cranio-caudal, Macroscopic Fat, Solid Enhancement, Axial Location, Exophytic Ratio, Thrombus Kind as `SegmentedControl`)
+  - `rcc-study-level-card.tsx` — 2 radios (Regional LN, Distant Met as `SegmentedControl`)
+  - `structured-report-client.tsx` — 1 radio (Modality hint as `SegmentedControl`)
+  - All call-site behavior preserved: controlled `value`/`onChange`, `disabled` + `disabledNote` (Bosniak gated by `massType=Solid`), Thrombus / LN / Met sub-field branching, Mass type cysticPredominant reset.
+- **Removed local `RadioGroup<T>` helpers** previously inlined in `rcc-mass-card.tsx` and `rcc-study-level-card.tsx`.
+
+### Fixed
+- **Critical: Radio option label truncation** — long option labels (e.g., `<50% exophytic`, `>=50% exophytic`, `Indeterminate`, `Upper pole`) were collapsing to ellipsis (`...`) under the previous `auto-cols-fr` equal-distribution layout combined with a `truncate` class on each label span. Replaced with `inline-flex flex-wrap items-stretch` + content-sized options + active-button direct highlight; labels now render in full and wrap to a new row only when the container is narrower than the row's natural width. No horizontal scroll, no clipping, full keyboard flow preserved. (SPEC-UI-001)
