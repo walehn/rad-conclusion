@@ -28,7 +28,11 @@ export function RccClinicalContextCard({
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* SPEC-UI-001 desktop layout revision: align gap rhythm with the
+            mass / study-level cards (gap-x-6 / gap-y-5). Keep the existing
+            md:grid-cols-3 split (textarea spans 2 + date input takes 1) since
+            it is already optimal for clinical-context content. */}
+        <div className="grid gap-x-6 gap-y-5 md:grid-cols-3">
           <div className="rounded-lg border border-border p-3 flex flex-col gap-2 md:col-span-2">
             <label
               htmlFor={id("info")}

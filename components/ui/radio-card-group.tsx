@@ -77,36 +77,43 @@ const cardToneVariants = cva(
       },
       selected: {
         true: "",
-        false: "hover:border-border hover:bg-muted/40",
+        // Stronger hover signal: a clearer border darkening + faint muted
+        // wash + tiny shadow lift make every card visibly clickable on
+        // pointer devices. SPEC-UI-001 contrast revision.
+        false:
+          "hover:border-foreground/30 hover:bg-muted/30 hover:shadow-sm",
       },
     },
     compoundVariants: [
-      // Selected ring + soft bg per tone
+      // Selected: stronger ring (40 -> 50), denser tinted bg (5 -> 10),
+      // saturated border (60% -> 100% tone), and a md shadow so the chosen
+      // card visually pops out of the grid in clinical lighting.
       {
         tone: "neutral",
         selected: true,
-        class: "border-foreground/40 bg-muted/60 ring-2 ring-foreground/20",
+        class:
+          "border-foreground/60 bg-muted ring-2 ring-foreground/30 shadow-md",
       },
       {
         tone: "success",
         selected: true,
-        class: "border-success/60 bg-success/5 ring-2 ring-success/40",
+        class: "border-success bg-success/10 ring-2 ring-success/50 shadow-md",
       },
       {
         tone: "warning",
         selected: true,
-        class: "border-warning/60 bg-warning/5 ring-2 ring-warning/40",
+        class: "border-warning bg-warning/10 ring-2 ring-warning/50 shadow-md",
       },
       {
         tone: "orange",
         selected: true,
-        class: "border-orange/60 bg-orange/5 ring-2 ring-orange/40",
+        class: "border-orange bg-orange/10 ring-2 ring-orange/50 shadow-md",
       },
       {
         tone: "destructive",
         selected: true,
         class:
-          "border-destructive/60 bg-destructive/5 ring-2 ring-destructive/40",
+          "border-destructive bg-destructive/10 ring-2 ring-destructive/50 shadow-md",
       },
     ],
     defaultVariants: {
@@ -282,7 +289,16 @@ export function RadioCardGroup<T extends string>({
                   tokens at any character if needed (e.g. URLs / code names),
                   while `leading-tight` keeps the visual rhythm tight. */}
               <span className="flex min-w-0 flex-1 flex-col gap-0.5 pl-2">
-                <span className="text-sm font-semibold leading-tight break-words">
+                {/* Selected label intensifies to font-bold so the chosen
+                    option reads at a glance even when scanning the grid
+                    diagonally; unselected stays at semibold to remain
+                    legible without competing with the selection. */}
+                <span
+                  className={cn(
+                    "text-sm leading-tight break-words",
+                    selected ? "font-bold" : "font-semibold"
+                  )}
+                >
                   {opt.label}
                 </span>
                 {opt.sublabel && (

@@ -218,7 +218,14 @@ export function RccMassCard({
         </Button>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* SPEC-UI-001 desktop layout revision:
+              - Mobile (<md): single column (unchanged, user-confirmed OK).
+              - Desktop (>=md): 2-column grid, with bulky controls (RadioCardGroup,
+                fieldset checkboxes, conditional Neves-Mayo Select) spanning both
+                columns so their internal wrapping does not feel cramped.
+              - gap-x-6 / gap-y-5 increases breathing room compared to the legacy
+                gap-4 so the denser primary-tone segmented controls stay readable. */}
+        <div className="grid gap-x-6 gap-y-5 md:grid-cols-2">
           {/* 1. Side */}
           <FieldRow label="Side">
             <SegmentedControl
@@ -258,8 +265,11 @@ export function RccMassCard({
             optional
           />
 
-          {/* 2c. Size comparison — trajectory */}
-          <FieldRow label="Trajectory">
+          {/* 2c. Size comparison — trajectory.
+              RadioCardGroup with up to 4 tonal cards reads cleanly at full width;
+              constraining it to a single grid column would force the cards to wrap
+              awkwardly and hide the color-coded growth tones. */}
+          <FieldRow label="Trajectory" className="md:col-span-2">
             <RadioCardGroup
               name={fieldId("trajectory")}
               ariaLabel="Trajectory"
@@ -305,9 +315,11 @@ export function RccMassCard({
 
           {/* 5. Bosniak — only rendered when mass type is not Solid (Bosniak v2019
               applies exclusively to cystic masses; for Solid, the field is omitted
-              from the UI and from the serialized prompt to avoid noise). */}
+              from the UI and from the serialized prompt to avoid noise).
+              Spans both columns so the 5 risk-tier cards (I-IV/IIF) line up in a
+              single readable row at desktop widths. */}
           {isCystic && (
-            <FieldRow label="Bosniak">
+            <FieldRow label="Bosniak" className="md:col-span-2">
               <RadioCardGroup
                 name={fieldId("bosniak")}
                 ariaLabel="Bosniak"
@@ -323,7 +335,7 @@ export function RccMassCard({
               Same rationale as Bosniak: a "predominantly cystic" indicator is
               meaningless for a Solid mass. */}
           {isCystic && (
-            <fieldset className="rounded-lg border border-border p-3 flex flex-col gap-2">
+            <fieldset className="md:col-span-2 rounded-lg border border-border p-3 flex flex-col gap-2">
               <legend
                 id={`${fieldId("cysticPredominant")}-legend`}
                 className="px-1 text-sm font-medium text-foreground"
@@ -466,9 +478,12 @@ export function RccMassCard({
           </FieldRow>
 
           {/* 14. Neves-Mayo Level — Renal vein: auto Level 0 (info only).
-                                     IVC: user-selected I–IV. */}
+                                     IVC: user-selected I–IV.
+              Span both columns so the long descriptive sentences (e.g.
+              "IVC, retro-/intrahepatic") render on a single line under the
+              field label and stay anchored next to the parent thrombus row. */}
           {value.thrombusKind === "Renal vein" && (
-            <div className="rounded-lg border border-border p-3 flex flex-col gap-1">
+            <div className="md:col-span-2 rounded-lg border border-border p-3 flex flex-col gap-1">
               <span className="text-sm font-medium text-foreground">
                 Neves-Mayo Level
               </span>
@@ -481,7 +496,7 @@ export function RccMassCard({
             </div>
           )}
           {value.thrombusKind === "IVC" && (
-            <div className="rounded-lg border border-border p-3 flex flex-col gap-2">
+            <div className="md:col-span-2 rounded-lg border border-border p-3 flex flex-col gap-2">
               <Select
                 id={fieldId("thrombusLevel")}
                 label="Neves-Mayo Level"
@@ -506,7 +521,7 @@ export function RccMassCard({
 
           {/* 15. Bland (non-tumor) thrombus — conditional on thrombusKind */}
           {showThrombusDetails && (
-            <FieldRow label="Bland (non-tumor) thrombus">
+            <FieldRow label="Bland (non-tumor) thrombus" className="md:col-span-2">
               <SegmentedControl
                 name={fieldId("blandThrombus")}
                 ariaLabel="Bland (non-tumor) thrombus"

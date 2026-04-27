@@ -39,7 +39,9 @@ const containerVariants = cva(
   // narrow viewports rather than truncating any option label. `items-stretch`
   // keeps every wrapped row aligned at equal height. Container height is no
   // longer fixed because wrapped rows must be free to stack vertically.
-  "relative inline-flex flex-wrap items-stretch gap-0.5 rounded-md bg-muted/60 p-0.5 text-foreground/90 ring-1 ring-inset ring-border/60",
+  // SPEC-UI-001 contrast revision: thicker outer border + slightly stronger
+  // muted backdrop + larger gap so inactive options read as distinct cells.
+  "relative inline-flex flex-wrap items-stretch gap-1 rounded-lg border border-border bg-muted/30 p-1 text-foreground",
   {
     variants: {
       size: {
@@ -61,16 +63,26 @@ const optionVariants = cva(
   // options to the next row. Active state is applied directly to the button
   // (background + ring + shadow) instead of via a separate sliding indicator,
   // so width-uneven option lists render correctly.
-  "relative inline-flex items-center justify-center whitespace-nowrap rounded-[5px] font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:cursor-not-allowed",
+  "relative inline-flex items-center justify-center whitespace-nowrap rounded-md font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:cursor-not-allowed",
   {
     variants: {
       size: {
-        sm: "px-2.5 py-1",
-        md: "px-3 py-1",
+        // Wider horizontal padding (vs. previous px-2.5/3) enlarges the click
+        // target and gives the active primary fill room to breathe.
+        sm: "px-3 py-1",
+        md: "px-4 py-1",
       },
       active: {
-        true: "bg-background text-foreground shadow-sm ring-1 ring-inset ring-border/40",
-        false: "text-muted-foreground hover:text-foreground",
+        // Active option = strong primary teal fill + bold white-equivalent
+        // text + subtle shadow. This is the critical contrast cue: at a
+        // glance the radiologist must see which option is selected without
+        // having to inspect ring details.
+        true: "bg-primary text-primary-foreground font-semibold shadow-sm",
+        // Inactive: keep readable foreground (not muted) so labels do not
+        // disappear; reveal a faint card-tone background on hover so the
+        // option signals it is interactive.
+        false:
+          "bg-transparent text-foreground/80 hover:bg-background hover:text-foreground",
       },
     },
     defaultVariants: {

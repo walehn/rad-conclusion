@@ -54,6 +54,7 @@ interface CheckboxGroupProps<T extends string> {
   options: readonly T[];
   selected: readonly T[] | undefined;
   onChange: (next: T[]) => void;
+  className?: string;
 }
 
 /**
@@ -68,6 +69,7 @@ function CheckboxGroup<T extends string>({
   options,
   selected,
   onChange,
+  className,
 }: CheckboxGroupProps<T>) {
   const current = selected ?? [];
   const toggle = (opt: T) => {
@@ -81,7 +83,10 @@ function CheckboxGroup<T extends string>({
   return (
     <fieldset
       aria-labelledby={`${id}-legend`}
-      className="rounded-lg border border-border p-3 flex flex-col gap-2"
+      className={cn(
+        "rounded-lg border border-border p-3 flex flex-col gap-2",
+        className
+      )}
     >
       <legend
         id={`${id}-legend`}
@@ -219,7 +224,10 @@ export function RccStudyLevelCard({ value, onChange }: RccStudyLevelCardProps) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* SPEC-UI-001 desktop layout revision: 2-column grid on md+ with
+            multi-select CheckboxGroups spanning both columns so all chip
+            options sit on a single readable row instead of being squeezed. */}
+        <div className="grid gap-x-6 gap-y-5 md:grid-cols-2">
           {/* Regional lymph nodes */}
           <FieldRow label="Regional lymph nodes">
             <SegmentedControl
@@ -231,20 +239,9 @@ export function RccStudyLevelCard({ value, onChange }: RccStudyLevelCardProps) {
             />
           </FieldRow>
 
-          {/* LN site multiselect — conditional on Present */}
-          {showLnDetails && (
-            <CheckboxGroup<RccLnSite>
-              id="study-lymphNodeSites"
-              legend="Lymph node sites"
-              options={RCC_LN_SITES}
-              selected={value.lymphNodeSites}
-              onChange={(next) =>
-                onChange({ ...value, lymphNodeSites: next })
-              }
-            />
-          )}
-
-          {/* LN largest short axis — conditional on Present */}
+          {/* LN largest short axis — conditional on Present.
+              Placed adjacent to the LN selector on desktop so the size input
+              stays in the same visual row as its parent control. */}
           {showLnDetails && (
             <NumberField
               id="study-lymphNodeShortAxisCm"
@@ -255,6 +252,22 @@ export function RccStudyLevelCard({ value, onChange }: RccStudyLevelCardProps) {
               }
               unit="cm"
               optional
+            />
+          )}
+
+          {/* LN site multiselect — conditional on Present.
+              Spans both columns so the chip set is not crushed into a single
+              column on desktop. */}
+          {showLnDetails && (
+            <CheckboxGroup<RccLnSite>
+              id="study-lymphNodeSites"
+              legend="Lymph node sites"
+              options={RCC_LN_SITES}
+              selected={value.lymphNodeSites}
+              onChange={(next) =>
+                onChange({ ...value, lymphNodeSites: next })
+              }
+              className="md:col-span-2"
             />
           )}
 
@@ -269,7 +282,8 @@ export function RccStudyLevelCard({ value, onChange }: RccStudyLevelCardProps) {
             />
           </FieldRow>
 
-          {/* Metastasis site multiselect — conditional on Present */}
+          {/* Metastasis site multiselect — conditional on Present.
+              Same col-span rationale as LN site multiselect. */}
           {showMetDetails && (
             <CheckboxGroup<RccMetSite>
               id="study-metastasisSites"
@@ -279,6 +293,7 @@ export function RccStudyLevelCard({ value, onChange }: RccStudyLevelCardProps) {
               onChange={(next) =>
                 onChange({ ...value, metastasisSites: next })
               }
+              className="md:col-span-2"
             />
           )}
         </div>
