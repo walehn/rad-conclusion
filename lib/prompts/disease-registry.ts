@@ -160,3 +160,34 @@ export function getDiseaseCategoryMetadata(
   }
   return metadata;
 }
+
+/**
+ * Convert a DiseaseCategory PascalCase identifier to a kebab-case URL slug.
+ *
+ * Examples:
+ *   - "RCC"            → "rcc"
+ *   - "ProstateCancer" → "prostate-cancer"
+ *
+ * Used for routing under `/structured-report/<slug>` (SPEC-DISEASE-SELECTOR-001).
+ */
+export function diseaseCategoryToSlug(category: DiseaseCategory): string {
+  return category.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+}
+
+/**
+ * Parse a kebab-case URL slug back into a DiseaseCategory.
+ *
+ * Iterates DISEASE_REGISTRY keys and returns the first whose
+ * diseaseCategoryToSlug() matches the input exactly (case-strict).
+ * Returns null for unregistered or malformed slugs.
+ *
+ * Round-trip guarantee:
+ *   parseDiseaseCategorySlug(diseaseCategoryToSlug(c)) === c
+ *   for every c ∈ DiseaseCategory.
+ */
+export function parseDiseaseCategorySlug(slug: string): DiseaseCategory | null {
+  for (const key of Object.keys(DISEASE_REGISTRY) as DiseaseCategory[]) {
+    if (diseaseCategoryToSlug(key) === slug) return key;
+  }
+  return null;
+}

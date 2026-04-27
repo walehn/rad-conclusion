@@ -3,6 +3,9 @@ import {
   DISEASE_REGISTRY,
   isDiseaseCategory,
   getDiseaseCategoryMetadata,
+  diseaseCategoryToSlug,
+  parseDiseaseCategorySlug,
+  type DiseaseCategory,
 } from '@/lib/prompts/disease-registry';
 
 describe('lib/prompts/disease-registry', () => {
@@ -63,6 +66,37 @@ describe('lib/prompts/disease-registry', () => {
       expect(meta.description.toLowerCase()).toContain('renal cell carcinoma');
       expect(meta.supportedModalities.length).toBeGreaterThan(0);
       expect(meta.standardReferences.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('diseaseCategoryToSlug / parseDiseaseCategorySlug', () => {
+    it('converts RCC to "rcc"', () => {
+      expect(diseaseCategoryToSlug('RCC')).toBe('rcc');
+    });
+
+    it('round-trips every registered DiseaseCategory', () => {
+      const keys = Object.keys(DISEASE_REGISTRY) as DiseaseCategory[];
+      for (const c of keys) {
+        expect(parseDiseaseCategorySlug(diseaseCategoryToSlug(c))).toBe(c);
+      }
+    });
+
+    it('returns null for unknown slugs', () => {
+      expect(parseDiseaseCategorySlug('foo')).toBe(null);
+      expect(parseDiseaseCategorySlug('prostate-cancer')).toBe(null); // not registered yet
+      expect(parseDiseaseCategorySlug('')).toBe(null);
+    });
+
+    it('is case-strict — rejects "Rcc" and "RCC"', () => {
+      expect(parseDiseaseCategorySlug('Rcc')).toBe(null);
+      expect(parseDiseaseCategorySlug('RCC')).toBe(null);
+    });
+
+    it('produces unique slugs across the entire registry', () => {
+      const keys = Object.keys(DISEASE_REGISTRY) as DiseaseCategory[];
+      const slugs = keys.map(diseaseCategoryToSlug);
+      const unique = new Set(slugs);
+      expect(unique.size).toBe(slugs.length);
     });
   });
 });

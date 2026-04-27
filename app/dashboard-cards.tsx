@@ -57,7 +57,7 @@ export function DashboardCards() {
         ariaLabel="구조화 리포트 생성기 시작 — 섹션 구조화된 리포트 생성"
         icon={<LayoutList className="h-12 w-12 text-primary" aria-hidden="true" />}
         title="구조화 리포트 생성기"
-        description="Findings와 Modality로부터 TECHNIQUE / FINDINGS / STAGING / IMPRESSION 구조의 완성된 리포트를 생성합니다. 현재 Renal Cell Carcinoma(신세포암)를 지원합니다."
+        description="다중 질병 지원 — 질병 선택 후 구조화 리포트를 생성합니다. 6개 섹션 (CLINICAL INFORMATION / TECHNIQUE / COMPARISON / FINDINGS / STAGING / IMPRESSION)."
       />
     </div>
   );

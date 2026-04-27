@@ -72,7 +72,7 @@ describe("StructuredReportClient — structured input integration", () => {
   });
 
   it("RCC Structured 입력의 직렬화 결과가 findings 필드로 전송된다", async () => {
-    render(<StructuredReportClient />);
+    render(<StructuredReportClient disease="RCC" />);
 
     // The RCC structured form is now always visible (no tab toggle). Fill in
     // the two minimum-required fields so `hasMinimumStructuredFields` passes

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { Send, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,8 +34,6 @@ import {
   SegmentedControl,
   toSegmentedOptions,
 } from "@/components/ui/segmented-control";
-
-const DISEASE_CATEGORY: DiseaseCategory = "RCC";
 
 const MODALITY_OPTIONS: readonly RccModality[] = [
   "Auto",
@@ -84,7 +83,7 @@ function appendStreamChunk(accumulated: string, rawLine: string): string {
   return accumulated;
 }
 
-export function StructuredReportClient() {
+export function StructuredReportClient({ disease }: { disease: DiseaseCategory }) {
   const [structuredInput, setStructuredInput] = React.useState<RccStructuredInput>(
     () => ({ masses: [{ id: genClientId() }] })
   );
@@ -212,7 +211,7 @@ export function StructuredReportClient() {
         },
         body: JSON.stringify({
           findings: findingsText,
-          diseaseCategory: DISEASE_CATEGORY,
+          diseaseCategory: disease,
           modality,
           lang,
           provider,
@@ -295,6 +294,15 @@ export function StructuredReportClient() {
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      {/* Back link to the disease selector landing page (SPEC-DISEASE-SELECTOR-001). */}
+      <Link
+        href="/structured-report"
+        aria-label="질병 선택 페이지로 돌아가기"
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground hover:underline transition-colors mb-3"
+      >
+        <span aria-hidden="true">←</span>
+        다른 질병 선택
+      </Link>
       {/* Page hero — split into two stacked cards.
 
           Card 1 = the "current disease" selector strip. Designed to scale to
@@ -326,13 +334,13 @@ export function StructuredReportClient() {
         <Card className="shadow-sm ring-1 ring-border/50">
           <CardContent className="flex flex-wrap items-center justify-between gap-4 py-5">
             <DiseaseCategoryIndicator
-              category={DISEASE_CATEGORY}
+              category={disease}
               variant="hero"
               index={1}
             />
             <ReferencesDialog
               size="lg"
-              citations={getDiseaseCategoryMetadata("RCC").standardReferences}
+              citations={getDiseaseCategoryMetadata(disease).standardReferences}
             />
           </CardContent>
         </Card>
