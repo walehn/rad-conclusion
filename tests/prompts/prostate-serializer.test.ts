@@ -17,6 +17,7 @@ import {
   deriveClinicalT,
   deriveClinicalN,
   deriveClinicalM,
+  deriveProstateVolume,
   derivePsaDensity,
   deriveEauRiskGroup,
   hasMinimumProstateFields,
@@ -611,6 +612,45 @@ describe("deriveClinicalM", () => {
         })
       )
     ).toBe("M1b");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// deriveProstateVolume — ellipsoid approximation V = W × H × AP × 0.52 / 1000
+// ---------------------------------------------------------------------------
+
+describe("deriveProstateVolume", () => {
+  it("W=40, H=30, AP=30 → 18.7 mL (40 × 30 × 30 × 0.52 / 1000 = 18.72 → 1 dp)", () => {
+    expect(deriveProstateVolume(40, 30, 30)).toBe(18.7);
+  });
+
+  it("W=50, H=40, AP=40 → 41.6 mL (typical enlarged prostate)", () => {
+    // 50 × 40 × 40 × 0.52 / 1000 = 41.6 exactly
+    expect(deriveProstateVolume(50, 40, 40)).toBe(41.6);
+  });
+
+  it("W=30, H=25, AP=25 → 9.8 mL (small prostate, 1 dp rounding)", () => {
+    // 30 × 25 × 25 × 0.52 / 1000 = 9.75 → 9.8 (Math.round rounds .5 up)
+    expect(deriveProstateVolume(30, 25, 25)).toBe(9.8);
+  });
+
+  it("returns undefined when any dimension is missing", () => {
+    expect(deriveProstateVolume(undefined, 30, 30)).toBeUndefined();
+    expect(deriveProstateVolume(40, undefined, 30)).toBeUndefined();
+    expect(deriveProstateVolume(40, 30, undefined)).toBeUndefined();
+  });
+
+  it("returns undefined when any dimension is zero or negative", () => {
+    expect(deriveProstateVolume(0, 30, 30)).toBeUndefined();
+    expect(deriveProstateVolume(40, 0, 30)).toBeUndefined();
+    expect(deriveProstateVolume(40, 30, 0)).toBeUndefined();
+    expect(deriveProstateVolume(-40, 30, 30)).toBeUndefined();
+  });
+
+  it("returns undefined when any dimension is NaN", () => {
+    expect(deriveProstateVolume(Number.NaN, 30, 30)).toBeUndefined();
+    expect(deriveProstateVolume(40, Number.NaN, 30)).toBeUndefined();
+    expect(deriveProstateVolume(40, 30, Number.NaN)).toBeUndefined();
   });
 });
 

@@ -112,6 +112,22 @@ export interface ProstateStructuredInput {
   // Section 2 — Lesion-level
   lesions: ProstateLesion[];
   // Section 3 — Whole-gland & staging
+  /**
+   * Transverse (left-right) prostate dimension in mm. When all three
+   * dimensions (W, H, AP) are present and positive, `prostateVolumeMl` is
+   * auto-derived via the ellipsoid formula in the form layer.
+   */
+  prostateWidthMm?: number;
+  /** Cranio-caudal (longitudinal) prostate dimension in mm. */
+  prostateHeightMm?: number;
+  /** Antero-posterior prostate dimension in mm. */
+  prostateAPMm?: number;
+  /**
+   * Prostate volume in mL. Populated automatically by the form when all
+   * three dimensions are present (V = W × H × AP × 0.52 / 1000); kept as a
+   * top-level field so PSA density and the serializer continue to consume
+   * a single canonical value regardless of how it was obtained.
+   */
   prostateVolumeMl: number;
   capsuleIntegrity: CapsuleIntegrity;
   seminalVesicleInvasionWholeGland: SviWholeGland;
@@ -384,6 +400,40 @@ export function deriveClinicalM(input: ProstateStructuredInput): ClinicalM {
 // ---------------------------------------------------------------------------
 
 /**
+ * Compute prostate volume (mL) from three orthogonal dimensions via the
+ * ellipsoid approximation:
+ *
+ *   V (mL) = W (mm) × H (mm) × AP (mm) × 0.52 / 1000
+ *
+ * The 0.52 constant approximates π/6 (≈ 0.5236), the standard ellipsoid
+ * volume coefficient used in clinical prostate volumetry. Dividing by 1000
+ * converts mm³ to cm³ (= mL).
+ *
+ * Returns `undefined` when any dimension is missing, NaN, or non-positive
+ * so callers can fall back to a placeholder display rather than `NaN`.
+ */
+export function deriveProstateVolume(
+  widthMm: number | undefined,
+  heightMm: number | undefined,
+  apMm: number | undefined
+): number | undefined {
+  if (
+    typeof widthMm !== "number" ||
+    Number.isNaN(widthMm) ||
+    widthMm <= 0 ||
+    typeof heightMm !== "number" ||
+    Number.isNaN(heightMm) ||
+    heightMm <= 0 ||
+    typeof apMm !== "number" ||
+    Number.isNaN(apMm) ||
+    apMm <= 0
+  ) {
+    return undefined;
+  }
+  return Math.round(((widthMm * heightMm * apMm * 0.52) / 1000) * 10) / 10;
+}
+
+/**
  * PSA density = PSA (ng/mL) / prostate volume (mL), rounded to 1 decimal.
  * Returns `undefined` when either input is missing, NaN, or volume <= 0.
  */
@@ -602,6 +652,17 @@ function lymphNodeLines(
 
 function wholeGlandStagingBlock(input: ProstateStructuredInput): string[] {
   const lines: string[] = ["WHOLE-GLAND & STAGING"];
+  if (
+    input.prostateWidthMm !== undefined &&
+    input.prostateHeightMm !== undefined &&
+    input.prostateAPMm !== undefined
+  ) {
+    pushBullet(
+      lines,
+      "Prostate dimensions (W × H × AP)",
+      `${input.prostateWidthMm} × ${input.prostateHeightMm} × ${input.prostateAPMm} mm`
+    );
+  }
   pushBullet(lines, "Prostate volume", formatMl(input.prostateVolumeMl));
   pushBullet(lines, "Capsule integrity", input.capsuleIntegrity);
   pushBullet(

@@ -32,6 +32,7 @@ import {
   deriveClinicalN,
   deriveClinicalT,
   deriveEauRiskGroup,
+  deriveProstateVolume,
   derivePsaDensity,
   type ProstateLymphNode,
   type ProstateStructuredInput,
@@ -530,7 +531,35 @@ export function ProstateStudyLevelCard({
   const derivedN = deriveClinicalN(value);
   const derivedM = deriveClinicalM(value);
   const eauRiskGroup = deriveEauRiskGroup(value);
+  const derivedVolumeMl = deriveProstateVolume(
+    value.prostateWidthMm,
+    value.prostateHeightMm,
+    value.prostateAPMm
+  );
   const psaDensity = derivePsaDensity(value.psaNgPerMl, value.prostateVolumeMl);
+
+  /**
+   * Apply a single dimension change. The new dimensions are run through
+   * `deriveProstateVolume` so that `prostateVolumeMl` (the canonical field
+   * consumed by PSA density and the serializer) stays in lockstep with the
+   * three orthogonal measurements. When any dimension is missing, we set
+   * volume back to 0 — the same sentinel `createEmptyProstateInput()` uses
+   * for "not entered" — so the submission gate continues to work correctly.
+   */
+  const handleDimensionChange = (
+    next: Pick<
+      ProstateStructuredInput,
+      "prostateWidthMm" | "prostateHeightMm" | "prostateAPMm"
+    >
+  ) => {
+    const merged = { ...value, ...next };
+    const computed = deriveProstateVolume(
+      merged.prostateWidthMm,
+      merged.prostateHeightMm,
+      merged.prostateAPMm
+    );
+    onChange({ ...merged, prostateVolumeMl: computed ?? 0 });
+  };
 
   const overridden = value.isStagingOverridden === true;
 
@@ -608,36 +637,85 @@ export function ProstateStudyLevelCard({
       </CardHeader>
       <CardContent>
         <div className="grid gap-x-6 gap-y-5 md:grid-cols-2">
-          {/* 1. Prostate volume — required (with PSA density read-out) */}
-          <NumberField
-            id={id("volume")}
-            label="Prostate volume · 전립선 부피"
-            value={value.prostateVolumeMl}
-            onChange={(v) =>
-              onChange({ ...value, prostateVolumeMl: v ?? 0 })
-            }
-            unit="mL"
-            min="10"
-            max="300"
-            step="0.1"
-          />
+          {/* 1. Prostate dimensions (W × H × AP) → ellipsoid-derived volume.
+                Three orthogonal measurements in mm; volume is auto-computed
+                via V = W × H × AP × 0.52 / 1000 (ellipsoid approximation,
+                where 0.52 ≈ π/6) and written back into `prostateVolumeMl`
+                so PSA density and the downstream serializer continue to
+                consume a single canonical value. */}
+          <div className="md:col-span-2 grid gap-x-6 gap-y-5 sm:grid-cols-2 md:grid-cols-3">
+            <NumberField
+              id={id("width")}
+              label="Width (TR) · 좌우"
+              value={value.prostateWidthMm}
+              onChange={(w) =>
+                handleDimensionChange({ prostateWidthMm: w })
+              }
+              unit="mm"
+              min="10"
+              max="100"
+              step="0.1"
+            />
+            <NumberField
+              id={id("height")}
+              label="Height (CC) · 상하"
+              value={value.prostateHeightMm}
+              onChange={(h) =>
+                handleDimensionChange({ prostateHeightMm: h })
+              }
+              unit="mm"
+              min="10"
+              max="100"
+              step="0.1"
+            />
+            <NumberField
+              id={id("ap")}
+              label="AP · 전후"
+              value={value.prostateAPMm}
+              onChange={(ap) =>
+                handleDimensionChange({ prostateAPMm: ap })
+              }
+              unit="mm"
+              min="10"
+              max="100"
+              step="0.1"
+            />
+          </div>
 
-          {/* PSA density — auto-displayed read-only (E-6, N-6) */}
-          <div className="rounded-lg border border-border p-3 flex flex-col gap-1">
-            <span className="text-[0.9375rem] font-bold tracking-tight text-foreground">
-              PSA density · PSA 밀도
-              <span className="ml-1 text-xs font-normal text-muted-foreground">
-                (auto-derived)
+          <div className="md:col-span-2 grid gap-x-6 gap-y-5 md:grid-cols-2">
+            {/* Prostate volume — auto-derived from W/H/AP, read-only */}
+            <div className="rounded-lg border border-border p-3 flex flex-col gap-1">
+              <span className="text-[0.9375rem] font-bold tracking-tight text-foreground">
+                Prostate volume · 전립선 부피
+                <span className="ml-1 text-xs font-normal text-muted-foreground">
+                  (auto-derived)
+                </span>
               </span>
-            </span>
-            <p className="text-sm text-card-foreground">
-              {psaDensity !== undefined
-                ? `${psaDensity} ng/mL/cc`
-                : "—"}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              PSA ÷ prostate volume, 1 dp.
-            </p>
+              <p className="text-sm text-card-foreground">
+                {derivedVolumeMl !== undefined ? `${derivedVolumeMl} mL` : "—"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Ellipsoid approximation: W × H × AP × 0.52 / 1000.
+              </p>
+            </div>
+
+            {/* PSA density — auto-displayed read-only (E-6, N-6) */}
+            <div className="rounded-lg border border-border p-3 flex flex-col gap-1">
+              <span className="text-[0.9375rem] font-bold tracking-tight text-foreground">
+                PSA density · PSA 밀도
+                <span className="ml-1 text-xs font-normal text-muted-foreground">
+                  (auto-derived)
+                </span>
+              </span>
+              <p className="text-sm text-card-foreground">
+                {psaDensity !== undefined
+                  ? `${psaDensity} ng/mL/cc`
+                  : "—"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                PSA ÷ prostate volume, 1 dp.
+              </p>
+            </div>
           </div>
 
           {/* 2. Capsule integrity */}
