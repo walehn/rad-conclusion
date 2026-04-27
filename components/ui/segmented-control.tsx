@@ -63,7 +63,7 @@ const optionVariants = cva(
   // options to the next row. Active state is applied directly to the button
   // (background + ring + shadow) instead of via a separate sliding indicator,
   // so width-uneven option lists render correctly.
-  "relative inline-flex items-center justify-center whitespace-nowrap rounded-md font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:cursor-not-allowed",
+  "relative inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:cursor-not-allowed",
   {
     variants: {
       size: {
@@ -222,6 +222,19 @@ export function SegmentedControl<T extends string>({
             onKeyDown={(event) => handleKeyDown(event, idx)}
             className={optionVariants({ size, active })}
           >
+            {/* Leading dot — radio-style affordance signalling that each
+                pill is a selectable option. Hollow ring when inactive, solid
+                fill when active. Color tracks the active text color so the
+                contrast against the primary fill stays consistent. */}
+            <span
+              aria-hidden="true"
+              className={cn(
+                "inline-block h-1.5 w-1.5 shrink-0 rounded-full transition-colors",
+                active
+                  ? "bg-primary-foreground"
+                  : "border border-muted-foreground/50 bg-transparent"
+              )}
+            />
             {/* Render the label as plain text — no `truncate` class — so long
                 option labels (e.g. ">=50% exophytic") are always visible in
                 full. `whitespace-nowrap` on the button keeps each individual
