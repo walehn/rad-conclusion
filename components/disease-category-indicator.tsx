@@ -9,7 +9,15 @@ import { cn } from "@/lib/utils";
 interface DiseaseCategoryIndicatorProps {
   category: DiseaseCategory;
   className?: string;
-  variant?: "pill" | "overline";
+  /**
+   * - `pill`     — small rounded chip with stethoscope (legacy in-form usage).
+   * - `overline` — tiny uppercase eyebrow above an `<h1>` (compact page header).
+   * - `hero`     — large circular `#N` badge + bold Korean / muted English
+   *                stack, sized as a page-level disease selector. Use inside a
+   *                dedicated hero Card so multiple diseases can be added later
+   *                with consistent presentation (RCC = #1, future = #2, …).
+   */
+  variant?: "pill" | "overline" | "hero";
   index?: number;
 }
 
@@ -20,6 +28,33 @@ export function DiseaseCategoryIndicator({
   index,
 }: DiseaseCategoryIndicatorProps) {
   const meta = getDiseaseCategoryMetadata(category);
+
+  if (variant === "hero") {
+    return (
+      <div
+        role="status"
+        aria-label={`현재 질병 카테고리: ${index !== undefined ? `#${index} ` : ""}${meta.displayNameKo} (${meta.displayName})`}
+        className={cn("flex items-center gap-3", className)}
+      >
+        {index !== undefined && (
+          <span
+            aria-hidden="true"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary font-mono text-base font-bold text-primary-foreground shadow-sm"
+          >
+            #{index}
+          </span>
+        )}
+        <div className="flex flex-col leading-tight">
+          <span className="text-xl font-bold tracking-tight text-foreground">
+            {meta.displayNameKo}
+          </span>
+          <span className="text-sm text-muted-foreground">
+            {meta.displayName}
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   if (variant === "overline") {
     return (

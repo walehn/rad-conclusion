@@ -15,6 +15,14 @@ import type { Citation } from "@/lib/prompts/disease-registry";
 interface ReferencesDialogProps {
   citations: readonly Citation[];
   triggerLabel?: string;
+  /**
+   * Visual size of the trigger button.
+   * - `sm` (default): `text-xs`/12px icon — used for compact in-form placement.
+   * - `lg`           : `text-sm`/16px icon — used inside the page hero card so
+   *                    the Sources link reads at body-text scale instead of
+   *                    feeling like a footnote.
+   */
+  size?: "sm" | "lg";
 }
 
 /**
@@ -24,16 +32,22 @@ interface ReferencesDialogProps {
 export function ReferencesDialog({
   citations,
   triggerLabel = "근거 표준 (Sources)",
+  size = "sm",
 }: ReferencesDialogProps) {
+  const triggerClasses =
+    size === "lg"
+      ? "inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:underline transition-colors"
+      : "inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:underline transition-colors";
+  const iconClasses = size === "lg" ? "h-4 w-4" : "h-3 w-3";
   return (
     <Dialog>
       <DialogTrigger asChild>
         <button
           type="button"
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:underline transition-colors"
+          className={triggerClasses}
           aria-label="View report generation sources"
         >
-          <Info className="h-3 w-3" aria-hidden="true" />
+          <Info className={iconClasses} aria-hidden="true" />
           {triggerLabel}
         </button>
       </DialogTrigger>

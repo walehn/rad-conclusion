@@ -295,38 +295,40 @@ export function StructuredReportClient() {
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      {/* Page hero — wrapped in the same Card frame as the input/output
-          sections below so the page reads as a coherent stack of cards
-          (shadow-sm + ring-1 ring-border/50). The Card sits inside a
-          <header> landmark so AT users still get the page-heading region;
-          the disease indicator + Sources dialog occupy the overline row
-          inside CardHeader, followed by a semantic <h1>; the muted-tone
-          description lives in CardContent. We intentionally do NOT use
-          CardTitle here because it renders a <div> in this codebase, which
-          would erase the page-level heading semantics required by AT / SEO. */}
-      <header className="mb-6">
+      {/* Page hero — split into two stacked cards.
+
+          Card 1 = the "current disease" selector strip. Designed to scale to
+          multiple diseases later (RCC = #1, future categories = #2, #3, …);
+          rendered at body-text scale via the `hero` indicator variant + `lg`
+          Sources trigger so it does not read as a footnote.
+
+          Card 2 = the page H1 banner. Carries the semantic <h1> page heading.
+          The previous "Findings 텍스트로부터..." description paragraph was
+          removed at user request. We intentionally use a raw <h1> rather than
+          CardTitle because CardTitle renders a <div> in this codebase, which
+          would erase page-heading semantics for AT / SEO.
+
+          Both cards live inside a single <header> landmark so the entire hero
+          region remains addressable as a banner by assistive tech. */}
+      <header className="mb-6 flex flex-col gap-4">
         <Card className="shadow-sm ring-1 ring-border/50">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-3">
-              <DiseaseCategoryIndicator
-                category={DISEASE_CATEGORY}
-                variant="overline"
-                index={1}
-              />
-              <ReferencesDialog
-                citations={getDiseaseCategoryMetadata("RCC").standardReferences}
-              />
-            </div>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">
+          <CardContent className="flex flex-wrap items-center justify-between gap-4 py-5">
+            <DiseaseCategoryIndicator
+              category={DISEASE_CATEGORY}
+              variant="hero"
+              index={1}
+            />
+            <ReferencesDialog
+              size="lg"
+              citations={getDiseaseCategoryMetadata("RCC").standardReferences}
+            />
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm ring-1 ring-border/50">
+          <CardContent className="py-5">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
               구조화 리포트 생성기
             </h1>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <p className="text-sm text-muted-foreground">
-              Findings 텍스트로부터 6개 섹션(CLINICAL INFORMATION /
-              TECHNIQUE / COMPARISON / FINDINGS / STAGING / IMPRESSION)으로
-              구조화된 리포트를 생성합니다.
-            </p>
           </CardContent>
         </Card>
       </header>
