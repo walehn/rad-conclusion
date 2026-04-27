@@ -295,27 +295,40 @@ export function StructuredReportClient() {
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      {/* Page hero — wrapped in the same Card frame as the input/output
+          sections below so the page reads as a coherent stack of cards
+          (shadow-sm + ring-1 ring-border/50). The Card sits inside a
+          <header> landmark so AT users still get the page-heading region;
+          the disease indicator + Sources dialog occupy the overline row
+          inside CardHeader, followed by a semantic <h1>; the muted-tone
+          description lives in CardContent. We intentionally do NOT use
+          CardTitle here because it renders a <div> in this codebase, which
+          would erase the page-level heading semantics required by AT / SEO. */}
       <header className="mb-6">
-        <div>
-          <div className="flex items-center gap-3">
-            <DiseaseCategoryIndicator
-              category={DISEASE_CATEGORY}
-              variant="overline"
-              index={1}
-            />
-            <ReferencesDialog
-              citations={getDiseaseCategoryMetadata("RCC").standardReferences}
-            />
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            구조화 리포트 생성기
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Findings 텍스트로부터 6개 섹션(CLINICAL INFORMATION /
-            TECHNIQUE / COMPARISON / FINDINGS / STAGING / IMPRESSION)으로
-            구조화된 리포트를 생성합니다.
-          </p>
-        </div>
+        <Card className="shadow-sm ring-1 ring-border/50">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-3">
+              <DiseaseCategoryIndicator
+                category={DISEASE_CATEGORY}
+                variant="overline"
+                index={1}
+              />
+              <ReferencesDialog
+                citations={getDiseaseCategoryMetadata("RCC").standardReferences}
+              />
+            </div>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">
+              구조화 리포트 생성기
+            </h1>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <p className="text-sm text-muted-foreground">
+              Findings 텍스트로부터 6개 섹션(CLINICAL INFORMATION /
+              TECHNIQUE / COMPARISON / FINDINGS / STAGING / IMPRESSION)으로
+              구조화된 리포트를 생성합니다.
+            </p>
+          </CardContent>
+        </Card>
       </header>
 
       <div className="grid gap-6 lg:grid-cols-2">
