@@ -42,7 +42,7 @@ function FieldRow({
         className
       )}
     >
-      <span className="px-1 text-sm font-medium text-foreground">{label}</span>
+      <span className="px-1 text-[0.9375rem] font-bold tracking-tight text-foreground">{label}</span>
       {children}
     </div>
   );
@@ -90,7 +90,7 @@ function CheckboxGroup<T extends string>({
     >
       <legend
         id={`${id}-legend`}
-        className="px-1 text-sm font-medium text-foreground"
+        className="px-1 text-[0.9375rem] font-bold tracking-tight text-foreground"
       >
         {legend}
       </legend>
@@ -144,7 +144,7 @@ function NumberField({
     <div className="rounded-lg border border-border p-3 flex flex-col gap-2">
       <label
         htmlFor={id}
-        className="text-sm font-medium text-foreground"
+        className="text-[0.9375rem] font-bold tracking-tight text-foreground"
       >
         {label}
         {optional && (
@@ -219,7 +219,16 @@ export function RccStudyLevelCard({ value, onChange }: RccStudyLevelCardProps) {
   return (
     <Card className="shadow-sm ring-1 ring-border/50">
       <CardHeader className="pb-4">
-        <CardTitle className="text-base font-semibold">
+        {/* Numbered section header (3/3). Matches the typography + numbered
+            badge used by the Clinical context (1) and Mass (2) sections so
+            the three top-level form sections read as a coherent series. */}
+        <CardTitle className="flex items-center gap-3 text-lg font-bold tracking-tight text-foreground">
+          <span
+            aria-hidden="true"
+            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground shadow-sm"
+          >
+            3
+          </span>
           Lymph nodes &amp; Distant metastases
         </CardTitle>
       </CardHeader>

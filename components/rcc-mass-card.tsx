@@ -74,7 +74,7 @@ function FieldRow({
         className
       )}
     >
-      <span className="px-1 text-sm font-medium text-foreground">{label}</span>
+      <span className="px-1 text-[0.9375rem] font-bold tracking-tight text-foreground">{label}</span>
       {children}
     </div>
   );
@@ -101,7 +101,7 @@ function NumberField({
     <div className="rounded-lg border border-border p-3 flex flex-col gap-2">
       <label
         htmlFor={id}
-        className="text-sm font-medium text-foreground"
+        className="text-[0.9375rem] font-bold tracking-tight text-foreground"
       >
         {label}
         {optional && (
@@ -151,7 +151,7 @@ function DateInput({
     <div className="rounded-lg border border-border p-3 flex flex-col gap-2">
       <label
         htmlFor={id}
-        className="text-sm font-medium text-foreground"
+        className="text-[0.9375rem] font-bold tracking-tight text-foreground"
       >
         {label}
         {optional && (
@@ -203,8 +203,19 @@ export function RccMassCard({
   return (
     <Card className="shadow-sm ring-1 ring-border/50">
       <CardHeader className="flex flex-row items-center justify-between pb-4">
-        <CardTitle className="text-base font-semibold">
-          Mass {index + 1}
+        {/* Numbered section header (2/3 — shared by all mass cards). The "#N"
+            instance suffix is rendered in the primary teal so the user can
+            distinguish multiple masses at a glance even when the section
+            badge ("2") is identical for every mass card. */}
+        <CardTitle className="flex items-center gap-3 text-lg font-bold tracking-tight text-foreground">
+          <span
+            aria-hidden="true"
+            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground shadow-sm"
+          >
+            2
+          </span>
+          <span>Mass</span>
+          <span className="text-primary font-extrabold">#{index + 1}</span>
         </CardTitle>
         <Button
           type="button"
@@ -212,7 +223,7 @@ export function RccMassCard({
           size="icon"
           disabled={!removable}
           onClick={onRemove}
-          aria-label={`Remove Mass ${index + 1}`}
+          aria-label={`Remove Mass #${index + 1}`}
         >
           <X className="h-4 w-4" />
         </Button>
@@ -283,7 +294,7 @@ export function RccMassCard({
                 }}
                 className="h-4 w-4 text-primary"
               />
-              <span className="text-sm font-medium text-foreground">
+              <span className="text-[0.9375rem] font-bold tracking-tight text-foreground">
                 Comparison with prior study available
                 <span className="ml-2 text-xs font-normal text-muted-foreground">
                   이전 검사와 비교
@@ -393,7 +404,7 @@ export function RccMassCard({
             <fieldset className="md:col-span-2 rounded-lg border border-border p-3 flex flex-col gap-2">
               <legend
                 id={`${fieldId("cysticPredominant")}-legend`}
-                className="px-1 text-sm font-medium text-foreground"
+                className="px-1 text-[0.9375rem] font-bold tracking-tight text-foreground"
               >
                 Predominantly cystic
               </legend>
@@ -539,7 +550,7 @@ export function RccMassCard({
               field label and stay anchored next to the parent thrombus row. */}
           {value.thrombusKind === "Renal vein" && (
             <div className="md:col-span-2 rounded-lg border border-border p-3 flex flex-col gap-1">
-              <span className="text-sm font-medium text-foreground">
+              <span className="text-[0.9375rem] font-bold tracking-tight text-foreground">
                 Neves-Mayo Level
               </span>
               <p className="text-sm text-card-foreground">

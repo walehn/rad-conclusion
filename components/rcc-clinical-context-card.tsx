@@ -23,7 +23,18 @@ export function RccClinicalContextCard({
   return (
     <Card className="shadow-sm ring-1 ring-border/50">
       <CardHeader className="pb-4">
-        <CardTitle className="text-base font-semibold">
+        {/* Numbered section header (1/3). Larger + bolder than the previous
+            text-base treatment to give each form section a visible anchor on
+            the page; the primary-toned circular badge makes the section index
+            scannable at a glance and ties the header to the design system's
+            primary teal. */}
+        <CardTitle className="flex items-center gap-3 text-lg font-bold tracking-tight text-foreground">
+          <span
+            aria-hidden="true"
+            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground shadow-sm"
+          >
+            1
+          </span>
           Clinical context
         </CardTitle>
       </CardHeader>
@@ -36,7 +47,7 @@ export function RccClinicalContextCard({
           <div className="rounded-lg border border-border p-3 flex flex-col gap-2 md:col-span-2">
             <label
               htmlFor={id("info")}
-              className="text-sm font-medium text-foreground"
+              className="text-[0.9375rem] font-bold tracking-tight text-foreground"
             >
               Clinical information
               <span className="ml-1 text-xs font-normal text-muted-foreground">
@@ -61,7 +72,7 @@ export function RccClinicalContextCard({
           <div className="rounded-lg border border-border p-3 flex flex-col gap-2">
             <label
               htmlFor={id("date")}
-              className="text-sm font-medium text-foreground"
+              className="text-[0.9375rem] font-bold tracking-tight text-foreground"
             >
               Study date
               <span className="ml-1 text-xs font-normal text-muted-foreground">
