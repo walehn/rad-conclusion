@@ -1,10 +1,14 @@
 /**
- * Structured Report prompt dispatcher (SPEC-DASHBOARD-001).
+ * Structured Report prompt dispatcher (SPEC-DASHBOARD-001, extended by SPEC-PROSTATE-001).
  *
  * Delegates system/user prompt construction to the disease-specific template
- * module that matches the requested DiseaseCategory. v0.1.0 only implements
- * 'RCC'; other categories throw an explicit error so the API layer can return
- * a 400 response instead of silently producing a malformed prompt.
+ * module that matches the requested DiseaseCategory. Currently dispatches to:
+ *   - 'RCC'            → ./disease-templates/rcc.ts
+ *   - 'ProstateCancer' → ./disease-templates/prostate.ts
+ *
+ * Unrecognised categories trigger the compile-time exhaustiveness check
+ * (assertUnreachable) so the API layer can return a 400 response instead of
+ * silently producing a malformed prompt.
  *
  * When adding a new disease category:
  *   1. Extend the DiseaseCategory union in ./disease-registry.ts
@@ -23,8 +27,22 @@ import {
   type RccModality,
   type RccReportLang,
 } from "./disease-templates/rcc";
+import {
+  buildProstateReportSystemPrompt,
+  buildProstateReportUserPrompt,
+  type ProstateModality,
+  type ProstateReportLang,
+} from "./disease-templates/prostate";
 
-export type StructuredReportLang = RccReportLang;
+/**
+ * Output language for the structured-report body.
+ *
+ * RccReportLang and ProstateReportLang are both `"ko" | "en" | "mixed"`, so
+ * either can be used as the alias source. The intersection (`& ProstateReportLang`)
+ * is written explicitly so a future divergence in either template's language
+ * enum is caught at compile time at this dispatch boundary.
+ */
+export type StructuredReportLang = RccReportLang & ProstateReportLang;
 
 export interface StructuredReportConfig {
   /** Which disease category template to use. v0.1.0 accepts 'RCC' only. */
@@ -62,6 +80,26 @@ function toRccModality(modality: string | undefined): RccModality {
 }
 
 /**
+ * Normalize a free-form modality string into the prostate template's enum.
+ *
+ * Prostate v1 (SPEC-PROSTATE-001) is MRI-only. Non-MRI hints collapse to
+ * "Auto" so the prompt instructs the model to infer rather than force a
+ * mismatched modality.
+ */
+function toProstateModality(modality: string | undefined): ProstateModality {
+  switch (modality) {
+    case "MRI":
+    case "Auto":
+      return modality;
+    case "CT":
+    case "US":
+      return "Auto";
+    default:
+      return "Auto";
+  }
+}
+
+/**
  * Compile-time exhaustiveness helper. If a new DiseaseCategory variant is
  * added to the union without a matching case, TypeScript will flag the
  * offending switch as returning `never` at this call.
@@ -69,7 +107,8 @@ function toRccModality(modality: string | undefined): RccModality {
 function assertUnreachable(value: never): never {
   throw new Error(
     `Unsupported disease category: ${String(value)}. ` +
-      "v0.1.0 only supports 'RCC'. Add a new branch in structured-report-prompt.ts to extend."
+      "Currently supported: 'RCC' and 'ProstateCancer'. " +
+      "Add a new branch in structured-report-prompt.ts to extend."
   );
 }
 
@@ -86,6 +125,11 @@ export function buildReportSystemPrompt(
       return buildRccReportSystemPrompt({
         lang,
         modality: toRccModality(modality),
+      });
+    case "ProstateCancer":
+      return buildProstateReportSystemPrompt({
+        lang,
+        modality: toProstateModality(modality),
       });
     default:
       return assertUnreachable(diseaseCategory);
@@ -107,6 +151,12 @@ export function buildReportUserPrompt(
       return buildRccReportUserPrompt({
         lang,
         modality: toRccModality(modality),
+        findings,
+      });
+    case "ProstateCancer":
+      return buildProstateReportUserPrompt({
+        lang,
+        modality: toProstateModality(modality),
         findings,
       });
     default:

@@ -83,7 +83,7 @@ describe('lib/prompts/disease-registry', () => {
 
     it('returns null for unknown slugs', () => {
       expect(parseDiseaseCategorySlug('foo')).toBe(null);
-      expect(parseDiseaseCategorySlug('prostate-cancer')).toBe(null); // not registered yet
+      expect(parseDiseaseCategorySlug('breast-cancer')).toBe(null); // not registered
       expect(parseDiseaseCategorySlug('')).toBe(null);
     });
 
@@ -97,6 +97,85 @@ describe('lib/prompts/disease-registry', () => {
       const slugs = keys.map(diseaseCategoryToSlug);
       const unique = new Set(slugs);
       expect(unique.size).toBe(slugs.length);
+    });
+  });
+
+  describe('DISEASE_REGISTRY — ProstateCancer entry', () => {
+    it('contains a ProstateCancer entry', () => {
+      expect(DISEASE_REGISTRY).toHaveProperty('ProstateCancer');
+      expect(DISEASE_REGISTRY.ProstateCancer).toBeDefined();
+      expect(DISEASE_REGISTRY.ProstateCancer.id).toBe('ProstateCancer');
+    });
+
+    it('exposes the correct English and Korean display names for ProstateCancer', () => {
+      expect(DISEASE_REGISTRY.ProstateCancer.displayName).toBe('Prostate Cancer');
+      expect(DISEASE_REGISTRY.ProstateCancer.displayNameKo).toBe('전립선암');
+    });
+
+    it('lists MRI as the only supported modality for ProstateCancer', () => {
+      const modalities = DISEASE_REGISTRY.ProstateCancer.supportedModalities;
+      expect(modalities).toEqual(['MRI']);
+      expect(modalities).toHaveLength(1);
+    });
+
+    it('registers exactly 5 standard references for ProstateCancer', () => {
+      const refs = DISEASE_REGISTRY.ProstateCancer.standardReferences;
+      expect(refs).toHaveLength(5);
+    });
+
+    it('references the canonical prostate cancer standards by id', () => {
+      const refs = DISEASE_REGISTRY.ProstateCancer.standardReferences;
+      const ids = refs.map((r) => r.id);
+      expect(ids).toContain('pi-rads-v2-1');
+      expect(ids).toContain('ajcc-8th-prostate');
+      expect(ids).toContain('eau-2025-2026');
+      expect(ids).toContain('pi-qual-v2');
+      expect(ids).toContain('mehralivand-epe-2019');
+    });
+
+    it('populates every required Citation field for each reference', () => {
+      const refs = DISEASE_REGISTRY.ProstateCancer.standardReferences;
+      for (const ref of refs) {
+        expect(typeof ref.id).toBe('string');
+        expect(ref.id.length).toBeGreaterThan(0);
+
+        expect(typeof ref.shortLabel).toBe('string');
+        expect(ref.shortLabel.length).toBeGreaterThan(0);
+
+        expect(typeof ref.fullTitle).toBe('string');
+        expect(ref.fullTitle.length).toBeGreaterThan(0);
+
+        expect(typeof ref.year).toBe('number');
+        expect(ref.year).toBeGreaterThan(1900);
+
+        expect(typeof ref.scope).toBe('string');
+        expect(ref.scope.length).toBeGreaterThan(0);
+
+        expect(typeof ref.notice).toBe('string');
+        expect(ref.notice && ref.notice.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('round-trips ProstateCancer through diseaseCategoryToSlug / parseDiseaseCategorySlug', () => {
+      const slug = diseaseCategoryToSlug('ProstateCancer');
+      expect(parseDiseaseCategorySlug(slug)).toBe('ProstateCancer');
+    });
+
+    it('produces "prostate-cancer" as the canonical slug for ProstateCancer', () => {
+      expect(diseaseCategoryToSlug('ProstateCancer')).toBe('prostate-cancer');
+    });
+
+    it('treats "ProstateCancer" as a valid DiseaseCategory via isDiseaseCategory', () => {
+      expect(isDiseaseCategory('ProstateCancer')).toBe(true);
+    });
+
+    it('returns ProstateCancer metadata via getDiseaseCategoryMetadata', () => {
+      const meta = getDiseaseCategoryMetadata('ProstateCancer');
+      expect(meta.id).toBe('ProstateCancer');
+      expect(meta.displayName).toBe('Prostate Cancer');
+      expect(meta.displayNameKo).toBe('전립선암');
+      expect(meta.supportedModalities).toEqual(['MRI']);
+      expect(meta.standardReferences).toHaveLength(5);
     });
   });
 });

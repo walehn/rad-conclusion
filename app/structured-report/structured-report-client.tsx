@@ -7,6 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { RccStructuredForm } from "@/components/rcc-structured-form";
+import {
+  ProstateStructuredForm,
+  createEmptyProstateInput,
+} from "@/components/prostate-structured-form";
 import { ModelSelector } from "@/components/model-selector";
 import { DiseaseCategoryIndicator } from "@/components/disease-category-indicator";
 import { ReferencesDialog } from "@/components/references-dialog";
@@ -17,6 +21,11 @@ import {
   serializeRccStructuredInput,
 } from "@/lib/prompts/disease-templates/rcc-serializer";
 import type { RccStructuredInput } from "@/lib/prompts/disease-templates/rcc-serializer";
+import {
+  hasMinimumProstateFields,
+  serializeProstateStructuredInput,
+} from "@/lib/prompts/disease-templates/prostate-serializer";
+import type { ProstateStructuredInput } from "@/lib/prompts/disease-templates/prostate-serializer";
 import { loadProviderSettings } from "@/lib/storage/settings-store";
 import { genClientId } from "@/lib/utils";
 import type { DiseaseCategory } from "@/lib/prompts/disease-registry";
@@ -83,9 +92,59 @@ function appendStreamChunk(accumulated: string, rawLine: string): string {
   return accumulated;
 }
 
+/**
+ * Discriminated union of per-disease form state.
+ *
+ * The route renders one disease at a time (per `[disease]` slug), so the
+ * `kind` discriminator is invariant for the lifetime of a mounted client.
+ * Using a union (rather than two parallel state slots) means TypeScript
+ * narrows `input` to the correct type on every read, and forgetting a new
+ * disease in `serialize` / `hasMinimum` / form rendering becomes a compile
+ * error rather than a runtime mismatch.
+ */
+type StructuredFormState =
+  | { kind: "RCC"; input: RccStructuredInput }
+  | { kind: "ProstateCancer"; input: ProstateStructuredInput };
+
+function createInitialFormState(disease: DiseaseCategory): StructuredFormState {
+  switch (disease) {
+    case "RCC":
+      return { kind: "RCC", input: { masses: [{ id: genClientId() }] } };
+    case "ProstateCancer":
+      return { kind: "ProstateCancer", input: createEmptyProstateInput() };
+  }
+}
+
+function hasMinimumFormFields(state: StructuredFormState): boolean {
+  switch (state.kind) {
+    case "RCC":
+      return hasMinimumStructuredFields(state.input);
+    case "ProstateCancer":
+      return hasMinimumProstateFields(state.input);
+  }
+}
+
+function serializeFormFindings(state: StructuredFormState): string {
+  switch (state.kind) {
+    case "RCC":
+      return serializeRccStructuredInput(state.input);
+    case "ProstateCancer":
+      return serializeProstateStructuredInput(state.input);
+  }
+}
+
+function getMinimumFieldsErrorMessage(disease: DiseaseCategory): string {
+  switch (disease) {
+    case "RCC":
+      return "Please complete the structured input (Side and Mass size are required for each mass).";
+    case "ProstateCancer":
+      return "Please complete the structured input (PSA, prostate volume, PI-QUAL overall, and at least one lesion with T2W/DWI scores and a sector are required).";
+  }
+}
+
 export function StructuredReportClient({ disease }: { disease: DiseaseCategory }) {
-  const [structuredInput, setStructuredInput] = React.useState<RccStructuredInput>(
-    () => ({ masses: [{ id: genClientId() }] })
+  const [formState, setFormState] = React.useState<StructuredFormState>(
+    () => createInitialFormState(disease)
   );
   const [modality, setModality] = React.useState<RccModality>("Auto");
   const [lang, setLang] = React.useState<RccReportLang>("en");
@@ -184,13 +243,11 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
 
   // --- Generation handler --------------------------------------------------
   const handleGenerate = React.useCallback(async () => {
-    if (!hasMinimumStructuredFields(structuredInput)) {
-      setInputError(
-        "Please complete the structured input (Side and Mass size are required for each mass)."
-      );
+    if (!hasMinimumFormFields(formState)) {
+      setInputError(getMinimumFieldsErrorMessage(disease));
       return;
     }
-    const findingsText = serializeRccStructuredInput(structuredInput);
+    const findingsText = serializeFormFindings(formState);
     setInputError("");
     setApiError(null);
     setContent("");
@@ -281,7 +338,7 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
       setStreamStartedAt(null);
       abortRef.current = null;
     }
-  }, [structuredInput, modality, lang, provider, model]);
+  }, [formState, disease, modality, lang, provider, model]);
 
   const handleCancel = React.useCallback(() => {
     abortRef.current?.abort();
@@ -410,14 +467,25 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
               <CardTitle className="text-lg font-semibold">Findings</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
-              <RccStructuredForm
-                value={structuredInput}
-                onChange={(next) => {
-                  setStructuredInput(next);
-                  if (inputError) setInputError("");
-                }}
-                error={inputError}
-              />
+              {formState.kind === "RCC" ? (
+                <RccStructuredForm
+                  value={formState.input}
+                  onChange={(next) => {
+                    setFormState({ kind: "RCC", input: next });
+                    if (inputError) setInputError("");
+                  }}
+                  error={inputError}
+                />
+              ) : (
+                <ProstateStructuredForm
+                  value={formState.input}
+                  onChange={(next) => {
+                    setFormState({ kind: "ProstateCancer", input: next });
+                    if (inputError) setInputError("");
+                  }}
+                  error={inputError}
+                />
+              )}
               {isStreaming ? (
                 <Button
                   onClick={handleCancel}
@@ -431,7 +499,7 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
               ) : (
                 <Button
                   onClick={handleGenerate}
-                  disabled={!hasMinimumStructuredFields(structuredInput)}
+                  disabled={!hasMinimumFormFields(formState)}
                   className="w-full bg-gradient-to-r from-primary to-primary/90 shadow-md shadow-primary/20 transition-all hover:shadow-lg hover:shadow-primary/30 disabled:from-muted disabled:to-muted disabled:shadow-none"
                   size="lg"
                 >
