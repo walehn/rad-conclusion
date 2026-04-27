@@ -95,7 +95,11 @@ logs/
 *.tmp
 *.temp
 *.bak
+*.bak[0-9]*
 *.backup
+
+# Local experimental/debug scripts (ad-hoc manual tests)
+/test_*.mjs
 
 # ===========================================
 # Backups
@@ -150,6 +154,7 @@ secret-*.*
 .claude/.env.local*
 .claude/local/
 .claude/plans/
+.claude/memory/
 
 # Skill-specific credentials
 .claude/skills/*/.env*

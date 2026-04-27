@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --port 3957",
+    "dev": "next dev --port 3001",
     "build": "next build",
     "start": "next start --port 3957",
     "lint": "next lint",
@@ -19,6 +19,7 @@
     "@ai-sdk/google": "^1.2.0",
     "@ai-sdk/openai": "^1.2.0",
     "@node-rs/argon2": "^2.0.2",
+    "@radix-ui/react-dialog": "^1.1.15",
     "ai": "^4.3.0",
     "better-sqlite3": "^11.10.0",
     "class-variance-authority": "^0.7.1",

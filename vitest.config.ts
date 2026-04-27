@@ -15,7 +15,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      include: ['lib/auth/**', 'lib/db/**', 'app/api/auth/**'],
+      include: ['lib/auth/**', 'lib/db/**', 'app/api/auth/**', 'lib/crypto/**', 'lib/api-keys/**', 'app/api/user/**'],
       exclude: ['**/*.test.ts', '**/node_modules/**', '**/*.d.ts'],
       thresholds: {
         lines: 85,

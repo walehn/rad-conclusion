@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { getCurrentUser } from "@/lib/auth/session";
-import { issueCsrfCookie } from "@/lib/auth/csrf";
 import { LoginForm } from "./login-form";
 
 // Pages that depend on cookies must not be statically cached.
@@ -32,8 +32,8 @@ export default async function LoginPage({
     redirect(nextPath);
   }
 
-  // Issue a fresh CSRF token cookie and embed its value for the client form.
-  const csrfToken = await issueCsrfCookie();
+  // CSRF cookie is set by middleware; read the token it forwarded via request header.
+  const csrfToken = (await headers()).get("x-csrf-for-page") ?? "";
 
   return <LoginForm csrfToken={csrfToken} nextPath={nextPath} />;
 }

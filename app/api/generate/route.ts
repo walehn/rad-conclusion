@@ -1,11 +1,12 @@
 import { streamText } from "ai";
 import { z } from "zod";
-import { getModel } from "@/lib/providers/registry";
+import { getModelWithKey } from "@/lib/providers/registry";
 import { buildSystemPrompt, buildUserPrompt } from "@/lib/prompts/system-prompt";
 import type { ProviderName } from "@/lib/providers/types";
 import type { ConclusionStyle, ConclusionLang, PromptVersion } from "@/lib/prompts/system-prompt";
 import { requireApiSession } from "@/lib/auth/guard";
 import { validateCsrfOrFail } from "@/lib/auth/csrf";
+import { resolveApiKey } from "@/lib/api-keys/resolve";
 
 const requestSchema = z.object({
   findings: z.string().min(1, "Findings text is required"),
@@ -22,7 +23,7 @@ const requestSchema = z.object({
 });
 
 export async function POST(req: Request) {
-  const { response } = await requireApiSession();
+  const { session, response } = await requireApiSession();
   if (response) return response;
 
   const csrfFailure = await validateCsrfOrFail(req);
@@ -53,7 +54,8 @@ export async function POST(req: Request) {
     const { findings, style, lang, title, provider, model, promptVersion } =
       parsed.data;
 
-    const llmModel = getModel(provider as ProviderName, model);
+    const apiKey = await resolveApiKey(session.userId, provider as ProviderName);
+    const llmModel = getModelWithKey(provider as ProviderName, model, apiKey);
 
     const systemPrompt = buildSystemPrompt({
       style: style as ConclusionStyle,
