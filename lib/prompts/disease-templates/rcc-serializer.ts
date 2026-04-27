@@ -182,16 +182,16 @@ function sizeComparisonLine(mass: RccMass): string {
  * Serialize a single mass into a fixed-order line list (no header).
  *
  * Output line count depends on massType:
- *  - Cystic / Indeterminate / undefined → 16 lines (full canonical order)
- *  - Solid                              → 14 lines (Bosniak and Predominantly
+ *  - Cystic                              → 16 lines (full canonical order)
+ *  - Solid / undefined / any other       → 14 lines (Bosniak and Predominantly
  *                                          cystic lines are omitted entirely;
- *                                          both fields apply only to cystic
- *                                          masses per Bosniak v2019)
+ *                                          both fields apply only to confirmed
+ *                                          cystic masses per Bosniak v2019)
  *
  * Undefined fields produce "Not specified in input".
  */
 function serializeRccMass(mass: RccMass): string[] {
-  const isSolid = mass.massType === "Solid";
+  const isCystic = mass.massType === "Cystic";
 
   const lines: string[] = [
     `- Side: ${strOrNotSpecified(mass.side)}`,
@@ -199,7 +199,7 @@ function serializeRccMass(mass: RccMass): string[] {
     `- Mass type: ${strOrNotSpecified(mass.massType)}`,
   ];
 
-  if (!isSolid) {
+  if (isCystic) {
     lines.push(
       `- Bosniak: ${bosniakLine(mass)}`,
       `- Predominantly cystic: ${predominantlyCysticLine(mass)}`

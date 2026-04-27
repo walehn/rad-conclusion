@@ -5,12 +5,18 @@ import {
 } from "@/lib/prompts/disease-templates/rcc-serializer";
 
 describe("serializeRccStructuredInput", () => {
-  // Test 1: Empty mass (single mass, no fields) → "Mass 1:" header + 16 NA lines
-  it("returns Mass 1 header plus 16 'Not specified in input' lines for an empty mass", () => {
+  // Test 1: Empty mass (single mass, no fields) → "Mass 1:" header + 14 NA lines.
+  // massType is undefined here, so Bosniak and Predominantly cystic are omitted
+  // entirely (those two lines render only when massType === "Cystic"). The
+  // serializer outputs them only after a confirmed cystic classification, so
+  // an empty/unselected mass renders the 14-line core canonical order.
+  it("returns Mass 1 header plus 14 'Not specified in input' lines for an empty mass", () => {
     const result = serializeRccStructuredInput({ masses: [{}] });
     const lines = result.split("\n");
     expect(lines[0]).toBe("Mass 1:");
-    expect(lines).toHaveLength(17);
+    expect(lines).toHaveLength(15);
+    expect(result).not.toContain("- Bosniak:");
+    expect(result).not.toContain("- Predominantly cystic:");
     for (const line of lines.slice(1)) {
       expect(line).toMatch(/Not specified in input$/);
     }

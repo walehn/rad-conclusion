@@ -193,7 +193,7 @@ export function RccMassCard({
   index,
   removable,
 }: RccMassCardProps) {
-  const isSolid = value.massType === "Solid";
+  const isCystic = value.massType === "Cystic";
   const showThrombusDetails =
     value.thrombusKind === "Renal vein" || value.thrombusKind === "IVC";
 
@@ -306,7 +306,7 @@ export function RccMassCard({
           {/* 5. Bosniak — only rendered when mass type is not Solid (Bosniak v2019
               applies exclusively to cystic masses; for Solid, the field is omitted
               from the UI and from the serialized prompt to avoid noise). */}
-          {!isSolid && (
+          {isCystic && (
             <FieldRow label="Bosniak">
               <RadioCardGroup
                 name={fieldId("bosniak")}
@@ -322,7 +322,7 @@ export function RccMassCard({
           {/* 5a. Predominantly cystic — only rendered when mass type is not Solid.
               Same rationale as Bosniak: a "predominantly cystic" indicator is
               meaningless for a Solid mass. */}
-          {!isSolid && (
+          {isCystic && (
             <fieldset className="rounded-lg border border-border p-3 flex flex-col gap-2">
               <legend
                 id={`${fieldId("cysticPredominant")}-legend`}
