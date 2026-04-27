@@ -246,48 +246,103 @@ export function RccMassCard({
             unit="cm"
           />
 
-          {/* 2a. Size comparison — prior size (cm) */}
-          <NumberField
-            id={fieldId("priorMassSizeCm")}
-            label="Prior size"
-            value={value.priorMassSizeCm}
-            onChange={(v) => onChange({ ...value, priorMassSizeCm: v })}
-            unit="cm"
-            optional
-          />
+          {/* 2a-d. Size / interval-change comparison group, gated by a single
+              "Comparison with prior study available" checkbox.
 
-          {/* 2b. Size comparison — prior study date */}
-          <DateInput
-            id={fieldId("priorStudyDate")}
-            label="Prior study date"
-            value={value.priorStudyDate}
-            onChange={(v) => onChange({ ...value, priorStudyDate: v })}
-            optional
-          />
+              Rationale: the four prior-study fields (Prior size, Prior study
+              date, Trajectory, Growth rate) are only meaningful when a prior
+              comparison study actually exists. Hiding them by default keeps
+              the form compact and steers the user away from accidentally
+              entering noisy values when there is no prior. Toggling the
+              checkbox off resets all four fields to undefined so the
+              serializer emits "Not specified in input" consistently and no
+              stale values linger if the user re-enables the toggle later
+              (mirrors the `massType` → `cysticPredominant` reset pattern). */}
+          <fieldset className="md:col-span-2 rounded-lg border border-border p-3 flex flex-col gap-3">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                id={fieldId("hasPriorStudy")}
+                type="checkbox"
+                checked={value.hasPriorStudy === true}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    onChange({ ...value, hasPriorStudy: true });
+                  } else {
+                    // Toggle off: clear all four comparison fields so the
+                    // serializer reports "Not specified in input" and a later
+                    // re-toggle starts from a clean slate.
+                    onChange({
+                      ...value,
+                      hasPriorStudy: false,
+                      priorMassSizeCm: undefined,
+                      priorStudyDate: undefined,
+                      trajectory: undefined,
+                      growthRate: undefined,
+                    });
+                  }
+                }}
+                className="h-4 w-4 text-primary"
+              />
+              <span className="text-sm font-medium text-foreground">
+                Comparison with prior study available
+                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                  이전 검사와 비교
+                </span>
+              </span>
+            </label>
 
-          {/* 2c. Size comparison — trajectory.
-              RadioCardGroup with up to 4 tonal cards reads cleanly at full width;
-              constraining it to a single grid column would force the cards to wrap
-              awkwardly and hide the color-coded growth tones. */}
-          <FieldRow label="Trajectory" className="md:col-span-2">
-            <RadioCardGroup
-              name={fieldId("trajectory")}
-              ariaLabel="Trajectory"
-              value={value.trajectory}
-              options={RCC_TRAJECTORY_RADIO_OPTIONS}
-              onChange={(opt) => onChange({ ...value, trajectory: opt })}
-              columns={2}
-            />
-          </FieldRow>
+            {value.hasPriorStudy === true && (
+              <div className="grid gap-x-6 gap-y-5 md:grid-cols-2 border-t border-border/60 pt-3">
+                {/* 2a. Size comparison — prior size (cm) */}
+                <NumberField
+                  id={fieldId("priorMassSizeCm")}
+                  label="Prior size"
+                  value={value.priorMassSizeCm}
+                  onChange={(v) =>
+                    onChange({ ...value, priorMassSizeCm: v })
+                  }
+                  unit="cm"
+                  optional
+                />
 
-          {/* 3. Growth rate */}
-          <NumberField
-            id={fieldId("growthRate")}
-            label="Growth rate"
-            value={value.growthRate}
-            onChange={(v) => onChange({ ...value, growthRate: v })}
-            optional
-          />
+                {/* 2b. Size comparison — prior study date */}
+                <DateInput
+                  id={fieldId("priorStudyDate")}
+                  label="Prior study date"
+                  value={value.priorStudyDate}
+                  onChange={(v) => onChange({ ...value, priorStudyDate: v })}
+                  optional
+                />
+
+                {/* 2c. Size comparison — trajectory.
+                    RadioCardGroup with up to 4 tonal cards reads cleanly at
+                    full width; constraining it to a single grid column would
+                    force the cards to wrap awkwardly and hide the
+                    color-coded growth tones. */}
+                <FieldRow label="Trajectory" className="md:col-span-2">
+                  <RadioCardGroup
+                    name={fieldId("trajectory")}
+                    ariaLabel="Trajectory"
+                    value={value.trajectory}
+                    options={RCC_TRAJECTORY_RADIO_OPTIONS}
+                    onChange={(opt) =>
+                      onChange({ ...value, trajectory: opt })
+                    }
+                    columns={2}
+                  />
+                </FieldRow>
+
+                {/* 2d. Growth rate */}
+                <NumberField
+                  id={fieldId("growthRate")}
+                  label="Growth rate"
+                  value={value.growthRate}
+                  onChange={(v) => onChange({ ...value, growthRate: v })}
+                  optional
+                />
+              </div>
+            )}
+          </fieldset>
 
           {/* 4. Mass type */}
           <FieldRow label="Mass type">

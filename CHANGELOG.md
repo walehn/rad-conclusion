@@ -28,6 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **`lib/ui/rcc-options-meta.ts`**: Tone/sublabel mapping for Bosniak and Trajectory radio options.
 
 ### Changed
+- **Prior-study comparison fields gated behind a new toggle** (RCC structured form): the four comparison fields (Prior size, Prior study date, Trajectory, Growth rate) now render only when the new "Comparison with prior study available" checkbox in `RccMassCard` is checked. Default is unchecked, keeping the form compact when there is no prior. Toggling off clears all four fields. Serializer behavior is unchanged: when the values are undefined the existing `sizeComparisonLine` returns "Not specified in input". (SPEC-UI-001)
 - **Migrated 14 radio inputs** in the structured input form to the unified primitives: (SPEC-UI-001)
   - `rcc-mass-card.tsx` — 11 radios (Bosniak + Trajectory as `RadioCardGroup`; Side, Mass type, Margins, Cranio-caudal, Macroscopic Fat, Solid Enhancement, Axial Location, Exophytic Ratio, Thrombus Kind as `SegmentedControl`)
   - `rcc-study-level-card.tsx` — 2 radios (Regional LN, Distant Met as `SegmentedControl`)

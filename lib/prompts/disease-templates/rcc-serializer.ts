@@ -50,6 +50,13 @@ export interface RccMass {
   priorMassSizeCm?: number;
   priorStudyDate?: string; // YYYY-MM-DD
   trajectory?: RccTrajectory;
+  // UI-only flag — ignored by serializer; backed by `priorMassSizeCm` /
+  // `priorStudyDate` / `trajectory` / `growthRate` presence. Toggling this
+  // checkbox in the UI gates the rendering of the four comparison fields, but
+  // the serializer relies solely on the underlying value presence so the
+  // existing `sizeComparisonLine` / `growthRateOrNotSpecified` behavior (which
+  // emits "Not specified in input" when the values are undefined) stays intact.
+  hasPriorStudy?: boolean;
 }
 
 export interface RccStructuredInput {
