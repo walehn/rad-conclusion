@@ -312,6 +312,18 @@ export function StructuredReportClient() {
           region remains addressable as a banner by assistive tech. */}
       <header className="mb-6 flex flex-col gap-4">
         <Card className="shadow-sm ring-1 ring-border/50">
+          <CardContent className="py-5">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              구조화 리포트 생성기
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              6개 섹션(CLINICAL INFORMATION / TECHNIQUE / COMPARISON /
+              FINDINGS / STAGING / IMPRESSION)으로 구조화된 리포트를
+              생성합니다.
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm ring-1 ring-border/50">
           <CardContent className="flex flex-wrap items-center justify-between gap-4 py-5">
             <DiseaseCategoryIndicator
               category={DISEASE_CATEGORY}
@@ -322,18 +334,6 @@ export function StructuredReportClient() {
               size="lg"
               citations={getDiseaseCategoryMetadata("RCC").standardReferences}
             />
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm ring-1 ring-border/50">
-          <CardContent className="py-5">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">
-              구조화 리포트 생성기
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              6개 섹션(CLINICAL INFORMATION / TECHNIQUE / COMPARISON /
-              FINDINGS / STAGING / IMPRESSION)으로 구조화된 리포트를
-              생성합니다.
-            </p>
           </CardContent>
         </Card>
       </header>
