@@ -19,14 +19,15 @@
 
 ---
 
-A browser-based radiology AI assistant with two tools: a **Conclusion Generator** that converts Findings text into clinically natural Impression statements via real-time streaming, and a **Structured Report Generator** that produces disease-specific structured reports (currently RCC) following SAR §3.3 format. Supports 4 LLM providers.
+A browser-based radiology AI assistant with two tools: a **Conclusion Generator** that converts Findings text into clinically natural Impression statements via real-time streaming, and a **Structured Report Generator** that produces disease-specific structured reports (disease selector at `/structured-report`, currently with RCC; prostate cancer planned per SPEC-PROSTATE-001) following SAR §3.3 format. Supports 4 LLM providers.
 
 ## Key Features
 
 - **Real-time streaming** — Token-by-token streaming output from LLM
 - **Conclusion Generator** — A/B Compare mode with V1 (Basic) vs V2 (Advanced Dx/DDx) prompt comparison and voting
 - **LLM-as-Judge evaluation** — Automated quality scoring of generated conclusions
-- **Structured Report Generator** — Disease-specific (RCC) structured input form with SAR §3.3 serialization; tab toggle between Free Text and RCC Structured modes
+- **Structured Report Generator** — Disease selection landing page at `/structured-report` listing registered diseases as cards; per-disease form at `/structured-report/<slug>` (currently `/structured-report/rcc`).
+- **RCC Structured Form** — 14-field controlled input following SAR §3.3 with Bosniak v2019 + Neves-Mayo + AJCC 8th classification; auto-numbered Mass cards with prior-study comparison toggle and free-text Other findings section.
 - **Disease dashboard** — Feature-selection card layout at root (`/`); original conclusion generator at `/conclusion`
 - **Common navigation bar** — Sticky nav across all authenticated pages
 - **4 LLM providers** — Local LLM, OpenAI, Anthropic, Google AI
@@ -128,7 +129,10 @@ rad-conclusion/
 │   │   ├── structured-report/ # Structured report streaming API
 │   │   └── user/api-keys/     # Per-account API key CRUD (GET/POST/DELETE)
 │   ├── conclusion/            # Conclusion generator page
-│   ├── structured-report/     # Structured report generator page
+│   ├── structured-report/     # Disease selection landing + per-disease form
+│   │   ├── page.tsx                        # Selector (server) — lists DISEASE_REGISTRY entries
+│   │   ├── [disease]/page.tsx              # Dynamic per-disease form route (notFound on bad slug)
+│   │   └── structured-report-client.tsx    # Client form (takes `disease` prop)
 │   ├── dashboard-cards.tsx    # Feature-selection cards
 │   ├── login/                 # Login page
 │   ├── settings/              # Provider settings page
@@ -139,9 +143,8 @@ rad-conclusion/
 │   ├── ui/                    # Base UI components
 │   ├── settings/              # Settings components
 │   ├── app-nav.tsx            # Common sticky navigation bar
-│   ├── disease-category-indicator.tsx  # Disease category badge (pill/overline)
+│   ├── disease-category-indicator.tsx  # Disease category badge (pill/overline/hero variants)
 │   ├── rcc-structured-form.tsx         # RCC 14-field structured input form
-│   ├── tabbed-findings-input.tsx       # Tab toggle: Free Text | RCC Structured
 │   ├── structured-report-output.tsx    # 6-section streaming output
 │   ├── findings-input.tsx     # Free-text findings field
 │   ├── conclusion-output.tsx  # Conclusion output area
