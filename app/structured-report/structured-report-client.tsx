@@ -329,6 +329,11 @@ export function StructuredReportClient() {
             <h1 className="text-2xl font-bold tracking-tight text-foreground">
               구조화 리포트 생성기
             </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              6개 섹션(CLINICAL INFORMATION / TECHNIQUE / COMPARISON /
+              FINDINGS / STAGING / IMPRESSION)으로 구조화된 리포트를
+              생성합니다.
+            </p>
           </CardContent>
         </Card>
       </header>
