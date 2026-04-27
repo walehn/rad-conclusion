@@ -16,8 +16,11 @@ describe("serializeRccStructuredInput", () => {
     }
   });
 
-  // Test 2: Solid mass + Bosniak III → Bosniak line forced to NA sentinel
-  it("overrides Bosniak to NA sentinel when massType is Solid, ignoring user input", () => {
+  // Test 2: Solid mass + Bosniak III → Bosniak line is OMITTED entirely.
+  // Bosniak v2019 applies only to cystic masses; for Solid the serializer
+  // drops the Bosniak (and Predominantly cystic) lines so the LLM prompt
+  // contains no noise about a non-applicable cystic-only field.
+  it("omits the Bosniak line entirely when massType is Solid, ignoring user input", () => {
     const result = serializeRccStructuredInput({
       masses: [
         {
@@ -27,7 +30,8 @@ describe("serializeRccStructuredInput", () => {
       ],
     });
     expect(result).toContain("Mass 1:\n");
-    expect(result).toContain("- Bosniak: Not applicable (solid mass)");
+    expect(result).not.toContain("- Bosniak:");
+    expect(result).not.toContain("Not applicable (solid mass)");
   });
 
   // Test 3: Cystic mass + Bosniak IIF → Bosniak shown as-is
@@ -203,8 +207,10 @@ describe("serializeRccStructuredInput", () => {
     expect(serializeRccStructuredInput({ masses: [] })).toBe("");
   });
 
-  // Test 14: two masses with independent Bosniak NA sentinel application
-  it("renders two masses as Mass 1 / Mass 2 blocks with per-mass Bosniak NA logic", () => {
+  // Test 14: two masses with independent per-mass-type rendering.
+  // Solid mass omits Bosniak + Predominantly cystic (14 lines); Cystic mass
+  // keeps the full 16-line canonical order.
+  it("renders two masses as Mass 1 / Mass 2 blocks with per-mass-type Bosniak rendering", () => {
     const result = serializeRccStructuredInput({
       masses: [
         {
@@ -225,21 +231,24 @@ describe("serializeRccStructuredInput", () => {
     const blocks = result.split("\n\n");
     expect(blocks).toHaveLength(2);
 
-    // Mass 1 block: Solid → NA sentinel
+    // Mass 1 block: Solid → Bosniak + Predominantly cystic lines OMITTED
     expect(blocks[0]).toMatch(/^Mass 1:\n/);
     expect(blocks[0]).toContain("- Side: Right");
     expect(blocks[0]).toContain("- Mass size: 4.2 cm");
-    expect(blocks[0]).toContain("- Bosniak: Not applicable (solid mass)");
+    expect(blocks[0]).not.toContain("- Bosniak:");
+    expect(blocks[0]).not.toContain("- Predominantly cystic:");
+    expect(blocks[0]).not.toContain("Not applicable (solid mass)");
 
-    // Mass 2 block: Cystic → Bosniak IIF preserved
+    // Mass 2 block: Cystic → Bosniak IIF preserved; full 16-line block
     expect(blocks[1]).toMatch(/^Mass 2:\n/);
     expect(blocks[1]).toContain("- Side: Left");
     expect(blocks[1]).toContain("- Mass size: 2.8 cm");
     expect(blocks[1]).toContain("- Bosniak: IIF");
     expect(blocks[1]).not.toContain("Not applicable (solid mass)");
 
-    // Each block should have header + 16 lines = 17 total
-    expect(blocks[0].split("\n")).toHaveLength(17);
+    // Solid block: header + 14 lines = 15 total
+    expect(blocks[0].split("\n")).toHaveLength(15);
+    // Cystic block: header + 16 lines = 17 total
     expect(blocks[1].split("\n")).toHaveLength(17);
   });
 
@@ -359,9 +368,10 @@ describe("serializeRccStructuredInput", () => {
   // Bosniak v2019 alignment: Predominantly cystic field (Cystic-only boolean)
   // -------------------------------------------------------------------------
 
-  // Test 29: Solid mass forces NA sentinel for Predominantly cystic, even when
-  // cysticPredominant is set (verifies forced override mirrors Bosniak NA).
-  it("forces 'Not applicable (solid mass)' for Predominantly cystic when massType is Solid, ignoring cysticPredominant input", () => {
+  // Test 29: Solid mass omits the Predominantly cystic line entirely, even
+  // when cysticPredominant is set. Mirrors the Bosniak omission policy: a
+  // cystic-only field has no place in a solid-mass serialization block.
+  it("omits the Predominantly cystic line entirely when massType is Solid, ignoring cysticPredominant input", () => {
     const result = serializeRccStructuredInput({
       masses: [
         {
@@ -370,10 +380,8 @@ describe("serializeRccStructuredInput", () => {
         },
       ],
     });
-    expect(result).toContain(
-      "- Predominantly cystic: Not applicable (solid mass)"
-    );
-    expect(result).not.toContain("- Predominantly cystic: Yes");
+    expect(result).not.toContain("- Predominantly cystic:");
+    expect(result).not.toContain("Not applicable (solid mass)");
   });
 
   // Test 30: Cystic + cysticPredominant true → "Yes"

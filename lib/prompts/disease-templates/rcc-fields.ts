@@ -88,17 +88,6 @@ export const RCC_MET_SITES = [
   "Other",
 ] as const;
 
-/** Sentinel value shown in the Bosniak selector when the mass is solid. */
-export const BOSNIAK_NA_SOLID = "Not applicable (solid mass)" as const;
-
-/**
- * Sentinel value shown in the Predominantly cystic selector when the mass is
- * solid. The string matches BOSNIAK_NA_SOLID, but is exported separately to
- * preserve semantic separation between the two NA contexts (Bosniak v2019
- * cyst classification vs. cystic-predominant pathology indicator).
- */
-export const PRED_CYSTIC_NA_SOLID = "Not applicable (solid mass)" as const;
-
 // ---------------------------------------------------------------------------
 // Union types derived from the constant arrays
 // ---------------------------------------------------------------------------

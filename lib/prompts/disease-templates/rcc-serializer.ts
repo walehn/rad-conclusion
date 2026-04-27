@@ -21,8 +21,6 @@ import {
   type RccLnSite,
   type RccMetSite,
   type RccTrajectory,
-  BOSNIAK_NA_SOLID,
-  PRED_CYSTIC_NA_SOLID,
 } from "./rcc-fields";
 
 // ---------------------------------------------------------------------------
@@ -87,29 +85,26 @@ function growthRateOrNotSpecified(value: number | undefined): string {
   return value !== undefined ? String(value) : NOT_SPECIFIED;
 }
 
+/**
+ * Build the Bosniak line value.
+ * Bosniak v2019 applies exclusively to cystic masses; for Solid the entire
+ * line is omitted from serializer output (see serializeRccMass), so this
+ * helper only handles the non-Solid path.
+ */
 function bosniakLine(mass: RccMass): string {
-  // When mass is Solid, always show the NA sentinel regardless of bosniak field.
-  if (mass.massType === "Solid") {
-    return BOSNIAK_NA_SOLID;
-  }
   return strOrNotSpecified(mass.bosniak);
 }
 
 /**
  * Build the Predominantly cystic line value.
- * Mirrors the Bosniak NA-on-Solid pattern: a Solid mass always emits the NA
- * sentinel regardless of the cysticPredominant input. For Cystic masses the
- * boolean is rendered as "Yes" / "No"; undefined falls back to NOT_SPECIFIED.
- *  - massType "Solid"             → "Not applicable (solid mass)" (forced)
- *  - massType "Cystic" + true     → "Yes"
- *  - massType "Cystic" + false    → "No"
+ * For Solid masses, the entire line is omitted from serializer output (see
+ * serializeRccMass). This helper only handles the non-Solid path:
+ *  - massType "Cystic" + true      → "Yes"
+ *  - massType "Cystic" + false     → "No"
  *  - massType "Cystic" + undefined → "Not specified in input"
- *  - massType undefined           → "Not specified in input"
+ *  - massType undefined            → "Not specified in input"
  */
 function predominantlyCysticLine(mass: RccMass): string {
-  if (mass.massType === "Solid") {
-    return PRED_CYSTIC_NA_SOLID;
-  }
   if (mass.cysticPredominant === undefined) {
     return NOT_SPECIFIED;
   }
@@ -184,17 +179,34 @@ function sizeComparisonLine(mass: RccMass): string {
 }
 
 /**
- * Serialize a single mass into 16 fixed lines (no header).
- * Always outputs all 16 lines in canonical order.
+ * Serialize a single mass into a fixed-order line list (no header).
+ *
+ * Output line count depends on massType:
+ *  - Cystic / Indeterminate / undefined → 16 lines (full canonical order)
+ *  - Solid                              → 14 lines (Bosniak and Predominantly
+ *                                          cystic lines are omitted entirely;
+ *                                          both fields apply only to cystic
+ *                                          masses per Bosniak v2019)
+ *
  * Undefined fields produce "Not specified in input".
  */
 function serializeRccMass(mass: RccMass): string[] {
-  return [
+  const isSolid = mass.massType === "Solid";
+
+  const lines: string[] = [
     `- Side: ${strOrNotSpecified(mass.side)}`,
     `- Mass size: ${numCmOrNotSpecified(mass.massSizeCm)}`,
     `- Mass type: ${strOrNotSpecified(mass.massType)}`,
-    `- Bosniak: ${bosniakLine(mass)}`,
-    `- Predominantly cystic: ${predominantlyCysticLine(mass)}`,
+  ];
+
+  if (!isSolid) {
+    lines.push(
+      `- Bosniak: ${bosniakLine(mass)}`,
+      `- Predominantly cystic: ${predominantlyCysticLine(mass)}`
+    );
+  }
+
+  lines.push(
     `- Axial location: ${strOrNotSpecified(mass.axial)}`,
     `- Cranio-caudal location: ${strOrNotSpecified(mass.cranio)}`,
     `- Margins: ${strOrNotSpecified(mass.margins)}`,
@@ -205,8 +217,10 @@ function serializeRccMass(mass: RccMass): string[] {
     `- Venous tumor thrombus: ${thrombusLine(mass)}`,
     `- Bland (non-tumor) thrombus: ${strOrNotSpecified(mass.blandThrombus)}`,
     `- Growth rate: ${growthRateOrNotSpecified(mass.growthRate)}`,
-    `- Size comparison: ${sizeComparisonLine(mass)}`,
-  ];
+    `- Size comparison: ${sizeComparisonLine(mass)}`
+  );
+
+  return lines;
 }
 
 /**

@@ -303,64 +303,52 @@ export function RccMassCard({
             />
           </FieldRow>
 
-          {/* 5. Bosniak — disabled when mass type is Solid */}
-          <FieldRow label="Bosniak">
-            <RadioCardGroup
-              name={fieldId("bosniak")}
-              ariaLabel="Bosniak"
-              value={value.bosniak}
-              options={RCC_BOSNIAK_RADIO_OPTIONS}
-              onChange={(opt) => onChange({ ...value, bosniak: opt })}
-              disabled={isSolid}
-              disabledNote="Not applicable (solid mass)"
-              columns={3}
-            />
-          </FieldRow>
-
-          {/* 5a. Predominantly cystic — disabled when mass type is Solid */}
-          <fieldset
-            aria-disabled={isSolid ? "true" : undefined}
-            className={cn(
-              "rounded-lg border border-border p-3 flex flex-col gap-2",
-              isSolid && "opacity-50"
-            )}
-          >
-            <legend
-              id={`${fieldId("cysticPredominant")}-legend`}
-              className="px-1 text-sm font-medium text-foreground"
-            >
-              Predominantly cystic
-            </legend>
-
-            <label
-              className={cn(
-                "flex items-center gap-2",
-                isSolid ? "cursor-not-allowed" : "cursor-pointer"
-              )}
-            >
-              <input
-                id={fieldId("cysticPredominant")}
-                type="checkbox"
-                checked={value.cysticPredominant === true}
-                onChange={(e) =>
-                  onChange({
-                    ...value,
-                    cysticPredominant: e.target.checked ? true : false,
-                  })
-                }
-                disabled={isSolid}
-                className="h-4 w-4 text-primary"
-                aria-labelledby={`${fieldId("cysticPredominant")}-legend`}
+          {/* 5. Bosniak — only rendered when mass type is not Solid (Bosniak v2019
+              applies exclusively to cystic masses; for Solid, the field is omitted
+              from the UI and from the serialized prompt to avoid noise). */}
+          {!isSolid && (
+            <FieldRow label="Bosniak">
+              <RadioCardGroup
+                name={fieldId("bosniak")}
+                ariaLabel="Bosniak"
+                value={value.bosniak}
+                options={RCC_BOSNIAK_RADIO_OPTIONS}
+                onChange={(opt) => onChange({ ...value, bosniak: opt })}
+                columns={3}
               />
-              <span className="text-sm">Yes</span>
-            </label>
+            </FieldRow>
+          )}
 
-            {isSolid && (
-              <p className="text-xs text-muted-foreground">
-                Not applicable (solid mass)
-              </p>
-            )}
-          </fieldset>
+          {/* 5a. Predominantly cystic — only rendered when mass type is not Solid.
+              Same rationale as Bosniak: a "predominantly cystic" indicator is
+              meaningless for a Solid mass. */}
+          {!isSolid && (
+            <fieldset className="rounded-lg border border-border p-3 flex flex-col gap-2">
+              <legend
+                id={`${fieldId("cysticPredominant")}-legend`}
+                className="px-1 text-sm font-medium text-foreground"
+              >
+                Predominantly cystic
+              </legend>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  id={fieldId("cysticPredominant")}
+                  type="checkbox"
+                  checked={value.cysticPredominant === true}
+                  onChange={(e) =>
+                    onChange({
+                      ...value,
+                      cysticPredominant: e.target.checked ? true : false,
+                    })
+                  }
+                  className="h-4 w-4 text-primary"
+                  aria-labelledby={`${fieldId("cysticPredominant")}-legend`}
+                />
+                <span className="text-sm">Yes</span>
+              </label>
+            </fieldset>
+          )}
 
           {/* 6. Macroscopic fat */}
           <FieldRow label="Macroscopic fat">

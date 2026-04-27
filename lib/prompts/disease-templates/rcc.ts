@@ -79,6 +79,26 @@ function buildModalityHintBlock(modality: RccModality): string {
 }
 
 /**
+ * TECHNIQUE study date instruction block.
+ *
+ * When the structured input contains a `Study date: YYYY-MM-DD` line, the
+ * TECHNIQUE section MUST include a single date line at the top of the section
+ * using the language-appropriate label. When no Study date is present, the
+ * line is omitted entirely (no placeholder is forced).
+ *
+ * Label conventions:
+ *  - en  → "Date of examination: YYYY-MM-DD"
+ *  - ko  → "검사일: YYYY-MM-DD"
+ *  - mixed → Korean label used (matches mixed-mode descriptive style)
+ */
+function buildTechniqueStudyDateBlock(lang: RccReportLang): string {
+  const label =
+    lang === "en" ? "Date of examination" : "검사일";
+  return `=== TECHNIQUE STUDY DATE ===
+If the structured input contains a "Study date: YYYY-MM-DD" line, the TECHNIQUE section MUST include exactly one line "${label}: <YYYY-MM-DD>" using the date string verbatim from the input. Place this line as the first line of the TECHNIQUE section, before any protocol description. If the input has no "Study date:" line, OMIT this date line entirely — do NOT emit a placeholder such as "Not specified".`;
+}
+
+/**
  * Build the system prompt for RCC structured reports.
  *
  * Composes the 9-block structure per templates-spec.md §6.5:
@@ -96,6 +116,7 @@ export function buildRccReportSystemPrompt(config: RccReportConfig): string {
   const { lang, modality = "Auto" } = config;
   const langInstr = RCC_LANG_INSTRUCTIONS[lang];
   const modalityHint = buildModalityHintBlock(modality);
+  const techniqueStudyDate = buildTechniqueStudyDateBlock(lang);
 
   return `You are an expert radiologist assistant drafting structured Renal Cell Carcinoma (RCC) reports. Your task is to produce a complete six-section structured report from the provided Findings, applying the SAR Disease-Focused Panel template, AJCC 8th edition TNM staging, Bosniak Classification 2019, and the Neves-Mayo venous thrombus classification.
 
@@ -113,12 +134,14 @@ Each section header must appear exactly once, at the start of its own line. Do N
 
 ${modalityHint}
 
+${techniqueStudyDate}
+
 === FINDINGS ANATOMY CHECKLIST (SAR 13 Core features) ===
 Enumerate each of the 13 SAR core features as a dashed bullet ("- <Feature>: <Value>") in this order:
 1. Mass size (cm, single largest dimension, decimal)
 2. Growth rate (text; "No prior available" if no comparison)
 3. Mass type (Cystic / Solid / Indeterminate)
-4. Bosniak classification (Not applicable (solid mass) / I / II / IIF / III / IV)
+4. Bosniak classification (I / II / IIF / III / IV) — INCLUDE this bullet ONLY when the mass is cystic; for solid masses OMIT the Bosniak bullet entirely (do not emit a placeholder line)
 5. Macroscopic fat (Present / Absent)
 6. Solid enhancement (Present / Absent / Indeterminate)
 7. Axial location (Anterior / Posterior)
@@ -150,7 +173,7 @@ II: Thin wall + up to 3 thin (≤ 2 mm) septa, OR non-enhancing homogeneous mass
 IIF: Smooth minimally thickened (3 mm) enhancing wall, OR ≥ 4 smooth thin (≤ 2 mm) enhancing septa, OR 1–3 minimally thickened (3 mm) enhancing septa.
 III: One or more thick (≥ 4 mm) OR irregular enhancing walls/septa.
 IV: One or more enhancing nodules (≥ 4 mm convex protrusion with obtuse margins, OR any convex protrusion with acute margins).
-Apply only when the mass is cystic. For solid masses, state "Not applicable (solid mass)".
+Apply only when the mass is cystic. For solid masses, do NOT include the Bosniak bullet (and do NOT include the Predominantly cystic bullet either) in the FINDINGS section.
 
 === NEVES-MAYO VENOUS THROMBUS LEVEL ===
 Level 0: Thrombus limited to renal vein only.
@@ -169,7 +192,7 @@ ${langInstr}
 3. Missing Core features MUST be marked as "Not specified in input" or "Not assessable on current imaging"; never silently omit a Core feature bullet.
 4. Units: use mm or cm with a space before the unit (e.g., "3.2 cm", not "3.2cm"); preserve decimal values verbatim; state left/right explicitly (no "L"/"R" abbreviations).
 5. Staging MUST be derived ONLY from findings explicitly stated in the input. Do not assume perinephric extension, lymph node involvement, or distant metastasis without textual support; where an assessment cannot be made, state "Cannot be determined on current imaging".
-6. Bosniak classification applies ONLY to cystic masses. For solid (or not-explicitly-cystic) masses, the Bosniak bullet MUST read "Not applicable (solid mass)".
+6. Bosniak classification applies ONLY to cystic masses. For solid (or not-explicitly-cystic) masses, OMIT the Bosniak bullet AND the Predominantly cystic bullet entirely from the FINDINGS section — do NOT emit a placeholder line such as "Not applicable" for either field.
 7. IMPRESSION is a numbered list (1., 2., 3., ...), MAXIMUM 5 items, prioritized by clinical significance — lead with the staging summary and the most critical finding.
 8. Do NOT provide treatment recommendations (surgery, chemotherapy, radiation, immunotherapy, ablation). This is a radiology report. Follow-up imaging suggestions are permitted only when directly supported by a finding (e.g., "short-interval MRI suggested for indeterminate cystic lesion").
 9. Output ONLY the final 6-section report. Do NOT include reasoning, deliberation, self-questions, or hedging phrases such as "Let's check", "Wait", "Actually", "On the other hand" inside any section. STAGING items must contain ONLY the final classification followed by a single short parenthetical justification: ONE clause, MAXIMUM 15 words, no semicolons, no "but"/"however"/"although", no comparison between alternative categories. When a finding is ambiguous between two T/N/M categories, pick the more conservative one and append "(strict interpretation)"; never narrate the decision process in the report body.
