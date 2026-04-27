@@ -5,14 +5,14 @@ import { Send, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
-import { TabbedFindingsInput } from "@/components/tabbed-findings-input";
-import type { ActiveTab } from "@/components/tabbed-findings-input";
+import { RccStructuredForm } from "@/components/rcc-structured-form";
 import { ModelSelector } from "@/components/model-selector";
 import { DiseaseCategoryIndicator } from "@/components/disease-category-indicator";
 import { ReferencesDialog } from "@/components/references-dialog";
 import { StructuredReportOutput } from "@/components/structured-report-output";
 import { getDiseaseCategoryMetadata } from "@/lib/prompts/disease-registry";
 import {
+  hasMinimumStructuredFields,
   serializeRccStructuredInput,
 } from "@/lib/prompts/disease-templates/rcc-serializer";
 import type { RccStructuredInput } from "@/lib/prompts/disease-templates/rcc-serializer";
@@ -51,7 +51,6 @@ const LANG_OPTIONS: ReadonlyArray<{ value: RccReportLang; label: string }> = [
 
 const SESSION_KEY_PROVIDER = "rad:last-provider";
 const SESSION_KEY_MODEL = "rad:last-model";
-const SESSION_KEY_ACTIVE_TAB = "rad:srep:active-tab";
 
 function getCsrfToken(): string {
   return (
@@ -86,11 +85,9 @@ function appendStreamChunk(accumulated: string, rawLine: string): string {
 }
 
 export function StructuredReportClient() {
-  const [freeTextFindings, setFreeTextFindings] = React.useState("");
   const [structuredInput, setStructuredInput] = React.useState<RccStructuredInput>(
     () => ({ masses: [{ id: genClientId() }] })
   );
-  const [activeTab, setActiveTab] = React.useState<ActiveTab>("free-text");
   const [modality, setModality] = React.useState<RccModality>("Auto");
   const [lang, setLang] = React.useState<RccReportLang>("en");
   const [provider, setProvider] = React.useState<ProviderName>("local");
@@ -156,12 +153,8 @@ export function StructuredReportClient() {
     try {
       const savedProvider = sessionStorage.getItem(SESSION_KEY_PROVIDER);
       const savedModel = sessionStorage.getItem(SESSION_KEY_MODEL);
-      const savedTab = sessionStorage.getItem(SESSION_KEY_ACTIVE_TAB);
       if (savedProvider) setProvider(savedProvider as ProviderName);
       if (savedModel) setModel(savedModel);
-      if (savedTab === "free-text" || savedTab === "rcc-structured") {
-        setActiveTab(savedTab);
-      }
     } catch {
       // sessionStorage unavailable (private mode, SSR boundary) — ignore.
     }
@@ -190,25 +183,15 @@ export function StructuredReportClient() {
     }
   }, [model]);
 
-  React.useEffect(() => {
-    try {
-      sessionStorage.setItem(SESSION_KEY_ACTIVE_TAB, activeTab);
-    } catch {
-      /* noop */
-    }
-  }, [activeTab]);
-
   // --- Generation handler --------------------------------------------------
   const handleGenerate = React.useCallback(async () => {
-    const findingsText =
-      activeTab === "rcc-structured"
-        ? serializeRccStructuredInput(structuredInput)
-        : freeTextFindings.trim();
-
-    if (activeTab === "free-text" && !findingsText) {
-      setInputError("Please enter the Findings text.");
+    if (!hasMinimumStructuredFields(structuredInput)) {
+      setInputError(
+        "Please complete the structured input (Side and Mass size are required for each mass)."
+      );
       return;
     }
+    const findingsText = serializeRccStructuredInput(structuredInput);
     setInputError("");
     setApiError(null);
     setContent("");
@@ -299,7 +282,7 @@ export function StructuredReportClient() {
       setStreamStartedAt(null);
       abortRef.current = null;
     }
-  }, [freeTextFindings, structuredInput, activeTab, modality, lang, provider, model]);
+  }, [structuredInput, modality, lang, provider, model]);
 
   const handleCancel = React.useCallback(() => {
     abortRef.current?.abort();
@@ -399,20 +382,13 @@ export function StructuredReportClient() {
               <CardTitle className="text-lg font-semibold">Findings</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
-              <TabbedFindingsInput
-                freeTextValue={freeTextFindings}
-                onFreeTextChange={(v) => {
-                  setFreeTextFindings(v);
+              <RccStructuredForm
+                value={structuredInput}
+                onChange={(next) => {
+                  setStructuredInput(next);
                   if (inputError) setInputError("");
                 }}
-                freeTextError={inputError}
-                structuredValue={structuredInput}
-                onStructuredChange={setStructuredInput}
-                activeTab={activeTab}
-                onActiveTabChange={(tab) => {
-                  setActiveTab(tab);
-                  if (inputError) setInputError("");
-                }}
+                error={inputError}
               />
               {isStreaming ? (
                 <Button
@@ -427,7 +403,7 @@ export function StructuredReportClient() {
               ) : (
                 <Button
                   onClick={handleGenerate}
-                  disabled={activeTab === "free-text" && !freeTextFindings.trim()}
+                  disabled={!hasMinimumStructuredFields(structuredInput)}
                   className="w-full bg-gradient-to-r from-primary to-primary/90 shadow-md shadow-primary/20 transition-all hover:shadow-lg hover:shadow-primary/30 disabled:from-muted disabled:to-muted disabled:shadow-none"
                   size="lg"
                 >

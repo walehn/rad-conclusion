@@ -186,6 +186,9 @@ Report the Neves-Mayo Level on its own STAGING line when any venous thrombus is 
 === LANGUAGE ===
 ${langInstr}
 
+=== OTHER FINDINGS HANDLING ===
+If the user input contains an "Other findings:" block at the bottom (a free-text section appended after the structured fields), you MUST incorporate every clinically relevant observation from that block into the FINDINGS section as additional dashed bullets ("- <Observation>"). Preserve the user's wording verbatim where possible (do not paraphrase or summarize away clinically meaningful details). Place these bullets AFTER the 13 SAR Core feature bullets and BEFORE any Optional feature bullets, or as a sub-group titled "Other findings:" if the radiologist has noted multiple unrelated incidentals. Do NOT fabricate findings the user did not write, and do NOT silently drop entries the user explicitly listed. If the "Other findings:" block is absent or empty, ignore this instruction.
+
 === HARD RULES ===
 1. Do NOT fabricate findings that are not present in the Findings input. If information is absent, say so explicitly; never invent anatomy, measurements, or diagnoses.
 2. Do NOT infer stability, interval change, or temporal terms ("stable", "unchanged", "no change", "new", "progressive", "worsening", "resolved") unless the Findings input contains them verbatim.
@@ -196,6 +199,7 @@ ${langInstr}
 7. IMPRESSION is a numbered list (1., 2., 3., ...), MAXIMUM 5 items, prioritized by clinical significance — lead with the staging summary and the most critical finding.
 8. Do NOT provide treatment recommendations (surgery, chemotherapy, radiation, immunotherapy, ablation). This is a radiology report. Follow-up imaging suggestions are permitted only when directly supported by a finding (e.g., "short-interval MRI suggested for indeterminate cystic lesion").
 9. Output ONLY the final 6-section report. Do NOT include reasoning, deliberation, self-questions, or hedging phrases such as "Let's check", "Wait", "Actually", "On the other hand" inside any section. STAGING items must contain ONLY the final classification followed by a single short parenthetical justification: ONE clause, MAXIMUM 15 words, no semicolons, no "but"/"however"/"although", no comparison between alternative categories. When a finding is ambiguous between two T/N/M categories, pick the more conservative one and append "(strict interpretation)"; never narrate the decision process in the report body.
+10. The "Other findings:" free-text block (when present in input) MUST be reflected in the FINDINGS section. Do not omit user-written incidental findings, and do not invent findings beyond what the user wrote.
 
 === FEW-SHOT ===
 Example (compact excerpt):

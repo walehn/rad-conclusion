@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { RccMassCard } from "@/components/rcc-mass-card";
 import { RccStudyLevelCard } from "@/components/rcc-study-level-card";
 import { RccClinicalContextCard } from "@/components/rcc-clinical-context-card";
+import { RccOtherFindingsCard } from "@/components/rcc-other-findings-card";
 import { genClientId } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -116,6 +117,8 @@ export function RccStructuredForm({
       </div>
 
       <RccStudyLevelCard value={value} onChange={onChange} />
+
+      <RccOtherFindingsCard value={value} onChange={onChange} />
     </div>
   );
 }

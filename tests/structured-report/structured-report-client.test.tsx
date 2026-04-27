@@ -36,7 +36,7 @@ function emptyStream(): ReadableStream<Uint8Array> {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("StructuredReportClient — tab integration", () => {
+describe("StructuredReportClient — structured input integration", () => {
   let fetchCalls: Array<{ url: string; options: RequestInit }> = [];
 
   beforeEach(() => {
@@ -71,38 +71,12 @@ describe("StructuredReportClient — tab integration", () => {
     vi.unstubAllGlobals();
   });
 
-  it("Free Text 탭의 텍스트가 그대로 findings 필드로 전송된다 (AC-1)", async () => {
+  it("RCC Structured 입력의 직렬화 결과가 findings 필드로 전송된다", async () => {
     render(<StructuredReportClient />);
 
-    // Free Text tab is active by default — find the textarea inside the tabpanel
-    const textarea = screen.getByRole("textbox");
-    fireEvent.change(textarea, { target: { value: "Right kidney 4cm mass" } });
-
-    fireEvent.click(
-      screen.getByRole("button", { name: /Generate structured report/i })
-    );
-
-    await waitFor(() => {
-      const generateCall = fetchCalls.find((c) =>
-        c.url === "/api/structured-report/generate"
-      );
-      expect(generateCall).toBeDefined();
-      const body = JSON.parse(generateCall!.options.body as string);
-      expect(body.findings).toBe("Right kidney 4cm mass");
-      expect(body.diseaseCategory).toBe("RCC");
-    });
-  });
-
-  it("RCC Structured 탭의 직렬화 결과가 findings 필드로 전송된다 (AC-2)", async () => {
-    render(<StructuredReportClient />);
-
-    // Switch to RCC Structured tab — use getAllByRole to handle multiple tab elements
-    // and target the one controlling the rcc-structured panel.
-    const rccTab = screen
-      .getAllByRole("tab", { name: /RCC Structured/i })
-      .find((el) => el.getAttribute("aria-controls") === "tabpanel-rcc-structured");
-    expect(rccTab).toBeDefined();
-    fireEvent.click(rccTab!);
+    // The RCC structured form is now always visible (no tab toggle). Fill in
+    // the two minimum-required fields so `hasMinimumStructuredFields` passes
+    // and the Generate button becomes enabled.
 
     // Select Side = "Right" via the radio input inside the Side radiogroup
     const rightRadio = screen.getByRole("radio", { name: "Right" });
@@ -114,15 +88,13 @@ describe("StructuredReportClient — tab integration", () => {
     });
     fireEvent.change(massSizeInput, { target: { value: "3.5" } });
 
-    // Generate button should be enabled for rcc-structured tab — pick the non-disabled one
-    const generateButtons = screen.getAllByRole("button", {
+    // With both required fields filled, exactly one Generate button should be
+    // rendered and enabled (the previous tab UI rendered two — one per panel).
+    const generateButton = screen.getByRole("button", {
       name: /Generate structured report/i,
     });
-    const enabledButton = generateButtons.find(
-      (el) => !(el as HTMLButtonElement).disabled
-    );
-    expect(enabledButton).toBeDefined();
-    fireEvent.click(enabledButton!);
+    expect((generateButton as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(generateButton);
 
     await waitFor(() => {
       const generateCall = fetchCalls.find((c) =>
@@ -135,14 +107,17 @@ describe("StructuredReportClient — tab integration", () => {
       expect(body.findings).toContain("Mass 1:");
       expect(body.findings).toContain("- Side:");
       expect(body.findings).toContain("- Mass size:");
-      // Bosniak v2019 alignment: the Predominantly cystic line is always
-      // emitted (NA for Solid masses, Yes/No/Not specified otherwise). In the
-      // default state the massType is undefined → "Not specified in input".
-      expect(body.findings).toContain("- Predominantly cystic:");
+      // Bosniak v2019 alignment: Predominantly cystic line is emitted only
+      // when massType === "Cystic"; in the default state massType is
+      // undefined so the line is omitted entirely.
+      expect(body.findings).not.toContain("- Predominantly cystic:");
       // Regression guard: study-level block must be omitted when no
       // lymphNodes / distantMetastases fields are set in the default state.
       expect(body.findings).not.toContain("Regional lymph nodes");
       expect(body.findings).not.toContain("Distant metastases");
+      // Other findings block must also be omitted when no otherFindings text
+      // has been entered.
+      expect(body.findings).not.toContain("Other findings:");
       expect(body.diseaseCategory).toBe("RCC");
     });
   });

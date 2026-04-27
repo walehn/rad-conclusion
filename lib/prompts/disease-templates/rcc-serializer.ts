@@ -72,6 +72,11 @@ export interface RccStructuredInput {
   distantMetastases?: RccLnM;
   // Meaningful only when distantMetastases === "Present"
   metastasisSites?: RccMetSite[];
+  // Free-text "Other findings" block — additional clinically relevant
+  // observations the structured fields do not cover (e.g., adrenal
+  // incidentaloma, vertebral degeneration). Multi-line preserved verbatim by
+  // the serializer; LLM is instructed to weave these into the FINDINGS section.
+  otherFindings?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -304,6 +309,24 @@ function metastasisBlock(input: RccStructuredInput): string[] {
   return ["Distant metastases: Present", `- Sites: ${sitesValue}`];
 }
 
+/**
+ * Build the Other findings block lines.
+ *
+ * Returns:
+ *  - [] when otherFindings is undefined or empty (block omitted entirely)
+ *  - ["Other findings:", <verbatim text>] otherwise
+ *
+ * Unlike `clinicalContextBlock`, multi-line input is preserved verbatim — the
+ * LLM consumes the full free-text block and is instructed (via the system
+ * prompt's `=== OTHER FINDINGS HANDLING ===` block) to weave each clinically
+ * relevant observation into the FINDINGS section.
+ */
+function otherFindingsBlock_(input: RccStructuredInput): string[] {
+  const text = input.otherFindings?.trim();
+  if (!text) return [];
+  return ["Other findings:", text];
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -333,6 +356,11 @@ export function serializeRccStructuredInput(input: RccStructuredInput): string {
   const studyLevelLines = [...lymphNodeBlock(input), ...metastasisBlock(input)];
   if (studyLevelLines.length > 0) {
     blocks.push(studyLevelLines.join("\n"));
+  }
+
+  const otherFindings = otherFindingsBlock_(input);
+  if (otherFindings.length > 0) {
+    blocks.push(otherFindings.join("\n"));
   }
 
   return blocks.join("\n\n");

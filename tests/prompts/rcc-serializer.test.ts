@@ -498,6 +498,54 @@ describe("serializeRccStructuredInput", () => {
     expect(result).not.toContain("Study date");
     expect(result.startsWith("Mass 1:")).toBe(true);
   });
+
+  // -------------------------------------------------------------------------
+  // Other findings (Section 4) — free-text block at the bottom of the input
+  // -------------------------------------------------------------------------
+
+  // Test 39: otherFindings undefined → no Other findings block emitted
+  it("emits no Other findings block when otherFindings is undefined", () => {
+    const result = serializeRccStructuredInput({
+      masses: [{ side: "Right", massSizeCm: 3.5 }],
+    });
+    expect(result).not.toContain("Other findings:");
+  });
+
+  // Test 40: single-line otherFindings → "Other findings:\n<text>" block
+  it("emits an Other findings block when otherFindings is a non-empty single line", () => {
+    const result = serializeRccStructuredInput({
+      masses: [{ side: "Right", massSizeCm: 3.5 }],
+      otherFindings: "Right adrenal nodule, 1 cm.",
+    });
+    expect(result).toContain("Other findings:\nRight adrenal nodule, 1 cm.");
+  });
+
+  // Test 41: multi-line otherFindings preserved verbatim (NOT flattened).
+  // Distinguishes this field from clinicalInformation, which is whitespace-
+  // collapsed to a single line. Users may intentionally list incidental
+  // findings on separate lines and the serializer must respect that.
+  it("preserves multi-line otherFindings verbatim (no flattening)", () => {
+    const result = serializeRccStructuredInput({
+      masses: [{ side: "Right", massSizeCm: 3.5 }],
+      otherFindings: "Line 1\nLine 2\nLine 3",
+    });
+    expect(result).toContain("Line 1\nLine 2\nLine 3");
+  });
+
+  // Test 42: order — Other findings block must be emitted AFTER the
+  // study-level block (Regional lymph nodes / Distant metastases).
+  it("emits Other findings AFTER the study-level block", () => {
+    const result = serializeRccStructuredInput({
+      masses: [{ side: "Right", massSizeCm: 3.5 }],
+      lymphNodes: "Absent",
+      otherFindings: "Adrenal incidentaloma.",
+    });
+    const lymphIdx = result.indexOf("Regional lymph nodes");
+    const otherIdx = result.indexOf("Other findings:");
+    expect(lymphIdx).toBeGreaterThanOrEqual(0);
+    expect(otherIdx).toBeGreaterThanOrEqual(0);
+    expect(lymphIdx).toBeLessThan(otherIdx);
+  });
 });
 
 describe("hasMinimumStructuredFields", () => {
