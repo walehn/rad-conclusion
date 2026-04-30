@@ -13,9 +13,6 @@ import {
   PRIOR_MRI_COMPARISON_OPTIONS,
   PROSTATE_SECTOR_CODES_FULL,
   PROSTATE_SECTOR_CODES_SIMPLIFIED,
-  RELATION_TO_APEX_OPTIONS,
-  RELATION_TO_URETHRA_OPTIONS,
-  SVI_SUSPICION_OPTIONS,
   ZONE_OPTIONS,
   type CraniocaudalLevel,
   type DceResult,
@@ -24,9 +21,6 @@ import {
   type NvbInvolvement,
   type PiradsScore,
   type PriorMriComparison,
-  type RelationToApex,
-  type RelationToUrethra,
-  type SviSuspicion,
   type Zone,
 } from "@/lib/prompts/disease-templates/prostate-fields";
 import {
@@ -53,11 +47,14 @@ import {
 function FieldRow({
   label,
   optional,
+  required,
   children,
   className,
 }: {
   label: string;
   optional?: boolean;
+  /** Marks the field as required for the Generate-report gate. */
+  required?: boolean;
   children: React.ReactNode;
   className?: string;
 }) {
@@ -70,7 +67,18 @@ function FieldRow({
     >
       <span className="px-1 text-[0.9375rem] font-bold tracking-tight text-foreground">
         {label}
-        {optional && (
+        {required && (
+          <>
+            <span
+              aria-hidden="true"
+              className="ml-1 font-bold text-destructive"
+            >
+              *
+            </span>
+            <span className="sr-only"> (required)</span>
+          </>
+        )}
+        {!required && optional && (
           <span className="ml-1 text-xs font-normal text-muted-foreground">
             (optional)
           </span>
@@ -88,6 +96,7 @@ function NumberField({
   onChange,
   unit,
   optional = false,
+  required = false,
   step = "0.1",
   min,
   max,
@@ -99,6 +108,7 @@ function NumberField({
   onChange: (v: number | undefined) => void;
   unit?: string;
   optional?: boolean;
+  required?: boolean;
   step?: string;
   min?: string;
   max?: string;
@@ -116,7 +126,18 @@ function NumberField({
         className="text-[0.9375rem] font-bold tracking-tight text-foreground"
       >
         {label}
-        {optional && (
+        {required && (
+          <>
+            <span
+              aria-hidden="true"
+              className="ml-1 font-bold text-destructive"
+            >
+              *
+            </span>
+            <span className="sr-only"> (required)</span>
+          </>
+        )}
+        {!required && optional && (
           <span className="ml-1 text-xs font-normal text-muted-foreground">
             (optional)
           </span>
@@ -174,31 +195,10 @@ const DCE_LABEL: Record<DceResult, string> = {
   not_performed_bpMRI: "bpMRI (DCE 미수행)",
 };
 
-const SVI_SUSPICION_LABEL: Record<SviSuspicion, string> = {
-  none: "None · 없음",
-  suspected: "Suspected · 의심",
-  definite: "Definite · 확실",
-};
-
 const NVB_LABEL: Record<NvbInvolvement, string> = {
   none: "None · 없음",
   abutment: "Abutment · 인접",
   encasement: "Encasement · 침범",
-};
-
-const RELATION_APEX_LABEL: Record<RelationToApex, string> = {
-  apex: "Apex",
-  mid: "Mid",
-  base: "Base",
-  apex_to_mid: "Apex → Mid",
-  mid_to_base: "Mid → Base",
-  whole_gland: "Whole gland",
-};
-
-const RELATION_URETHRA_LABEL: Record<RelationToUrethra, string> = {
-  not_abutting: "Not abutting · 인접 없음",
-  abutting: "Abutting · 인접",
-  involving: "Involving · 침범",
 };
 
 const PRIOR_MRI_LABEL: Record<PriorMriComparison, string> = {
@@ -300,8 +300,12 @@ function SectorPicker({ id, selected, onChange }: SectorPickerProps) {
         className="px-1 text-[0.9375rem] font-bold tracking-tight text-foreground"
       >
         Sector map location · 분획 위치
-        <span className="ml-1 text-xs font-normal text-muted-foreground">
-          (≥1 required)
+        <span aria-hidden="true" className="ml-1 font-bold text-destructive">
+          *
+        </span>
+        <span className="sr-only"> (required, at least one sector)</span>
+        <span className="ml-2 text-xs font-normal text-muted-foreground">
+          (≥1 sector)
         </span>
       </legend>
 
@@ -543,7 +547,7 @@ export function ProstateLesionCard({
           />
 
           {/* 8. T2W score — zone-adapted rubric hint */}
-          <FieldRow label={`T2W score (${rubricLabel})`}>
+          <FieldRow label={`T2W score (${rubricLabel})`} required>
             <SegmentedControl<PiradsScore>
               name={fieldId("t2w")}
               ariaLabel="T2W score"
@@ -554,7 +558,7 @@ export function ProstateLesionCard({
           </FieldRow>
 
           {/* 9. DWI score */}
-          <FieldRow label={`DWI score (${rubricLabel})`}>
+          <FieldRow label={`DWI score (${rubricLabel})`} required>
             <SegmentedControl<PiradsScore>
               name={fieldId("dwi")}
               ariaLabel="DWI score"
@@ -728,24 +732,12 @@ export function ProstateLesionCard({
             />
           </FieldRow>
 
-          {/* 15. Seminal vesicle invasion suspicion */}
-          <FieldRow label="Seminal vesicle invasion · 정낭 침범 의심">
-            <SegmentedControl<SviSuspicion>
-              name={fieldId("svi")}
-              ariaLabel="Seminal vesicle invasion suspicion"
-              value={lesion.seminalVesicleInvasionSuspicion}
-              options={toLabeledOptions(
-                SVI_SUSPICION_OPTIONS,
-                SVI_SUSPICION_LABEL
-              )}
-              onChange={(next) =>
-                onChange({ ...lesion, seminalVesicleInvasionSuspicion: next })
-              }
-            />
-          </FieldRow>
-
-          {/* 16. Neurovascular bundle involvement (optional) */}
-          <FieldRow label="Neurovascular bundle · 신경혈관다발" optional>
+          {/* 15. Neurovascular bundle involvement (optional) */}
+          <FieldRow
+            label="Neurovascular bundle · 신경혈관다발"
+            optional
+            className="md:col-span-2"
+          >
             <SegmentedControl<NvbInvolvement>
               name={fieldId("nvb")}
               ariaLabel="Neurovascular bundle involvement"
@@ -760,43 +752,7 @@ export function ProstateLesionCard({
             />
           </FieldRow>
 
-          {/* 17. Relation to apex (optional) */}
-          <FieldRow
-            label="Relation to apex · 첨부와의 관계"
-            optional
-            className="md:col-span-2"
-          >
-            <SegmentedControl<RelationToApex>
-              name={fieldId("apex")}
-              ariaLabel="Relation to apex"
-              value={lesion.relationToApex}
-              options={toLabeledOptions(
-                RELATION_TO_APEX_OPTIONS,
-                RELATION_APEX_LABEL
-              )}
-              onChange={(next) =>
-                onChange({ ...lesion, relationToApex: next })
-              }
-            />
-          </FieldRow>
-
-          {/* 18. Relation to urethra (optional) */}
-          <FieldRow label="Relation to urethra · 요도와의 관계" optional>
-            <SegmentedControl<RelationToUrethra>
-              name={fieldId("urethra")}
-              ariaLabel="Relation to urethra"
-              value={lesion.relationToUrethra}
-              options={toLabeledOptions(
-                RELATION_TO_URETHRA_OPTIONS,
-                RELATION_URETHRA_LABEL
-              )}
-              onChange={(next) =>
-                onChange({ ...lesion, relationToUrethra: next })
-              }
-            />
-          </FieldRow>
-
-          {/* 19. Prior MRI comparison — conditional on parentPriorMRIDate (E-1) */}
+          {/* 16. Prior MRI comparison — conditional on parentPriorMRIDate (E-1) */}
           {parentPriorMRIDate && (
             <FieldRow
               label="Prior MRI comparison · 이전 MRI 비교"

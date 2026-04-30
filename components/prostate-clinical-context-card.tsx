@@ -5,10 +5,8 @@ import { cn } from "@/lib/utils";
 import {
   CLINICAL_INDICATION_OPTIONS,
   PRIOR_BIOPSY_STATUS_OPTIONS,
-  DIGITAL_RECTAL_EXAM_OPTIONS,
   type ClinicalIndication,
   type PriorBiopsyStatus,
-  type DigitalRectalExam,
 } from "@/lib/prompts/disease-templates/prostate-fields";
 import type { ProstateStructuredInput } from "@/lib/prompts/disease-templates/prostate-serializer";
 import {
@@ -31,11 +29,18 @@ import {
 function FieldRow({
   label,
   optional,
+  required,
   children,
   className,
 }: {
   label: string;
   optional?: boolean;
+  /**
+   * Marks the field as required for the Generate-report button gate. Surfaces
+   * a red `*` after the label. Mutually exclusive with `optional` — if both
+   * are passed, `required` wins.
+   */
+  required?: boolean;
   children: React.ReactNode;
   className?: string;
 }) {
@@ -48,7 +53,18 @@ function FieldRow({
     >
       <span className="px-1 text-[0.9375rem] font-bold tracking-tight text-foreground">
         {label}
-        {optional && (
+        {required && (
+          <>
+            <span
+              aria-hidden="true"
+              className="ml-1 font-bold text-destructive"
+            >
+              *
+            </span>
+            <span className="sr-only"> (required)</span>
+          </>
+        )}
+        {!required && optional && (
           <span className="ml-1 text-xs font-normal text-muted-foreground">
             (optional)
           </span>
@@ -66,6 +82,7 @@ function NumberField({
   onChange,
   unit,
   optional = false,
+  required = false,
   step = "1",
   min,
   max,
@@ -77,6 +94,7 @@ function NumberField({
   onChange: (v: number | undefined) => void;
   unit?: string;
   optional?: boolean;
+  required?: boolean;
   step?: string;
   min?: string;
   max?: string;
@@ -94,7 +112,18 @@ function NumberField({
         className="text-[0.9375rem] font-bold tracking-tight text-foreground"
       >
         {label}
-        {optional && (
+        {required && (
+          <>
+            <span
+              aria-hidden="true"
+              className="ml-1 font-bold text-destructive"
+            >
+              *
+            </span>
+            <span className="sr-only"> (required)</span>
+          </>
+        )}
+        {!required && optional && (
           <span className="ml-1 text-xs font-normal text-muted-foreground">
             (optional)
           </span>
@@ -129,6 +158,7 @@ function DateInput({
   value,
   onChange,
   optional = false,
+  required = false,
   className,
 }: {
   id: string;
@@ -136,6 +166,7 @@ function DateInput({
   value: string | undefined;
   onChange: (v: string | undefined) => void;
   optional?: boolean;
+  required?: boolean;
   className?: string;
 }) {
   return (
@@ -150,7 +181,18 @@ function DateInput({
         className="text-[0.9375rem] font-bold tracking-tight text-foreground"
       >
         {label}
-        {optional && (
+        {required && (
+          <>
+            <span
+              aria-hidden="true"
+              className="ml-1 font-bold text-destructive"
+            >
+              *
+            </span>
+            <span className="sr-only"> (required)</span>
+          </>
+        )}
+        {!required && optional && (
           <span className="ml-1 text-xs font-normal text-muted-foreground">
             (optional)
           </span>
@@ -190,15 +232,6 @@ const PRIOR_BIOPSY_STATUS_LABEL: Record<PriorBiopsyStatus, string> = {
   positive_ISUP4: "Positive ISUP 4",
   positive_ISUP5: "Positive ISUP 5",
   unknown: "Unknown · 미상",
-};
-
-const DIGITAL_RECTAL_EXAM_LABEL: Record<DigitalRectalExam, string> = {
-  not_performed: "Not performed",
-  normal_T1c: "Normal (T1c)",
-  palpable_unilateral_T2a_b: "Palpable unilateral (T2a/b)",
-  palpable_bilateral_T2c: "Palpable bilateral (T2c)",
-  extracapsular_T3: "Extracapsular (T3)",
-  fixed_T4: "Fixed (T4)",
 };
 
 function toLabeledOptions<T extends string>(
@@ -252,6 +285,36 @@ export function ProstateClinicalContextCard({
         </CardTitle>
       </CardHeader>
       <CardContent>
+        {/* Negative-MRI shortcut. Toggling ON hides Section 2 (lesion list)
+            entirely and clears any existing lesions. The serializer omits
+            LESION blocks while staging defaults pin to cT1c / N0 / M0. */}
+        <div className="mb-5 flex items-start gap-3 rounded-lg border border-border bg-muted/30 p-3">
+          <input
+            type="checkbox"
+            id={id("noSuspiciousLesion")}
+            checked={value.noSuspiciousLesion}
+            onChange={(e) => {
+              const checked = e.target.checked;
+              onChange({
+                ...value,
+                noSuspiciousLesion: checked,
+                lesions: checked ? [] : value.lesions,
+              });
+            }}
+            className="mt-0.5 h-4 w-4 cursor-pointer rounded border-border text-primary focus:ring-2 focus:ring-primary"
+          />
+          <label
+            htmlFor={id("noSuspiciousLesion")}
+            className="cursor-pointer select-none text-sm font-medium text-foreground"
+          >
+            No suspicious lesion · 의심 병변 없음 (PI-RADS ≤ 2)
+            <p className="mt-1 text-xs font-normal text-muted-foreground">
+              체크 시 병변 입력 섹션이 숨겨지고, 보고서는 음성 MRI 양식으로
+              생성됩니다.
+            </p>
+          </label>
+        </div>
+
         <div className="grid gap-x-6 gap-y-5 md:grid-cols-2">
           {/* 1. Study date — required, ISO YYYY-MM-DD */}
           <DateInput
@@ -261,6 +324,7 @@ export function ProstateClinicalContextCard({
             onChange={(v) =>
               onChange({ ...value, studyDate: v ?? "" })
             }
+            required
           />
 
           {/* 2. Patient age (years) — optional, 40–100 */}
@@ -334,6 +398,7 @@ export function ProstateClinicalContextCard({
             min="0"
             max="500"
             step="0.1"
+            required
           />
 
           {/* 6. PSA date offset (days) — optional, 0–365 */}
@@ -382,28 +447,7 @@ export function ProstateClinicalContextCard({
             />
           )}
 
-          {/* 9. Digital rectal exam — optional (6 values). T-stage hints
-              embedded in the option labels (e.g. "Palpable bilateral (T2c)"). */}
-          <FieldRow
-            label="Digital rectal exam · 직장수지검사"
-            optional
-            className="md:col-span-2"
-          >
-            <SegmentedControl<DigitalRectalExam>
-              name={id("dre")}
-              ariaLabel="Digital rectal exam"
-              value={value.digitalRectalExam}
-              options={toLabeledOptions(
-                DIGITAL_RECTAL_EXAM_OPTIONS,
-                DIGITAL_RECTAL_EXAM_LABEL
-              )}
-              onChange={(next) =>
-                onChange({ ...value, digitalRectalExam: next })
-              }
-            />
-          </FieldRow>
-
-          {/* 10. Additional clinical notes — optional, ≤500 chars */}
+          {/* 9. Additional clinical notes — optional, ≤500 chars */}
           <div className="rounded-lg border border-border p-3 flex flex-col gap-2 md:col-span-2">
             <label
               htmlFor={id("notes")}

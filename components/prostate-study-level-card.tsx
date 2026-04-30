@@ -5,7 +5,6 @@ import { Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   BONE_INVOLVEMENT_OPTIONS,
-  CAPSULE_INTEGRITY_OPTIONS,
   CLINICAL_M_OPTIONS,
   CLINICAL_N_OPTIONS,
   CLINICAL_T_OPTIONS,
@@ -16,7 +15,6 @@ import {
   PIQUAL_T2W_DWI_SUBSCORE_OPTIONS,
   SVI_WHOLE_GLAND_OPTIONS,
   type BoneInvolvement,
-  type CapsuleIntegrity,
   type ClinicalM,
   type ClinicalN,
   type ClinicalT,
@@ -57,11 +55,14 @@ import {
 function FieldRow({
   label,
   optional,
+  required,
   children,
   className,
 }: {
   label: string;
   optional?: boolean;
+  /** Marks the field as required for the Generate-report gate. */
+  required?: boolean;
   children: React.ReactNode;
   className?: string;
 }) {
@@ -74,7 +75,18 @@ function FieldRow({
     >
       <span className="px-1 text-[0.9375rem] font-bold tracking-tight text-foreground">
         {label}
-        {optional && (
+        {required && (
+          <>
+            <span
+              aria-hidden="true"
+              className="ml-1 font-bold text-destructive"
+            >
+              *
+            </span>
+            <span className="sr-only"> (required)</span>
+          </>
+        )}
+        {!required && optional && (
           <span className="ml-1 text-xs font-normal text-muted-foreground">
             (optional)
           </span>
@@ -92,6 +104,7 @@ function NumberField({
   onChange,
   unit,
   optional = false,
+  required = false,
   step = "0.1",
   min,
   max,
@@ -103,6 +116,7 @@ function NumberField({
   onChange: (v: number | undefined) => void;
   unit?: string;
   optional?: boolean;
+  required?: boolean;
   step?: string;
   min?: string;
   max?: string;
@@ -120,7 +134,18 @@ function NumberField({
         className="text-[0.9375rem] font-bold tracking-tight text-foreground"
       >
         {label}
-        {optional && (
+        {required && (
+          <>
+            <span
+              aria-hidden="true"
+              className="ml-1 font-bold text-destructive"
+            >
+              *
+            </span>
+            <span className="sr-only"> (required)</span>
+          </>
+        )}
+        {!required && optional && (
           <span className="ml-1 text-xs font-normal text-muted-foreground">
             (optional)
           </span>
@@ -152,13 +177,6 @@ function NumberField({
 // ---------------------------------------------------------------------------
 // Bilingual option labels
 // ---------------------------------------------------------------------------
-
-const CAPSULE_INTEGRITY_LABEL: Record<CapsuleIntegrity, string> = {
-  intact: "Intact · 정상",
-  bulging_no_breach: "Bulging (no breach) · 융기",
-  focally_breached: "Focally breached · 국소 침범",
-  gross_extracapsular_extension: "Gross ECE · 명백한 피막외 진행",
-};
 
 const SVI_WHOLE_GLAND_LABEL: Record<SviWholeGland, string> = {
   none: "None · 없음",
@@ -655,6 +673,7 @@ export function ProstateStudyLevelCard({
               min="10"
               max="100"
               step="0.1"
+              required
             />
             <NumberField
               id={id("height")}
@@ -667,6 +686,7 @@ export function ProstateStudyLevelCard({
               min="10"
               max="100"
               step="0.1"
+              required
             />
             <NumberField
               id={id("ap")}
@@ -679,6 +699,7 @@ export function ProstateStudyLevelCard({
               min="10"
               max="100"
               step="0.1"
+              required
             />
           </div>
 
@@ -718,26 +739,7 @@ export function ProstateStudyLevelCard({
             </div>
           </div>
 
-          {/* 2. Capsule integrity */}
-          <FieldRow
-            label="Capsule integrity · 피막 상태"
-            className="md:col-span-2"
-          >
-            <SegmentedControl<CapsuleIntegrity>
-              name={id("capsule")}
-              ariaLabel="Capsule integrity"
-              value={value.capsuleIntegrity}
-              options={toLabeledOptions(
-                CAPSULE_INTEGRITY_OPTIONS,
-                CAPSULE_INTEGRITY_LABEL
-              )}
-              onChange={(next) =>
-                onChange({ ...value, capsuleIntegrity: next })
-              }
-            />
-          </FieldRow>
-
-          {/* 3. SVI (whole gland) */}
+          {/* 2. SVI (whole gland) */}
           <FieldRow
             label="Seminal vesicle invasion (whole gland) · 정낭 침범"
             className="md:col-span-2"
@@ -1063,6 +1065,7 @@ export function ProstateStudyLevelCard({
               <FieldRow
                 label="PI-QUAL overall · 종합 점수"
                 className="md:col-span-2"
+                required
               >
                 <RadioCardGroup<PiQualOverall>
                   name={id("piqualOverall")}

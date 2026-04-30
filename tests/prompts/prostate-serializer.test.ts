@@ -47,7 +47,6 @@ function makeLesion(overrides: Partial<ProstateLesion> = {}): ProstateLesion {
     overallPiradsCategory: "4",
     isPiradsOverridden: false,
     epeRiskMehralivand: "0_no_features",
-    seminalVesicleInvasionSuspicion: "none",
     targetForBiopsy: true,
     ...overrides,
   };
@@ -65,9 +64,10 @@ function makeInput(
     clinicalIndication: "pre_biopsy_initial",
     psaNgPerMl: 6.5,
     priorBiopsyStatus: "none",
+    noSuspiciousLesion: false,
     lesions: [makeLesion()],
     prostateVolumeMl: 40,
-    capsuleIntegrity: "intact",
+    prostateWidthMm: 40,
     seminalVesicleInvasionWholeGland: "none",
     bladderNeckInvolvement: "none",
     externalSphincterInvolvement: "none",
@@ -124,8 +124,27 @@ describe("hasMinimumProstateFields", () => {
     ).toBe(false);
   });
 
-  it("returns false when lesions array is empty", () => {
+  it("returns false when lesions array is empty (and noSuspiciousLesion=false)", () => {
     expect(hasMinimumProstateFields(makeInput({ lesions: [] }))).toBe(false);
+  });
+
+  it("returns true when noSuspiciousLesion=true and lesions array is empty", () => {
+    expect(
+      hasMinimumProstateFields(
+        makeInput({ noSuspiciousLesion: true, lesions: [] })
+      )
+    ).toBe(true);
+  });
+
+  it("noSuspiciousLesion=true skips first-lesion sector/score validation", () => {
+    expect(
+      hasMinimumProstateFields(
+        makeInput({
+          noSuspiciousLesion: true,
+          lesions: [],
+        })
+      )
+    ).toBe(true);
   });
 
   it("returns false when first lesion is missing t2w or dwi score", () => {
@@ -278,40 +297,16 @@ describe("derivePiradsCategory — TZ rubric", () => {
 // ---------------------------------------------------------------------------
 
 describe("deriveClinicalT", () => {
-  it("cT1c: empty findings + DRE not_performed → cT1c", () => {
-    expect(
-      deriveClinicalT(makeInput({ digitalRectalExam: "not_performed" }))
-    ).toBe("cT1c");
-  });
-
-  it("cT1c: empty findings + DRE undefined → cT1c (palpation rule, N-1)", () => {
-    expect(
-      deriveClinicalT(makeInput({ digitalRectalExam: undefined }))
-    ).toBe("cT1c");
-  });
-
-  it("cT1c: empty findings + DRE normal_T1c → cT1c", () => {
-    expect(
-      deriveClinicalT(makeInput({ digitalRectalExam: "normal_T1c" }))
-    ).toBe("cT1c");
-  });
-
-  it("cT2a: DRE palpable_unilateral_T2a_b + no MRI T3+ → cT2a", () => {
+  // ----- Step 1: noSuspiciousLesion shortcut --------------------------------
+  it("cT1c: noSuspiciousLesion=true short-circuits to cT1c", () => {
     expect(
       deriveClinicalT(
-        makeInput({ digitalRectalExam: "palpable_unilateral_T2a_b" })
+        makeInput({ noSuspiciousLesion: true, lesions: [] })
       )
-    ).toBe("cT2a");
+    ).toBe("cT1c");
   });
 
-  it("cT2c: DRE palpable_bilateral_T2c + no MRI T3+ → cT2c", () => {
-    expect(
-      deriveClinicalT(
-        makeInput({ digitalRectalExam: "palpable_bilateral_T2c" })
-      )
-    ).toBe("cT2c");
-  });
-
+  // ----- Step 4: cT3a from per-lesion EPE -----------------------------------
   it("cT3a: any lesion EPE = 1_curvilinear_or_bulge → cT3a", () => {
     expect(
       deriveClinicalT(
@@ -344,20 +339,7 @@ describe("deriveClinicalT", () => {
     ).toBe("cT3a");
   });
 
-  it("cT3a: capsuleIntegrity gross_extracapsular_extension → cT3a", () => {
-    expect(
-      deriveClinicalT(
-        makeInput({ capsuleIntegrity: "gross_extracapsular_extension" })
-      )
-    ).toBe("cT3a");
-  });
-
-  it("cT3a: DRE extracapsular_T3 alone → cT3a", () => {
-    expect(
-      deriveClinicalT(makeInput({ digitalRectalExam: "extracapsular_T3" }))
-    ).toBe("cT3a");
-  });
-
+  // ----- Step 3: cT3b from whole-gland SVI ----------------------------------
   it("cT3b: seminalVesicleInvasionWholeGland !== none → cT3b", () => {
     expect(
       deriveClinicalT(
@@ -376,18 +358,7 @@ describe("deriveClinicalT", () => {
     ).toBe("cT3b");
   });
 
-  it("cT3b: any lesion SVI suspicion = definite → cT3b", () => {
-    expect(
-      deriveClinicalT(
-        makeInput({
-          lesions: [
-            makeLesion({ seminalVesicleInvasionSuspicion: "definite" }),
-          ],
-        })
-      )
-    ).toBe("cT3b");
-  });
-
+  // ----- Step 2: cT4 from structural invasion -------------------------------
   it("cT4: bladderNeckInvolvement=invasion → cT4", () => {
     expect(
       deriveClinicalT(makeInput({ bladderNeckInvolvement: "invasion" }))
@@ -412,35 +383,113 @@ describe("deriveClinicalT", () => {
     ).toBe("cT4");
   });
 
-  it("cT4: DRE fixed_T4 alone → cT4", () => {
+  // ----- Step 5: MRI cT2 heuristic — cT2c (bilateral) -----------------------
+  it("cT2c: any lesion laterality midline_bilateral → cT2c", () => {
     expect(
-      deriveClinicalT(makeInput({ digitalRectalExam: "fixed_T4" }))
-    ).toBe("cT4");
+      deriveClinicalT(
+        makeInput({
+          lesions: [
+            makeLesion({
+              laterality: "midline_bilateral",
+              sizeMaxAxialMm: 8,
+            }),
+          ],
+        })
+      )
+    ).toBe("cT2c");
   });
 
-  // N-1 explicit guard: MRI lesions present, no DRE evidence, no T3+ → cT1c.
-  it("N-1 explicit: MRI lesions alone (no DRE, no T3+) → cT1c (NOT cT2a)", () => {
-    const input = makeInput({
-      digitalRectalExam: "not_performed",
-      lesions: [
-        makeLesion({
-          t2wScore: "4",
-          dwiScore: "4",
-          overallPiradsCategory: "4",
-          epeRiskMehralivand: "0_no_features",
-          seminalVesicleInvasionSuspicion: "none",
-        }),
-        makeLesion({
-          lesionIndex: 2,
-          t2wScore: "5",
-          dwiScore: "5",
-          overallPiradsCategory: "5",
-        }),
-      ],
-    });
-    expect(deriveClinicalT(input)).toBe("cT1c");
+  it("cT2c: lesions span both right and left → cT2c", () => {
+    expect(
+      deriveClinicalT(
+        makeInput({
+          lesions: [
+            makeLesion({ laterality: "right", sizeMaxAxialMm: 8 }),
+            makeLesion({
+              lesionIndex: 2,
+              laterality: "left",
+              sizeMaxAxialMm: 8,
+            }),
+          ],
+        })
+      )
+    ).toBe("cT2c");
   });
 
+  // ----- Step 5: MRI cT2 heuristic — cT2b (size >= half-width) -------------
+  it("cT2b: single unilateral lesion with size = halfWidth (boundary) → cT2b", () => {
+    // prostateWidthMm=40 → halfWidth=20; sizeMaxAxialMm=20 hits >= threshold.
+    expect(
+      deriveClinicalT(
+        makeInput({
+          prostateWidthMm: 40,
+          lesions: [
+            makeLesion({ laterality: "right", sizeMaxAxialMm: 20 }),
+          ],
+        })
+      )
+    ).toBe("cT2b");
+  });
+
+  it("cT2b: single unilateral lesion with size > halfWidth → cT2b", () => {
+    expect(
+      deriveClinicalT(
+        makeInput({
+          prostateWidthMm: 40,
+          lesions: [
+            makeLesion({ laterality: "right", sizeMaxAxialMm: 25 }),
+          ],
+        })
+      )
+    ).toBe("cT2b");
+  });
+
+  it("cT2b: missing prostateWidthMm uses 20 mm fallback threshold", () => {
+    expect(
+      deriveClinicalT(
+        makeInput({
+          prostateWidthMm: undefined,
+          lesions: [
+            makeLesion({ laterality: "right", sizeMaxAxialMm: 22 }),
+          ],
+        })
+      )
+    ).toBe("cT2b");
+  });
+
+  // ----- Step 5: MRI cT2 heuristic — cT2a (default unilateral small) -------
+  it("cT2a: single unilateral lesion with size < halfWidth → cT2a", () => {
+    expect(
+      deriveClinicalT(
+        makeInput({
+          prostateWidthMm: 40,
+          lesions: [
+            makeLesion({ laterality: "right", sizeMaxAxialMm: 8 }),
+          ],
+        })
+      )
+    ).toBe("cT2a");
+  });
+
+  it("cT2a: small left-side lesion → cT2a", () => {
+    expect(
+      deriveClinicalT(
+        makeInput({
+          prostateWidthMm: 50,
+          lesions: [
+            makeLesion({ laterality: "left", sizeMaxAxialMm: 12 }),
+          ],
+        })
+      )
+    ).toBe("cT2a");
+  });
+
+  // ----- Step 6: cT1c default for empty lesion list (toggle off) ------------
+  it("cT1c: lesions empty + noSuspiciousLesion=false (no T3+ evidence) → cT1c", () => {
+    expect(deriveClinicalT(makeInput({ lesions: [] }))).toBe("cT1c");
+  });
+
+  // ----- Priority cascade ---------------------------------------------------
   it("priority: cT4 dominates cT3b (invasion + SVI both present)", () => {
     expect(
       deriveClinicalT(
@@ -457,21 +506,42 @@ describe("deriveClinicalT", () => {
       deriveClinicalT(
         makeInput({
           seminalVesicleInvasionWholeGland: "right",
-          capsuleIntegrity: "gross_extracapsular_extension",
+          lesions: [
+            makeLesion({ epeRiskMehralivand: "3_frank_breach" }),
+          ],
         })
       )
     ).toBe("cT3b");
   });
 
-  it("priority: cT3a dominates cT2a (EPE + DRE T2a/b both present)", () => {
+  it("priority: cT3a dominates cT2 heuristic (EPE positive + bilateral lesion)", () => {
     expect(
       deriveClinicalT(
         makeInput({
-          digitalRectalExam: "palpable_unilateral_T2a_b",
-          capsuleIntegrity: "gross_extracapsular_extension",
+          lesions: [
+            makeLesion({
+              laterality: "midline_bilateral",
+              epeRiskMehralivand: "1_curvilinear_or_bulge",
+              sizeMaxAxialMm: 30,
+            }),
+          ],
         })
       )
     ).toBe("cT3a");
+  });
+
+  it("priority: noSuspiciousLesion=true overrides other lesion-derived evidence", () => {
+    // Even if a lesion with EPE positive is somehow present, the toggle pins cT1c.
+    expect(
+      deriveClinicalT(
+        makeInput({
+          noSuspiciousLesion: true,
+          lesions: [
+            makeLesion({ epeRiskMehralivand: "3_frank_breach" }),
+          ],
+        })
+      )
+    ).toBe("cT1c");
   });
 });
 
@@ -725,27 +795,48 @@ describe("deriveEauRiskGroup", () => {
     ).toBe("not_applicable");
   });
 
-  it("low: PSA=8, ISUP1, cT1c", () => {
+  it("low: PSA=8, ISUP1, empty lesions → cT1c → low", () => {
+    // lesions=[] with noSuspiciousLesion=false drives deriveClinicalT to
+    // cT1c via the lesion-empty fallback path; deriveEauRiskGroup applies
+    // its low-risk gate. (noSuspiciousLesion=true would short-circuit EAU
+    // to not_applicable — that path is exercised separately below.)
     expect(
       deriveEauRiskGroup(
         makeInput({
           clinicalIndication: "staging_after_diagnosis",
           psaNgPerMl: 8,
           priorBiopsyStatus: "positive_ISUP1",
-          digitalRectalExam: "not_performed",
+          lesions: [],
         })
       )
     ).toBe("low");
   });
 
-  it("low: PSA=8, ISUP1, cT2a (DRE-driven)", () => {
+  it("not_applicable: noSuspiciousLesion=true overrides EAU stratification", () => {
     expect(
       deriveEauRiskGroup(
         makeInput({
           clinicalIndication: "staging_after_diagnosis",
           psaNgPerMl: 8,
           priorBiopsyStatus: "positive_ISUP1",
-          digitalRectalExam: "palpable_unilateral_T2a_b",
+          noSuspiciousLesion: true,
+          lesions: [],
+        })
+      )
+    ).toBe("not_applicable");
+  });
+
+  it("low: PSA=8, ISUP1, single small unilateral lesion → cT2a (MRI heuristic) → low", () => {
+    expect(
+      deriveEauRiskGroup(
+        makeInput({
+          clinicalIndication: "staging_after_diagnosis",
+          psaNgPerMl: 8,
+          priorBiopsyStatus: "positive_ISUP1",
+          prostateWidthMm: 40,
+          lesions: [
+            makeLesion({ laterality: "right", sizeMaxAxialMm: 8 }),
+          ],
         })
       )
     ).toBe("low");
@@ -775,14 +866,16 @@ describe("deriveEauRiskGroup", () => {
     ).toBe("high");
   });
 
-  it("high: PSA=8, ISUP1, cT3a → high (T-stage)", () => {
+  it("high: PSA=8, ISUP1, cT3a (lesion EPE positive) → high (T-stage)", () => {
     expect(
       deriveEauRiskGroup(
         makeInput({
           clinicalIndication: "staging_after_diagnosis",
           psaNgPerMl: 8,
           priorBiopsyStatus: "positive_ISUP1",
-          capsuleIntegrity: "gross_extracapsular_extension",
+          lesions: [
+            makeLesion({ epeRiskMehralivand: "3_frank_breach" }),
+          ],
         })
       )
     ).toBe("high");
@@ -807,7 +900,7 @@ describe("deriveEauRiskGroup", () => {
           clinicalIndication: "staging_after_diagnosis",
           psaNgPerMl: 15,
           priorBiopsyStatus: "positive_ISUP1",
-          digitalRectalExam: "not_performed",
+          lesions: [],
         })
       )
     ).toBe("intermediate_favourable");
@@ -820,20 +913,27 @@ describe("deriveEauRiskGroup", () => {
           clinicalIndication: "staging_after_diagnosis",
           psaNgPerMl: 15,
           priorBiopsyStatus: "positive_ISUP3",
-          digitalRectalExam: "not_performed",
+          lesions: [],
         })
       )
     ).toBe("intermediate_unfavourable");
   });
 
-  it("intermediate_unfavourable: PSA=8, ISUP2, cT2c → 2 factors", () => {
+  it("intermediate_unfavourable: PSA=8, ISUP2, cT2c (bilateral lesions) → 2 factors", () => {
     expect(
       deriveEauRiskGroup(
         makeInput({
           clinicalIndication: "staging_after_diagnosis",
           psaNgPerMl: 8,
           priorBiopsyStatus: "positive_ISUP2",
-          digitalRectalExam: "palpable_bilateral_T2c",
+          lesions: [
+            makeLesion({ laterality: "right", sizeMaxAxialMm: 8 }),
+            makeLesion({
+              lesionIndex: 2,
+              laterality: "left",
+              sizeMaxAxialMm: 8,
+            }),
+          ],
         })
       )
     ).toBe("intermediate_unfavourable");
@@ -846,7 +946,7 @@ describe("deriveEauRiskGroup", () => {
           clinicalIndication: "staging_after_diagnosis",
           psaNgPerMl: 8,
           priorBiopsyStatus: "positive_ISUP2",
-          digitalRectalExam: "not_performed",
+          lesions: [],
         })
       )
     ).toBe("intermediate_favourable");
@@ -959,11 +1059,57 @@ describe("serializeProstateStructuredInput — required fields verbatim", () => 
   });
 
   it("emits derived clinical T/N/M when not overridden", () => {
+    // makeInput() seeds a single right-side lesion of 12 mm against a 40 mm
+    // prostate width — the MRI-based heuristic discriminates this as cT2a
+    // (unilateral, size < halfWidth=20). N/M default to NX/M0 with no nodes
+    // and no metastasis declared.
     const result = serializeProstateStructuredInput(makeInput());
-    expect(result).toContain("- Clinical T: cT1c");
+    expect(result).toContain("- Clinical T: cT2a");
     expect(result).toContain("- Clinical N: NX");
     expect(result).toContain("- Clinical M: M0");
     expect(result).not.toContain("- Staging overridden:");
+  });
+
+  it("suppresses Clinical T/N/M and EAU lines when noSuspiciousLesion=true and no override", () => {
+    // AJCC TNM presupposes confirmed disease. A negative MRI without an
+    // explicit clinician override yields no measurable disease, so the
+    // serializer omits the staging lines entirely (the prompt then renders
+    // "Not applicable — negative MRI." in the STAGING section).
+    const result = serializeProstateStructuredInput(
+      makeInput({ noSuspiciousLesion: true, lesions: [] })
+    );
+    expect(result).toContain(
+      "- No suspicious lesion: yes (PI-RADS ≤ 2 negative MRI)"
+    );
+    expect(result).not.toContain("LESION 1");
+    expect(result).not.toContain("- Clinical T:");
+    expect(result).not.toContain("- Clinical N:");
+    expect(result).not.toContain("- Clinical M:");
+    expect(result).not.toContain("- EAU risk group:");
+  });
+
+  it("honours isStagingOverridden=true even on a negative MRI", () => {
+    // Use case: staging_after_diagnosis patient with biopsy-proven ISUP 2
+    // disease that is invisible on the current MRI; the radiologist supplies
+    // cT2a manually. The override path always wins.
+    const result = serializeProstateStructuredInput(
+      makeInput({
+        noSuspiciousLesion: true,
+        lesions: [],
+        isStagingOverridden: true,
+        clinicalT: "cT2a",
+        clinicalN: "N0",
+        clinicalM: "M0",
+        clinicalIndication: "staging_after_diagnosis",
+        priorBiopsyStatus: "positive_ISUP2",
+      })
+    );
+    expect(result).toContain("- Clinical T: cT2a");
+    expect(result).toContain("- Clinical N: N0");
+    expect(result).toContain("- Clinical M: M0");
+    expect(result).toContain("- Staging overridden: yes");
+    // EAU is still emitted because the override path is active.
+    expect(result).toContain("- EAU risk group:");
   });
 
   it("emits override clinical T/N/M when isStagingOverridden=true", () => {
@@ -1127,7 +1273,6 @@ describe("serializeProstateStructuredInput — determinism and snapshot", () => 
       psaDateOffsetDays: -3,
       priorBiopsyStatus: "positive_ISUP2",
       priorBiopsyDate: "2026-04-10",
-      digitalRectalExam: "palpable_unilateral_T2a_b",
       additionalClinicalNotes: "On 5-ARI for 6 months.",
       lesions: [
         makeLesion({
@@ -1146,15 +1291,11 @@ describe("serializeProstateStructuredInput — determinism and snapshot", () => 
           isPiradsOverridden: false,
           adcMeanValue: 750,
           epeRiskMehralivand: "1_curvilinear_or_bulge",
-          seminalVesicleInvasionSuspicion: "none",
           neurovascularBundleInvolvement: "abutment",
-          relationToApex: "mid",
-          relationToUrethra: "abutting",
           targetForBiopsy: true,
         }),
       ],
       prostateVolumeMl: 50,
-      capsuleIntegrity: "focally_breached",
       seminalVesicleInvasionWholeGland: "none",
       bladderNeckInvolvement: "none",
       externalSphincterInvolvement: "none",

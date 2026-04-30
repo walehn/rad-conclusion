@@ -21,14 +21,12 @@
  */
 
 import type {
-  CapsuleIntegrity,
   ClinicalIndication,
   ClinicalM,
   ClinicalN,
   ClinicalT,
   CraniocaudalLevel,
   DceResult,
-  DigitalRectalExam,
   EauRiskGroup,
   EpeRisk,
   Laterality,
@@ -41,9 +39,6 @@ import type {
   PiradsScore,
   PriorBiopsyStatus,
   PriorMriComparison,
-  RelationToApex,
-  RelationToUrethra,
-  SviSuspicion,
   SviWholeGland,
   BoneInvolvement,
   Zone,
@@ -86,10 +81,7 @@ export interface ProstateLesion {
   /** ADC mean value in 10⁻⁶ mm²/s. */
   adcMeanValue?: number;
   epeRiskMehralivand: EpeRisk;
-  seminalVesicleInvasionSuspicion: SviSuspicion;
   neurovascularBundleInvolvement?: NvbInvolvement;
-  relationToApex?: RelationToApex;
-  relationToUrethra?: RelationToUrethra;
   priorMRIComparison?: PriorMriComparison;
   targetForBiopsy: boolean;
 }
@@ -107,8 +99,14 @@ export interface ProstateStructuredInput {
   priorBiopsyStatus: PriorBiopsyStatus;
   /** ISO date YYYY-MM-DD. */
   priorBiopsyDate?: string;
-  digitalRectalExam?: DigitalRectalExam;
   additionalClinicalNotes?: string;
+  /**
+   * Negative-MRI shortcut. When true, the form hides Section 2 (lesion list)
+   * and the serializer omits the LESION blocks entirely. Staging defaults to
+   * cT1c/N0/M0 unless explicitly overridden, and the IMPRESSION section is
+   * fixed to a "no PI-RADS ≥3 lesion" surveillance message.
+   */
+  noSuspiciousLesion: boolean;
   // Section 2 — Lesion-level
   lesions: ProstateLesion[];
   // Section 3 — Whole-gland & staging
@@ -129,7 +127,6 @@ export interface ProstateStructuredInput {
    * a single canonical value regardless of how it was obtained.
    */
   prostateVolumeMl: number;
-  capsuleIntegrity: CapsuleIntegrity;
   seminalVesicleInvasionWholeGland: SviWholeGland;
   bladderNeckInvolvement: LocalInvolvement;
   externalSphincterInvolvement: LocalInvolvement;
@@ -257,26 +254,37 @@ export function derivePiradsCategory(
 // ---------------------------------------------------------------------------
 
 /**
- * AJCC 8th clinical T-stage.
+ * AJCC 8th clinical T-stage — MRI-based heuristic (Korean clinical workflow).
+ *
+ * NOTE: This implementation deviates from AJCC 8th's strict requirement that
+ * cT2 sub-staging requires palpation evidence. In Korean practice DRE results
+ * are rarely communicated to the radiology service, so the form intentionally
+ * derives cT2a/b/c from MRI lesion laterality and size. Clinicians who hold
+ * authoritative palpation/biopsy data can correct the value via the
+ * `isStagingOverridden` + `clinicalT` override path.
  *
  * Priority order (highest cT wins):
- *  1. cT4 — structural invasion of bladder neck, external sphincter, rectum,
- *     or pelvic sidewall.
- *  2. cT3b — seminal vesicle invasion (whole-gland !== 'none' OR any lesion's
- *     SVI suspicion === 'definite').
- *  3. cT3a — gross extracapsular extension OR any lesion EPE risk in
- *     {1, 2, 3} (curvilinear/bulge, both features, frank breach).
- *  4. cT2a / cT2c — palpation-based per AJCC 8th (DRE rule N-1):
- *     palpable_unilateral_T2a_b → cT2a (conservative default since the enum
- *     does not distinguish T2a/T2b);  palpable_bilateral_T2c → cT2c.
- *  5. cT1c — default (no palpable disease, no MRI evidence of T3+).
- *
- * Critical N-1 rule: when DRE is undefined / 'not_performed' / 'normal_T1c',
- * MRI alone shall NOT auto-assign cT2 a/b/c sub-stages. Returns cT1c unless a
- * higher-priority structural finding has triggered.
+ *  1. noSuspiciousLesion === true                               → cT1c
+ *  2. structural invasion (bladder neck / ext. sphincter /
+ *     rectum / pelvic sidewall === 'invasion')                  → cT4
+ *  3. seminalVesicleInvasionWholeGland !== 'none'                → cT3b
+ *  4. any lesion's epeRiskMehralivand ∈ {1, 2, 3}                → cT3a
+ *  5. lesion-side cT2 heuristic:
+ *     - any lesion laterality 'midline_bilateral' OR
+ *       lesions span both 'right' AND 'left'                     → cT2c
+ *     - single unilateral lesion with sizeMaxAxialMm >=
+ *       prostateWidthMm / 2 (or >= 20 mm fallback when width
+ *       missing)                                                 → cT2b
+ *     - any other unilateral lesion present                      → cT2a
+ *  6. lesion 0개 + noSuspiciousLesion=false                      → cT1c
  */
 export function deriveClinicalT(input: ProstateStructuredInput): ClinicalT {
-  // Step 1: cT4 — structural invasion (highest priority).
+  // Step 1: explicit no-lesion shortcut.
+  if (input.noSuspiciousLesion) {
+    return "cT1c";
+  }
+
+  // Step 2: cT4 — structural invasion.
   if (
     input.bladderNeckInvolvement === "invasion" ||
     input.externalSphincterInvolvement === "invasion" ||
@@ -286,22 +294,13 @@ export function deriveClinicalT(input: ProstateStructuredInput): ClinicalT {
     return "cT4";
   }
 
-  // Step 2: cT3b — seminal vesicle invasion.
+  // Step 3: cT3b — seminal vesicle invasion (whole-gland field is the single
+  // source of truth after the lesion-level SVI suspicion field was retired).
   if (input.seminalVesicleInvasionWholeGland !== "none") {
     return "cT3b";
   }
-  if (
-    input.lesions.some(
-      (l) => l.seminalVesicleInvasionSuspicion === "definite"
-    )
-  ) {
-    return "cT3b";
-  }
 
-  // Step 3: cT3a — extracapsular extension.
-  if (input.capsuleIntegrity === "gross_extracapsular_extension") {
-    return "cT3a";
-  }
+  // Step 4: cT3a — extraprostatic extension per Mehralivand grade.
   if (
     input.lesions.some(
       (l) =>
@@ -313,30 +312,39 @@ export function deriveClinicalT(input: ProstateStructuredInput): ClinicalT {
     return "cT3a";
   }
 
-  // Step 4: DRE-based palpation rule (AJCC 8th, requirement N-1).
-  // MRI alone never auto-assigns cT2 sub-stages.
-  switch (input.digitalRectalExam) {
-    case "palpable_unilateral_T2a_b":
-      return "cT2a";
-    case "palpable_bilateral_T2c":
-      return "cT2c";
-    case "extracapsular_T3":
-      // DRE-based cT3a — already covered by step 3 if MRI EPE present;
-      // otherwise still cT3a per DRE evidence.
-      return "cT3a";
-    case "fixed_T4":
-      // DRE-based cT4 — covered by step 1 if structural invasion present;
-      // otherwise still cT4 per DRE evidence.
-      return "cT4";
-    case "not_performed":
-    case "normal_T1c":
-    case undefined:
-      // No palpable disease and no MRI evidence of T3+ → cT1c.
-      return "cT1c";
+  // Step 5: cT2 sub-stage from MRI lesion geometry.
+  if (input.lesions.length === 0) {
+    return "cT1c";
   }
 
-  // Unreachable in practice — exhaustive switch above covers the union.
-  return "cT1c";
+  const hasMidlineBilateral = input.lesions.some(
+    (l) => l.laterality === "midline_bilateral"
+  );
+  const hasRight = input.lesions.some((l) => l.laterality === "right");
+  const hasLeft = input.lesions.some((l) => l.laterality === "left");
+  if (hasMidlineBilateral || (hasRight && hasLeft)) {
+    return "cT2c";
+  }
+
+  // Single-side lesion(s). Use the largest axial dimension across all lesions
+  // versus the half-width threshold to discriminate cT2a vs cT2b.
+  const halfWidth =
+    typeof input.prostateWidthMm === "number" &&
+    !Number.isNaN(input.prostateWidthMm) &&
+    input.prostateWidthMm > 0
+      ? input.prostateWidthMm / 2
+      : 20; // 20 mm fallback when width is missing.
+  const largestAxial = Math.max(
+    ...input.lesions.map((l) =>
+      typeof l.sizeMaxAxialMm === "number" && !Number.isNaN(l.sizeMaxAxialMm)
+        ? l.sizeMaxAxialMm
+        : 0
+    )
+  );
+  if (largestAxial >= halfWidth) {
+    return "cT2b";
+  }
+  return "cT2a";
 }
 
 /**
@@ -498,6 +506,13 @@ export function deriveEauRiskGroup(
     return "not_applicable";
   }
 
+  if (input.noSuspiciousLesion) {
+    // Negative MRI: even with biopsy-confirmed prior disease, this scan
+    // contributes no measurable T-stage evidence so EAU stratification
+    // is left to the clinician via the staging override path.
+    return "not_applicable";
+  }
+
   const isup = extractIsupGrade(input.priorBiopsyStatus);
   if (isup === 0) {
     // EAU risk stratification requires biopsy-confirmed disease.
@@ -550,7 +565,9 @@ function clinicalContextBlock(input: ProstateStructuredInput): string[] {
   );
   pushBullet(lines, "Prior biopsy status", input.priorBiopsyStatus);
   pushBullet(lines, "Prior biopsy date", input.priorBiopsyDate);
-  pushBullet(lines, "Digital rectal exam", input.digitalRectalExam);
+  if (input.noSuspiciousLesion) {
+    lines.push("- No suspicious lesion: yes (PI-RADS ≤ 2 negative MRI)");
+  }
 
   const psaDensity = derivePsaDensity(
     input.psaNgPerMl,
@@ -609,16 +626,9 @@ function lesionBlock(lesion: ProstateLesion, index: number): string[] {
   pushBullet(lines, "EPE risk (Mehralivand)", lesion.epeRiskMehralivand);
   pushBullet(
     lines,
-    "Seminal vesicle invasion suspicion",
-    lesion.seminalVesicleInvasionSuspicion
-  );
-  pushBullet(
-    lines,
     "Neurovascular bundle involvement",
     lesion.neurovascularBundleInvolvement
   );
-  pushBullet(lines, "Relation to apex", lesion.relationToApex);
-  pushBullet(lines, "Relation to urethra", lesion.relationToUrethra);
   pushBullet(lines, "Prior MRI comparison", lesion.priorMRIComparison);
   lines.push(
     `- Target for biopsy: ${lesion.targetForBiopsy ? "yes" : "no"}`
@@ -664,7 +674,6 @@ function wholeGlandStagingBlock(input: ProstateStructuredInput): string[] {
     );
   }
   pushBullet(lines, "Prostate volume", formatMl(input.prostateVolumeMl));
-  pushBullet(lines, "Capsule integrity", input.capsuleIntegrity);
   pushBullet(
     lines,
     "Seminal vesicle invasion (whole gland)",
@@ -705,28 +714,42 @@ function wholeGlandStagingBlock(input: ProstateStructuredInput): string[] {
 
   // Auto-derived staging — emit override values when isStagingOverridden=true,
   // otherwise emit the canonical derived value.
+  //
+  // Negative-MRI shortcut: when noSuspiciousLesion=true AND no manual override
+  // is supplied, AJCC TNM categorization is not meaningful (TNM presupposes
+  // confirmed disease whose extent can be measured). The block omits the
+  // Clinical T/N/M and EAU lines so the downstream prompt can render the
+  // STAGING section as "Not applicable — negative MRI." A user-driven
+  // isStagingOverridden=true is honoured even on a negative MRI, since it
+  // signals authoritative clinical knowledge (e.g. staging_after_diagnosis
+  // patients with a prior biopsy whose disease is invisible on the current
+  // MRI but whose cT was set by the referring clinician).
   const overridden = input.isStagingOverridden === true;
-  const cT =
-    overridden && input.clinicalT !== undefined
-      ? input.clinicalT
-      : deriveClinicalT(input);
-  const cN =
-    overridden && input.clinicalN !== undefined
-      ? input.clinicalN
-      : deriveClinicalN(input);
-  const cM =
-    overridden && input.clinicalM !== undefined
-      ? input.clinicalM
-      : deriveClinicalM(input);
-  lines.push(`- Clinical T: ${cT}`);
-  lines.push(`- Clinical N: ${cN}`);
-  lines.push(`- Clinical M: ${cM}`);
-  if (overridden) {
-    lines.push("- Staging overridden: yes");
-  }
+  const stagingSuppressed = input.noSuspiciousLesion && !overridden;
 
-  const eau = deriveEauRiskGroup(input);
-  lines.push(`- EAU risk group: ${eau}`);
+  if (!stagingSuppressed) {
+    const cT =
+      overridden && input.clinicalT !== undefined
+        ? input.clinicalT
+        : deriveClinicalT(input);
+    const cN =
+      overridden && input.clinicalN !== undefined
+        ? input.clinicalN
+        : deriveClinicalN(input);
+    const cM =
+      overridden && input.clinicalM !== undefined
+        ? input.clinicalM
+        : deriveClinicalM(input);
+    lines.push(`- Clinical T: ${cT}`);
+    lines.push(`- Clinical N: ${cN}`);
+    lines.push(`- Clinical M: ${cM}`);
+    if (overridden) {
+      lines.push("- Staging overridden: yes");
+    }
+
+    const eau = deriveEauRiskGroup(input);
+    lines.push(`- EAU risk group: ${eau}`);
+  }
 
   // PI-QUAL
   pushBullet(lines, "PI-QUAL overall", input.piQualOverall);
@@ -820,9 +843,9 @@ export function createEmptyProstateInput(): ProstateStructuredInput {
     clinicalIndication: "pre_biopsy_initial",
     psaNgPerMl: 0,
     priorBiopsyStatus: "none",
+    noSuspiciousLesion: false,
     lesions: [],
     prostateVolumeMl: 0,
-    capsuleIntegrity: "intact",
     seminalVesicleInvasionWholeGland: "none",
     bladderNeckInvolvement: "none",
     externalSphincterInvolvement: "none",
@@ -859,7 +882,6 @@ export function createEmptyProstateLesion(lesionIndex: number): ProstateLesion {
     overallPiradsCategory: "3",
     isPiradsOverridden: false,
     epeRiskMehralivand: "0_no_features",
-    seminalVesicleInvasionSuspicion: "none",
     targetForBiopsy: false,
   };
 }
@@ -868,6 +890,10 @@ export function createEmptyProstateLesion(lesionIndex: number): ProstateLesion {
  * Returns true when the input contains the minimum fields required for a
  * meaningful prostate prompt. Form-layer enforces stricter requirements
  * (e.g., PI-QUAL T2W/DWI subscores); this gate is the serializer minimum.
+ *
+ * When `noSuspiciousLesion` is true the function only validates the
+ * study-level fields (date, indication, PSA, volume, PI-QUAL) and skips the
+ * lesion-list checks — Section 2 of the form is hidden in that mode.
  */
 export function hasMinimumProstateFields(
   input: ProstateStructuredInput
@@ -884,6 +910,11 @@ export function hasMinimumProstateFields(
     return false;
   }
   if (isAbsent(input.piQualOverall)) return false;
+
+  if (input.noSuspiciousLesion) {
+    return true;
+  }
+
   if (!Array.isArray(input.lesions) || input.lesions.length < 1) return false;
 
   const first = input.lesions[0];

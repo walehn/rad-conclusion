@@ -23,16 +23,6 @@ export const PRIOR_BIOPSY_STATUS_OPTIONS = [
 ] as const;
 export type PriorBiopsyStatus = (typeof PRIOR_BIOPSY_STATUS_OPTIONS)[number];
 
-export const DIGITAL_RECTAL_EXAM_OPTIONS = [
-  "not_performed",
-  "normal_T1c",
-  "palpable_unilateral_T2a_b",
-  "palpable_bilateral_T2c",
-  "extracapsular_T3",
-  "fixed_T4",
-] as const;
-export type DigitalRectalExam = (typeof DIGITAL_RECTAL_EXAM_OPTIONS)[number];
-
 // ---------------------------------------------------------------------------
 // Section 2 — Lesion-level
 // ---------------------------------------------------------------------------
@@ -69,32 +59,12 @@ export const EPE_RISK_OPTIONS = [
 ] as const;
 export type EpeRisk = (typeof EPE_RISK_OPTIONS)[number];
 
-export const SVI_SUSPICION_OPTIONS = ["none", "suspected", "definite"] as const;
-export type SviSuspicion = (typeof SVI_SUSPICION_OPTIONS)[number];
-
 export const NVB_INVOLVEMENT_OPTIONS = [
   "none",
   "abutment",
   "encasement",
 ] as const;
 export type NvbInvolvement = (typeof NVB_INVOLVEMENT_OPTIONS)[number];
-
-export const RELATION_TO_APEX_OPTIONS = [
-  "apex",
-  "mid",
-  "base",
-  "apex_to_mid",
-  "mid_to_base",
-  "whole_gland",
-] as const;
-export type RelationToApex = (typeof RELATION_TO_APEX_OPTIONS)[number];
-
-export const RELATION_TO_URETHRA_OPTIONS = [
-  "not_abutting",
-  "abutting",
-  "involving",
-] as const;
-export type RelationToUrethra = (typeof RELATION_TO_URETHRA_OPTIONS)[number];
 
 export const PRIOR_MRI_COMPARISON_OPTIONS = [
   "new_lesion",
@@ -109,14 +79,6 @@ export type PriorMriComparison = (typeof PRIOR_MRI_COMPARISON_OPTIONS)[number];
 // ---------------------------------------------------------------------------
 // Section 3 — Whole-gland & staging
 // ---------------------------------------------------------------------------
-
-export const CAPSULE_INTEGRITY_OPTIONS = [
-  "intact",
-  "bulging_no_breach",
-  "focally_breached",
-  "gross_extracapsular_extension",
-] as const;
-export type CapsuleIntegrity = (typeof CAPSULE_INTEGRITY_OPTIONS)[number];
 
 export const SVI_WHOLE_GLAND_OPTIONS = [
   "none",
