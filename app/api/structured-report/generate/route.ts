@@ -36,9 +36,9 @@ export const dynamic = "force-dynamic";
  * Request body schema.
  *
  * - findings: non-empty; hard-capped at 20_000 chars to keep prompts bounded.
- * - diseaseCategory: v0.1.0 fixed to the literal 'RCC'. Any other value
- *   (e.g., 'HCC', 'ProstateCancer') is rejected at the zod layer, producing
- *   a 400 response without reaching the prompt dispatcher.
+ * - diseaseCategory: 'RCC' or 'ProstateCancer' (extended by SPEC-PROSTATE-001).
+ *   Any other value is rejected at the zod layer, producing a 400 response
+ *   without reaching the prompt dispatcher.
  * - modality: optional hint routed to the RCC template (defaults to 'Auto').
  * - lang: output language for the report body.
  * - provider/model: same provider surface as /api/generate.
@@ -48,7 +48,7 @@ const requestSchema = z.object({
     .string()
     .min(1, "Findings text is required")
     .max(20_000, "Findings text exceeds maximum length (20000 characters)"),
-  diseaseCategory: z.literal("RCC"),
+  diseaseCategory: z.union([z.literal("RCC"), z.literal("ProstateCancer")]),
   modality: z.enum(["CT", "MRI", "US", "Auto"]).optional(),
   lang: z.enum(["ko", "en", "mixed"]),
   provider: z.enum(["local", "openai", "anthropic", "google"]),

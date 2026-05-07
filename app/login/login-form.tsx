@@ -102,7 +102,12 @@ export function LoginForm({ csrfToken, nextPath }: LoginFormProps): React.ReactE
               {/* Hidden CSRF field for defensive progressive enhancement. */}
               <input type="hidden" name="csrf_token" value={csrfToken} />
 
-              <div className="flex flex-col gap-2">
+              {/* suppressHydrationWarning: password managers (LastPass,
+                  1Password, Bitwarden, etc.) inject sibling helper elements
+                  next to the <input> at runtime, which produces benign
+                  hydration mismatches against the SSR markup. The wrapper is
+                  the closest common ancestor where the injected node lands. */}
+              <div className="flex flex-col gap-2" suppressHydrationWarning>
                 <label
                   htmlFor="email"
                   className="text-sm font-medium text-foreground"
@@ -123,7 +128,7 @@ export function LoginForm({ csrfToken, nextPath }: LoginFormProps): React.ReactE
                 />
               </div>
 
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2" suppressHydrationWarning>
                 <label
                   htmlFor="password"
                   className="text-sm font-medium text-foreground"

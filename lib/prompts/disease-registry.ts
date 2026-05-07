@@ -1,21 +1,25 @@
 /**
- * Disease Category Registry for Structured Report Generator (SPEC-DASHBOARD-001).
+ * Disease Category Registry for Structured Report Generator
+ * (SPEC-DASHBOARD-001, extended by SPEC-PROSTATE-001).
  *
- * v0.1.0 scope: RCC (Renal Cell Carcinoma) only.
- *
- * Designed as a union type so future categories (HCC, Prostate Cancer, etc.)
- * can be added by (1) extending the union, (2) adding an entry to
- * DISEASE_REGISTRY, and (3) creating a matching template module under
- * lib/prompts/disease-templates/<category>.ts.
+ * Designed as a union type so future categories (HCC, etc.) can be added by
+ *   (1) extending the union,
+ *   (2) adding an entry to DISEASE_REGISTRY, and
+ *   (3) creating a matching template module under
+ *       lib/prompts/disease-templates/<category>.ts.
  */
 
 /**
  * Supported disease categories for structured reports.
  *
- * v0.1.0: 'RCC' only. Future union extension example:
- *   type DiseaseCategory = 'RCC' | 'HCC' | 'ProstateCancer' | 'PulmonaryNodule';
+ * Registered categories:
+ *   - "RCC"            — Renal Cell Carcinoma (SPEC-DASHBOARD-001)
+ *   - "ProstateCancer" — Prostate Cancer / PI-RADS v2.1 (SPEC-PROSTATE-001)
+ *
+ * Future extension example:
+ *   type DiseaseCategory = "RCC" | "ProstateCancer" | "HCC" | "PulmonaryNodule";
  */
-export type DiseaseCategory = "RCC";
+export type DiseaseCategory = "RCC" | "ProstateCancer";
 
 /**
  * Imaging modalities supported per disease category.
@@ -133,6 +137,81 @@ export const DISEASE_REGISTRY: Record<DiseaseCategory, DiseaseCategoryMetadata> 
         url: "https://doi.org/10.1111/j.1464-410X.1987.tb04832.x",
         scope: "IVC tumor thrombus level reporting (Levels 0–IV)",
         notice: "Level 0–IV designation is public nomenclature.",
+      },
+    ] as const,
+  },
+  ProstateCancer: {
+    id: "ProstateCancer",
+    displayName: "Prostate Cancer",
+    displayNameKo: "전립선암",
+    description:
+      "Prostate cancer structured reporting per PI-RADS v2.1 (treatment-naïve), with AJCC 8th edition staging and EAU 2025/2026 risk stratification",
+    supportedModalities: ["MRI"] as const,
+    standardReferences: [
+      {
+        id: "pi-rads-v2-1",
+        shortLabel: "PI-RADS v2.1",
+        fullTitle:
+          "Prostate Imaging Reporting and Data System Version 2.1: 2019 Update of Prostate Imaging Reporting and Data System Version 2",
+        authors: "Turkbey B, Rosenkrantz AB, Haider MA, et al.",
+        venue: "European Urology / ACR / ESUR / AdMeTech",
+        year: 2019,
+        url: "https://www.europeanurology.com/article/S0302-2838(19)30180-0/fulltext",
+        scope:
+          "DWI/T2W/DCE per-sequence scores; per-zone overall PI-RADS 1–5; 41-sector map; lesion measurement",
+        notice:
+          "This template paraphrases the published recommendations; refer to the original publication for verbatim wording.",
+      },
+      {
+        id: "ajcc-8th-prostate",
+        shortLabel: "AJCC 8th",
+        fullTitle: "AJCC Cancer Staging Manual, 8th Edition – Prostate chapter",
+        authors: "Buyyounouski MK, Choyke PL, McKenney JK, et al.",
+        venue: "American Joint Committee on Cancer / Springer",
+        year: 2017,
+        url: "https://acsjournals.onlinelibrary.wiley.com/doi/full/10.3322/caac.21391",
+        scope: "cT/cN/cM, ISUP Grade Group, Prognostic Stage Groups",
+        notice:
+          "This template paraphrases the published recommendations; refer to the original publication for verbatim wording.",
+      },
+      {
+        id: "eau-2025-2026",
+        shortLabel: "EAU 2025/2026",
+        fullTitle:
+          "EAU-EANM-ESTRO-ESUR-ISUP-SIOG Guidelines on Prostate Cancer",
+        authors: "Cornford P, van den Bergh RCN, Briers E, et al.",
+        venue: "EAU / Uroweb",
+        year: 2025,
+        url: "https://uroweb.org/guidelines/prostate-cancer",
+        scope: "Risk stratification, mpMRI role",
+        notice:
+          "This template paraphrases the published recommendations; refer to the original publication for verbatim wording.",
+      },
+      {
+        id: "pi-qual-v2",
+        shortLabel: "PI-QUAL v2",
+        fullTitle:
+          "PI-QUAL version 2: an update of a standardised scoring system for the assessment of image quality of prostate MRI",
+        authors: "de Rooij M, Allen C, Twilt JJ, et al.",
+        venue: "European Radiology 34:7068–7079",
+        year: 2024,
+        url: "https://link.springer.com/article/10.1007/s00330-024-10795-4",
+        scope: "Image-quality (T2W, DWI, ±DCE); 3-point overall scale",
+        notice:
+          "This template paraphrases the published recommendations; refer to the original publication for verbatim wording.",
+      },
+      {
+        id: "mehralivand-epe-2019",
+        shortLabel: "Mehralivand EPE",
+        fullTitle:
+          "A Grading System for the Assessment of Risk of Extraprostatic Extension of Prostate Cancer at Multiparametric MRI",
+        authors: "Mehralivand S, Shih JH, Harmon S, et al.",
+        venue: "Radiology",
+        year: 2019,
+        url: "https://pubmed.ncbi.nlm.nih.gov/30667329/",
+        scope: "Per-lesion EPE grade 0–3",
+        notice:
+          "This template paraphrases the published recommendations; refer to the original publication for verbatim wording.",
       },
     ] as const,
   },
