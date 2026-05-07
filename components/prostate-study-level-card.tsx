@@ -11,7 +11,6 @@ import {
   LOCAL_INVOLVEMENT_OPTIONS,
   OTHER_DISTANT_METS_OPTIONS,
   PIQUAL_DCE_SUBSCORE_OPTIONS,
-  PIQUAL_OVERALL_OPTIONS,
   PIQUAL_T2W_DWI_SUBSCORE_OPTIONS,
   SVI_WHOLE_GLAND_OPTIONS,
   type BoneInvolvement,
@@ -30,6 +29,7 @@ import {
   deriveClinicalN,
   deriveClinicalT,
   deriveEauRiskGroup,
+  derivePiQualOverall,
   deriveProstateVolume,
   derivePsaDensity,
   type ProstateLymphNode,
@@ -42,11 +42,6 @@ import {
   toSegmentedOptions,
   type SegmentedControlOption,
 } from "@/components/ui/segmented-control";
-import {
-  RadioCardGroup,
-  type RadioCardOption,
-  type SemanticTone,
-} from "@/components/ui/radio-card-group";
 
 // ---------------------------------------------------------------------------
 // File-local helpers (mirror rcc-study-level-card.tsx for visual rhythm parity)
@@ -216,26 +211,11 @@ const PIQUAL_OVERALL_SUBLABEL: Record<PiQualOverall, string> = {
   "3_optimal": "우수",
 };
 
-const PIQUAL_OVERALL_TONE: Record<PiQualOverall, SemanticTone> = {
-  "1_inadequate": "destructive",
-  "2_acceptable": "warning",
-  "3_optimal": "success",
-};
-
 const PIQUAL_DCE_LABEL: Record<PiQualDceSubscore, string> = {
   "+": "+ (Adequate)",
   "-": "- (Inadequate)",
   not_applicable: "N/A · 미수행",
 };
-
-const PIQUAL_OVERALL_RADIO_OPTIONS: ReadonlyArray<
-  RadioCardOption<PiQualOverall>
-> = PIQUAL_OVERALL_OPTIONS.map((v) => ({
-  value: v,
-  label: PIQUAL_OVERALL_LABEL[v],
-  sublabel: PIQUAL_OVERALL_SUBLABEL[v],
-  tone: PIQUAL_OVERALL_TONE[v],
-}));
 
 function toLabeledOptions<T extends string>(
   values: ReadonlyArray<T>,
@@ -366,7 +346,9 @@ function LymphNodeSubCard({
 
       {nodes.length === 0 ? (
         <p className="text-xs text-muted-foreground">
-          림프절이 평가되지 않았습니다. 추가하려면 아래 버튼을 누르세요.
+          {isRegional
+            ? "의심 림프절 없음 — 기본값 N0. 의심 림프절이 보이면 아래 버튼으로 추가하세요."
+            : "비국소 의심 림프절 없음. 발견 시 아래 버튼으로 추가하세요."}
         </p>
       ) : (
         <div className="flex flex-col gap-3">
@@ -1054,33 +1036,20 @@ export function ProstateStudyLevelCard({
             </div>
           )}
 
-          {/* 11. PI-QUAL block (required submission gate, U-7) */}
+          {/* 11. PI-QUAL block (required submission gate, U-7).
+             Per-sequence sub-scores are entered first; the overall PI-QUAL
+             category is auto-derived from T2W/DWI per de Rooij 2024 (1–4
+             sub-score scale → 1–3 overall scale). The radiologist no longer
+             clicks an overall radio — the badge below updates live. */}
           <fieldset className="md:col-span-2 rounded-lg border border-border p-3 flex flex-col gap-3">
             <legend className="px-1 text-[0.9375rem] font-bold tracking-tight text-foreground">
               PI-QUAL v2 · 영상 품질 평가
             </legend>
 
             <div className="grid gap-x-6 gap-y-5 md:grid-cols-2">
-              {/* Overall — RadioCardGroup with semantic tones */}
-              <FieldRow
-                label="PI-QUAL overall · 종합 점수"
-                className="md:col-span-2"
-                required
-              >
-                <RadioCardGroup<PiQualOverall>
-                  name={id("piqualOverall")}
-                  ariaLabel="PI-QUAL overall"
-                  value={value.piQualOverall}
-                  options={PIQUAL_OVERALL_RADIO_OPTIONS}
-                  onChange={(next) =>
-                    onChange({ ...value, piQualOverall: next })
-                  }
-                  columns={3}
-                />
-              </FieldRow>
-
-              {/* T2W subscore (1–4) */}
-              <FieldRow label="T2W subscore">
+              {/* T2W subscore (1–4). onChange also recomputes the auto-derived
+                 overall so the badge below stays synchronised. */}
+              <FieldRow label="T2W subscore" required>
                 <SegmentedControl<PiQualT2WDwiSubscore>
                   name={id("piqualT2W")}
                   ariaLabel="PI-QUAL T2W subscore"
@@ -1089,13 +1058,20 @@ export function ProstateStudyLevelCard({
                     PIQUAL_T2W_DWI_SUBSCORE_OPTIONS
                   )}
                   onChange={(next) =>
-                    onChange({ ...value, piQualT2WSubscore: next })
+                    onChange({
+                      ...value,
+                      piQualT2WSubscore: next,
+                      piQualOverall: derivePiQualOverall(
+                        next,
+                        value.piQualDWISubscore
+                      ),
+                    })
                   }
                 />
               </FieldRow>
 
-              {/* DWI subscore (1–4) */}
-              <FieldRow label="DWI subscore">
+              {/* DWI subscore (1–4). Same auto-sync as T2W above. */}
+              <FieldRow label="DWI subscore" required>
                 <SegmentedControl<PiQualT2WDwiSubscore>
                   name={id("piqualDWI")}
                   ariaLabel="PI-QUAL DWI subscore"
@@ -1104,7 +1080,14 @@ export function ProstateStudyLevelCard({
                     PIQUAL_T2W_DWI_SUBSCORE_OPTIONS
                   )}
                   onChange={(next) =>
-                    onChange({ ...value, piQualDWISubscore: next })
+                    onChange({
+                      ...value,
+                      piQualDWISubscore: next,
+                      piQualOverall: derivePiQualOverall(
+                        value.piQualT2WSubscore,
+                        next
+                      ),
+                    })
                   }
                 />
               </FieldRow>
@@ -1127,6 +1110,64 @@ export function ProstateStudyLevelCard({
                     onChange({ ...value, piQualDCESubscore: next })
                   }
                 />
+              </FieldRow>
+
+              {/* Overall — auto-derived read-only summary badge.
+                 Conversion rule: max(T2W,DWI)≤2 → inadequate; T2W=4 AND
+                 DWI=4 → optimal; otherwise acceptable. */}
+              <FieldRow
+                label="PI-QUAL overall · 종합 점수 (자동 산출)"
+                className="md:col-span-2"
+              >
+                {(() => {
+                  const overall = derivePiQualOverall(
+                    value.piQualT2WSubscore,
+                    value.piQualDWISubscore
+                  );
+                  const toneClass =
+                    overall === "3_optimal"
+                      ? "text-emerald-700 dark:text-emerald-300"
+                      : overall === "2_acceptable"
+                        ? "text-amber-700 dark:text-amber-300"
+                        : "text-destructive";
+                  const ringClass =
+                    overall === "3_optimal"
+                      ? "border-emerald-300/60 bg-emerald-50/70 dark:border-emerald-700/40 dark:bg-emerald-950/30"
+                      : overall === "2_acceptable"
+                        ? "border-amber-300/60 bg-amber-50/70 dark:border-amber-700/40 dark:bg-amber-950/30"
+                        : "border-destructive/40 bg-destructive/5";
+                  return (
+                    <div
+                      role="status"
+                      aria-live="polite"
+                      aria-label={`PI-QUAL overall ${PIQUAL_OVERALL_LABEL[overall]}`}
+                      className={cn(
+                        "flex flex-col gap-1 rounded-md border px-3 py-2.5",
+                        ringClass
+                      )}
+                    >
+                      <div className="flex items-baseline gap-2">
+                        <span
+                          className={cn("text-lg font-bold", toneClass)}
+                        >
+                          {PIQUAL_OVERALL_LABEL[overall]}
+                        </span>
+                        <span className="text-sm text-muted-foreground">
+                          {PIQUAL_OVERALL_SUBLABEL[overall]}
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        T2W {value.piQualT2WSubscore}/4 · DWI{" "}
+                        {value.piQualDWISubscore}/4 → PI-QUAL{" "}
+                        {overall === "1_inadequate"
+                          ? "1"
+                          : overall === "2_acceptable"
+                            ? "2"
+                            : "3"}
+                      </div>
+                    </div>
+                  );
+                })()}
               </FieldRow>
             </div>
           </fieldset>

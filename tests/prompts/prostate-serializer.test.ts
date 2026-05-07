@@ -550,16 +550,20 @@ describe("deriveClinicalT", () => {
 // ---------------------------------------------------------------------------
 
 describe("deriveClinicalN", () => {
-  it("NX: no nodes assessed", () => {
-    expect(deriveClinicalN(makeInput())).toBe("NX");
+  it("N0 (default-negative): no nodes entered → N0", () => {
+    // Korean clinical workflow convention: prostate MRI always covers the
+    // regional nodal stations, so "no node entered" means "no suspicious
+    // node found" rather than "indeterminate." NX is reserved for the
+    // explicit-override path.
+    expect(deriveClinicalN(makeInput())).toBe("N0");
   });
 
-  it("NX: explicit empty arrays for both", () => {
+  it("N0 (default-negative): explicit empty arrays for both", () => {
     expect(
       deriveClinicalN(
         makeInput({ regionalLymphNodes: [], nonRegionalLymphNodes: [] })
       )
-    ).toBe("NX");
+    ).toBe("N0");
   });
 
   it("N1: regional with shortAxisMm=10 (≥8 mm criterion)", () => {
@@ -737,11 +741,11 @@ describe("derivePsaDensity", () => {
     expect(derivePsaDensity(10, 50)).toBe(0.2);
   });
 
-  it("rounds to 1 decimal place", () => {
-    // 7 / 30 = 0.2333... → 0.2
-    expect(derivePsaDensity(7, 30)).toBe(0.2);
-    // 7.5 / 30 = 0.25 → 0.3 (Math.round rounds .5 up)
-    expect(derivePsaDensity(7.5, 30)).toBe(0.3);
+  it("rounds to 2 decimal places", () => {
+    // 7 / 30 = 0.2333... → 0.23
+    expect(derivePsaDensity(7, 30)).toBe(0.23);
+    // 7.5 / 30 = 0.25 → 0.25
+    expect(derivePsaDensity(7.5, 30)).toBe(0.25);
   });
 
   it("psa=8, vol=0 → undefined", () => {
@@ -1042,7 +1046,7 @@ describe("serializeProstateStructuredInput — required fields verbatim", () => 
       serializeProstateStructuredInput(
         makeInput({ psaNgPerMl: 8, prostateVolumeMl: 40 })
       )
-    ).toContain("- PSA density: 0.2 ng/mL/cc");
+    ).toContain("- PSA density: 0.20 ng/mL/cc");
   });
 
   it("emits sector map location as comma-separated list", () => {
@@ -1061,20 +1065,24 @@ describe("serializeProstateStructuredInput — required fields verbatim", () => 
   it("emits derived clinical T/N/M when not overridden", () => {
     // makeInput() seeds a single right-side lesion of 12 mm against a 40 mm
     // prostate width — the MRI-based heuristic discriminates this as cT2a
-    // (unilateral, size < halfWidth=20). N/M default to NX/M0 with no nodes
-    // and no metastasis declared.
+    // (unilateral, size < halfWidth=20). N/M default to N0/M0: empty
+    // lymph node arrays are treated as a deliberate negative assessment
+    // (Korean clinical-workflow convention), and no metastasis declared.
     const result = serializeProstateStructuredInput(makeInput());
     expect(result).toContain("- Clinical T: cT2a");
-    expect(result).toContain("- Clinical N: NX");
+    expect(result).toContain("- Clinical N: N0");
     expect(result).toContain("- Clinical M: M0");
     expect(result).not.toContain("- Staging overridden:");
   });
 
-  it("suppresses Clinical T/N/M and EAU lines when noSuspiciousLesion=true and no override", () => {
+  it("suppresses Clinical T/N/M and emits explicit not-applicable marker when noSuspiciousLesion=true and no override", () => {
     // AJCC TNM presupposes confirmed disease. A negative MRI without an
     // explicit clinician override yields no measurable disease, so the
-    // serializer omits the staging lines entirely (the prompt then renders
-    // "Not applicable — negative MRI." in the STAGING section).
+    // serializer omits the cT/cN/cM lines and instead emits an explicit
+    // "AJCC TNM staging: not applicable on negative MRI" marker plus an
+    // "EAU risk group: not_applicable" line. The downstream prompt uses
+    // these markers to render "Not applicable — negative MRI." in STAGING
+    // and to suppress any cT1c/N0/M0 fabrication in IMPRESSION.
     const result = serializeProstateStructuredInput(
       makeInput({ noSuspiciousLesion: true, lesions: [] })
     );
@@ -1085,7 +1093,10 @@ describe("serializeProstateStructuredInput — required fields verbatim", () => 
     expect(result).not.toContain("- Clinical T:");
     expect(result).not.toContain("- Clinical N:");
     expect(result).not.toContain("- Clinical M:");
-    expect(result).not.toContain("- EAU risk group:");
+    expect(result).toContain(
+      "- AJCC TNM staging: not applicable on negative MRI (no measurable disease)"
+    );
+    expect(result).toContain("- EAU risk group: not applicable");
   });
 
   it("honours isStagingOverridden=true even on a negative MRI", () => {
@@ -1163,7 +1174,7 @@ describe("serializeProstateStructuredInput — required fields verbatim", () => 
         piQualDCESubscore: "+",
       })
     );
-    expect(result).toContain("- PI-QUAL overall: 2_acceptable");
+    expect(result).toContain("- PI-QUAL overall: PI-QUAL 2 — acceptable");
     expect(result).toContain("- PI-QUAL T2W subscore: 3");
     expect(result).toContain("- PI-QUAL DWI subscore: 4");
     expect(result).toContain("- PI-QUAL DCE subscore: +");
@@ -1330,12 +1341,14 @@ describe("serializeProstateStructuredInput — determinism and snapshot", () => 
     // Clinical context selected fields
     expect(result).toContain("- Study date: 2026-04-27");
     expect(result).toContain("- Patient age: 67");
-    expect(result).toContain("- Clinical indication: staging_after_diagnosis");
+    expect(result).toContain(
+      "- Clinical indication: staging MRI after biopsy-confirmed diagnosis"
+    );
     expect(result).toContain("- PSA: 12.5 ng/mL");
-    expect(result).toContain("- PSA density: 0.3 ng/mL/cc");
+    expect(result).toContain("- PSA density: 0.25 ng/mL/cc");
 
     // Lesion content
-    expect(result).toContain("- Zone: peripheral_zone_PZ");
+    expect(result).toContain("- Zone: peripheral zone (PZ)");
     expect(result).toContain("- Sector map location: R-mid-PZpl, R-mid-PZpm");
     expect(result).toContain("- Size (max axial): 14 mm");
     expect(result).toContain("- Size (orthogonal axial): 12 mm");
@@ -1344,7 +1357,9 @@ describe("serializeProstateStructuredInput — determinism and snapshot", () => 
     expect(result).toContain("- DCE result: positive");
     expect(result).toContain("- Overall PI-RADS category: 4");
     expect(result).toContain("- ADC mean value: 750 ×10⁻⁶ mm²/s");
-    expect(result).toContain("- EPE risk (Mehralivand): 1_curvilinear_or_bulge");
+    expect(result).toContain(
+      "- EPE risk (Mehralivand): Mehralivand grade 1 (curvilinear contact or capsular bulge)"
+    );
 
     // Staging — derived (cT3a from EPE; ISUP=2, PSA=12.5, cT3a → high)
     expect(result).toContain("- Clinical T: cT3a");

@@ -371,10 +371,29 @@ export function serializeRccStructuredInput(input: RccStructuredInput): string {
  * two mandatory fields (side + mass size) needed for a meaningful prompt.
  */
 export function hasMinimumStructuredFields(input: RccStructuredInput): boolean {
-  return (
-    input.masses.length >= 1 &&
-    input.masses.every(
-      (m) => m.side !== undefined && m.massSizeCm !== undefined
-    )
-  );
+  return getMissingRccFields(input).length === 0;
+}
+
+/**
+ * Diagnostic counterpart to `hasMinimumStructuredFields`. Returns a list of
+ * Korean-labelled descriptions of every required field that is currently
+ * empty for the RCC structured form, so the UI can show the user exactly
+ * what is blocking the Generate button rather than disabling it silently.
+ */
+export function getMissingRccFields(input: RccStructuredInput): string[] {
+  const missing: string[] = [];
+  if (input.masses.length < 1) {
+    missing.push("Mass 1개 이상 (Add mass 버튼을 눌러 추가)");
+    return missing;
+  }
+  input.masses.forEach((m, idx) => {
+    const label = `Mass ${idx + 1}`;
+    if (m.side === undefined) {
+      missing.push(`${label} — Side (좌/우)`);
+    }
+    if (m.massSizeCm === undefined) {
+      missing.push(`${label} — Mass size (cm)`);
+    }
+  });
+  return missing;
 }

@@ -170,9 +170,101 @@ function isAbsent(value: unknown): boolean {
 }
 
 /**
+ * Map of snake_case / mixed-case wire enum values → human-readable English
+ * labels suitable for direct inclusion in a clinical narrative.
+ *
+ * The serializer emits these labels in place of the raw enum codes so the
+ * downstream LLM never sees `pre_biopsy_initial`-style tokens and therefore
+ * cannot accidentally reproduce them in the report body. Values not listed
+ * here are passed through verbatim (e.g. cT2a / N0 / M1b — clinical codes
+ * that are public nomenclature and should appear unchanged in the output).
+ *
+ * Keep this list aligned with the enum unions defined above; missing entries
+ * fall through to the generic underscore→space fallback in `humanizeEnum`.
+ */
+const HUMAN_ENUM_LABELS: Readonly<Record<string, string>> = {
+  // ClinicalIndication
+  pre_biopsy_initial: "pre-biopsy MRI (initial workup)",
+  pre_biopsy_repeat_after_negative:
+    "pre-biopsy MRI (repeat after prior negative biopsy)",
+  staging_after_diagnosis:
+    "staging MRI after biopsy-confirmed diagnosis",
+
+  // PriorBiopsyStatus
+  positive_ISUP1: "positive — ISUP grade group 1",
+  positive_ISUP2: "positive — ISUP grade group 2",
+  positive_ISUP3: "positive — ISUP grade group 3",
+  positive_ISUP4: "positive — ISUP grade group 4",
+  positive_ISUP5: "positive — ISUP grade group 5",
+
+  // DceResult
+  not_performed_bpMRI: "not performed (bpMRI protocol)",
+
+  // EpeRiskMehralivand
+  "0_no_features": "Mehralivand grade 0 (no features)",
+  "1_curvilinear_or_bulge":
+    "Mehralivand grade 1 (curvilinear contact or capsular bulge)",
+  "2_both_features": "Mehralivand grade 2 (both features present)",
+  "3_frank_breach": "Mehralivand grade 3 (frank capsular breach)",
+
+  // PiQualOverall
+  "1_inadequate": "PI-QUAL 1 — inadequate",
+  "2_acceptable": "PI-QUAL 2 — acceptable",
+  "3_optimal": "PI-QUAL 3 — optimal",
+
+  // EauRiskGroup
+  intermediate_favourable: "intermediate-favourable",
+  intermediate_unfavourable: "intermediate-unfavourable",
+  not_applicable: "not applicable",
+
+  // Zone
+  peripheral_zone_PZ: "peripheral zone (PZ)",
+  transition_zone_TZ: "transition zone (TZ)",
+  central_zone_CZ: "central zone (CZ)",
+  anterior_fibromuscular_stroma_AFMS:
+    "anterior fibromuscular stroma (AFMS)",
+
+  // CraniocaudalLevel
+  mid_gland: "mid-gland",
+
+  // Laterality
+  midline_bilateral: "midline / bilateral",
+
+  // PriorMRIComparison
+  new_lesion: "new lesion",
+  increased_size_only: "increased size only",
+  increased_score: "increased PI-RADS score",
+  not_visible_on_prior: "not visible on prior MRI",
+
+  // Lymph node morphology
+  loss_of_fatty_hilum: "loss of fatty hilum",
+};
+
+/**
+ * Convert a wire enum value to a human-readable English label. Pass-through
+ * for non-string inputs and for strings that match no entry in the map and
+ * contain no underscore (e.g. cT2a, NX, M1b — public clinical codes).
+ *
+ * For strings not present in `HUMAN_ENUM_LABELS` but containing underscores,
+ * fall back to a generic underscore→space substitution so the LLM never sees
+ * snake_case tokens regardless of map coverage.
+ */
+function humanizeEnum(
+  value: string | number | undefined | null
+): string | number | undefined | null {
+  if (typeof value !== "string") return value;
+  if (Object.prototype.hasOwnProperty.call(HUMAN_ENUM_LABELS, value)) {
+    return HUMAN_ENUM_LABELS[value];
+  }
+  if (value.includes("_")) return value.replace(/_/g, " ");
+  return value;
+}
+
+/**
  * Push a `- <label>: <value>` bullet line to `lines` only when the value is
  * present (per `isAbsent`). Numbers are stringified with no unit; callers
- * provide formatted strings when units are required.
+ * provide formatted strings when units are required. String values are
+ * humanized via `humanizeEnum` so wire enum codes never reach the LLM.
  */
 function pushBullet(
   lines: string[],
@@ -180,7 +272,7 @@ function pushBullet(
   value: string | number | undefined | null
 ): void {
   if (isAbsent(value)) return;
-  lines.push(`- ${label}: ${String(value)}`);
+  lines.push(`- ${label}: ${String(humanizeEnum(value))}`);
 }
 
 function formatMm(value: number | undefined): string | undefined {
@@ -349,17 +441,22 @@ export function deriveClinicalT(input: ProstateStructuredInput): ClinicalT {
 
 /**
  * AJCC 8th clinical N-stage.
- *  - NX: no nodes assessed (both regional and non-regional arrays empty/absent).
+ *
+ * Convention for prostate MRI: every standard pelvic protocol covers the
+ * regional nodal stations (T2W axial + DWI), so the absence of suspicious
+ * nodes in the structured input is treated as a deliberate negative
+ * assessment, not as "indeterminate." This matches the Korean clinical
+ * workflow where radiologists rarely log negative LN explicitly — when no
+ * suspicious node is dictated, N0 is the operative default.
+ *
  *  - N1: regional node with shortAxisMm >= 8 OR any suspiciousFeatures present.
- *  - N0: regional nodes assessed with no suspicious features.
+ *  - N0: regional nodes assessed with no suspicious features, OR no nodes
+ *        added (the form treats "nothing entered" as "negative" by default).
+ *  - NX: not produced by automatic derivation. To assert NX explicitly, the
+ *        clinician sets `isStagingOverridden=true` and `clinicalN="NX"`.
  */
 export function deriveClinicalN(input: ProstateStructuredInput): ClinicalN {
   const regional = input.regionalLymphNodes ?? [];
-  const nonRegional = input.nonRegionalLymphNodes ?? [];
-
-  if (regional.length === 0 && nonRegional.length === 0) {
-    return "NX";
-  }
 
   const hasSuspiciousRegional = regional.some(
     (n) =>
@@ -368,7 +465,8 @@ export function deriveClinicalN(input: ProstateStructuredInput): ClinicalN {
   );
   if (hasSuspiciousRegional) return "N1";
 
-  // Regional nodes assessed but none meet suspicious criteria.
+  // Regional nodes assessed but none meet suspicious criteria, OR no
+  // suspicious node was entered (default-negative interpretation).
   return "N0";
 }
 
@@ -442,8 +540,111 @@ export function deriveProstateVolume(
 }
 
 /**
- * PSA density = PSA (ng/mL) / prostate volume (mL), rounded to 1 decimal.
+ * Derive the PI-QUAL v2 overall image-quality category from the per-sequence
+ * T2W and DWI sub-scores per de Rooij M et al., European Radiology 2024.
+ *
+ * Conversion table (T2W and DWI on a 1–4 scale):
+ *  - Either sub-score ≤ 2                         → 1 (inadequate)
+ *  - T2W = 4 AND DWI = 4                          → 3 (optimal)
+ *  - Otherwise (any 3/3, 3/4, or 4/3 combination) → 2 (acceptable)
+ *
+ * The DCE sub-score does not directly determine overall quality in this
+ * simplified mapping (it remains a reportable per-sequence field). For
+ * mpMRI protocols the radiologist may still opt to downgrade overall
+ * quality manually; for this template the T2W+DWI rule is the single
+ * source of truth.
+ */
+export function derivePiQualOverall(
+  t2w: PiQualT2WDwiSubscore,
+  dwi: PiQualT2WDwiSubscore
+): PiQualOverall {
+  const t = Number.parseInt(t2w, 10);
+  const d = Number.parseInt(dwi, 10);
+  if (t <= 2 || d <= 2) return "1_inadequate";
+  if (t === 4 && d === 4) return "3_optimal";
+  return "2_acceptable";
+}
+
+/**
+ * Derive lesion laterality from PI-RADS v2.1 sector codes. Sector encoding:
+ *  - "R-..." (e.g. R-mid-PZpl) and "SV-R"          → right-sided contribution
+ *  - "L-..." (e.g. L-apex-TZa) and "SV-L"          → left-sided contribution
+ *  - "AFMS-..." and "Membranous-urethra"           → midline contribution
+ *
+ * Returns:
+ *  - `"midline_bilateral"` when both right and left sectors are present, OR
+ *    when any midline-only sector is selected (mixed or pure midline)
+ *  - `"right"` when only right-side sectors are selected
+ *  - `"left"` when only left-side sectors are selected
+ *  - `undefined` when the sector list is empty
+ *
+ * Used by the lesion-card UI to keep `lesion.laterality` synchronised with the
+ * sector picker (single source of truth — see SPEC-PROSTATE-001 sector-vs-
+ * laterality dedup decision). Also exported for downstream consumers that
+ * need to recompute laterality from a sector list without a full Lesion.
+ */
+export function deriveLateralityFromSectors(
+  codes: readonly string[] | undefined
+): Laterality | undefined {
+  if (codes === undefined || codes.length === 0) return undefined;
+  let hasRight = false;
+  let hasLeft = false;
+  let hasMidline = false;
+  for (const c of codes) {
+    if (c === "SV-R" || c.startsWith("R-")) hasRight = true;
+    else if (c === "SV-L" || c.startsWith("L-")) hasLeft = true;
+    else if (c.startsWith("AFMS-") || c === "Membranous-urethra") {
+      hasMidline = true;
+    }
+  }
+  if (hasMidline || (hasRight && hasLeft)) return "midline_bilateral";
+  if (hasRight) return "right";
+  if (hasLeft) return "left";
+  return undefined;
+}
+
+/**
+ * Derive craniocaudal level from PI-RADS v2.1 sector codes. Sector encoding:
+ *  `<Side>-<Level>-<Region>` for prostate body (R-/L-/AFMS- prefix), where
+ *  `<Level>` ∈ {apex, mid, base}. SV-R / SV-L / Membranous-urethra carry no
+ *  level and are treated as base-level by convention (seminal vesicles sit
+ *  at the prostate base).
+ *
+ * Returns the most superior (most caudal) level present (base > mid > apex)
+ * to drive the form field consistently for multi-level lesions. Returns
+ * `undefined` when the sector list is empty.
+ */
+export function deriveCraniocaudalLevelFromSectors(
+  codes: readonly string[] | undefined
+): CraniocaudalLevel | undefined {
+  if (codes === undefined || codes.length === 0) return undefined;
+  let hasApex = false;
+  let hasMid = false;
+  let hasBase = false;
+  for (const c of codes) {
+    if (c === "SV-R" || c === "SV-L" || c === "Membranous-urethra") {
+      hasBase = true;
+      continue;
+    }
+    const m = c.match(/-(apex|mid|base)\b/);
+    if (m) {
+      if (m[1] === "apex") hasApex = true;
+      else if (m[1] === "mid") hasMid = true;
+      else hasBase = true;
+    }
+  }
+  if (hasBase) return "base";
+  if (hasMid) return "mid_gland";
+  if (hasApex) return "apex";
+  return undefined;
+}
+
+/**
+ * PSA density = PSA (ng/mL) / prostate volume (mL), rounded to 2 decimals.
  * Returns `undefined` when either input is missing, NaN, or volume <= 0.
+ *
+ * Note: callers that emit the value into a report should wrap with
+ * `.toFixed(2)` so trailing zeros are preserved (0.20 vs 0.2).
  */
 export function derivePsaDensity(
   psaNgPerMl: number,
@@ -458,7 +659,7 @@ export function derivePsaDensity(
   ) {
     return undefined;
   }
-  return Math.round((psaNgPerMl / prostateVolumeMl) * 10) / 10;
+  return Math.round((psaNgPerMl / prostateVolumeMl) * 100) / 100;
 }
 
 /**
@@ -574,7 +775,9 @@ function clinicalContextBlock(input: ProstateStructuredInput): string[] {
     input.prostateVolumeMl
   );
   if (psaDensity !== undefined) {
-    lines.push(`- PSA density: ${psaDensity} ng/mL/cc`);
+    // Always render with 2 decimal places (e.g. 0.20, not 0.2) so the report
+    // surface reads cleanly across PSA/volume combinations.
+    lines.push(`- PSA density: ${psaDensity.toFixed(2)} ng/mL/cc`);
   }
 
   const notes = input.additionalClinicalNotes?.trim();
@@ -648,12 +851,17 @@ function lymphNodeLines(
     if (!isAbsent(node.station)) parts.push(`station ${node.station}`);
     if (!isAbsent(node.location)) parts.push(`location ${node.location}`);
     parts.push(`short axis ${node.shortAxisMm} mm`);
-    if (!isAbsent(node.morphology)) parts.push(`morphology ${node.morphology}`);
+    if (!isAbsent(node.morphology)) {
+      parts.push(`morphology ${humanizeEnum(node.morphology)}`);
+    }
     if (
       node.suspiciousFeatures !== undefined &&
       node.suspiciousFeatures.length > 0
     ) {
-      parts.push(`features: ${node.suspiciousFeatures.join(", ")}`);
+      const humanized = node.suspiciousFeatures.map((f) =>
+        String(humanizeEnum(f))
+      );
+      parts.push(`features: ${humanized.join(", ")}`);
     }
     lines.push(`  - Node ${idx + 1}: ${parts.join("; ")}`);
   });
@@ -692,10 +900,27 @@ function wholeGlandStagingBlock(input: ProstateStructuredInput): string[] {
     input.pelvicSidewallInvolvement
   );
 
-  lines.push(...lymphNodeLines("Regional lymph nodes", input.regionalLymphNodes));
-  lines.push(
-    ...lymphNodeLines("Non-regional lymph nodes", input.nonRegionalLymphNodes)
-  );
+  // Lymph node emit. When neither regional nor non-regional nodes were entered,
+  // emit an explicit negative line so the LLM cannot fabricate "indeterminate"
+  // wording. This pairs with deriveClinicalN's default-N0 behaviour: empty
+  // arrays are treated as a deliberate negative assessment, not unknown.
+  const regionalLn = input.regionalLymphNodes ?? [];
+  const nonRegionalLn = input.nonRegionalLymphNodes ?? [];
+  if (regionalLn.length === 0 && nonRegionalLn.length === 0) {
+    lines.push(
+      "- Lymph nodes: no suspicious regional or non-regional lymph nodes (clinical N0)"
+    );
+  } else {
+    lines.push(
+      ...lymphNodeLines("Regional lymph nodes", input.regionalLymphNodes)
+    );
+    lines.push(
+      ...lymphNodeLines(
+        "Non-regional lymph nodes",
+        input.nonRegionalLymphNodes
+      )
+    );
+  }
 
   pushBullet(lines, "Bone involvement", input.boneInvolvement);
   if (
@@ -727,7 +952,14 @@ function wholeGlandStagingBlock(input: ProstateStructuredInput): string[] {
   const overridden = input.isStagingOverridden === true;
   const stagingSuppressed = input.noSuspiciousLesion && !overridden;
 
-  if (!stagingSuppressed) {
+  if (stagingSuppressed) {
+    // Explicit "not applicable" marker so downstream prompts cannot silently
+    // hallucinate a default cT1c / N0 / M0 from the absence of cT lines.
+    lines.push(
+      "- AJCC TNM staging: not applicable on negative MRI (no measurable disease)"
+    );
+    lines.push("- EAU risk group: not applicable");
+  } else {
     const cT =
       overridden && input.clinicalT !== undefined
         ? input.clinicalT
@@ -748,7 +980,7 @@ function wholeGlandStagingBlock(input: ProstateStructuredInput): string[] {
     }
 
     const eau = deriveEauRiskGroup(input);
-    lines.push(`- EAU risk group: ${eau}`);
+    lines.push(`- EAU risk group: ${humanizeEnum(eau)}`);
   }
 
   // PI-QUAL
@@ -853,9 +1085,13 @@ export function createEmptyProstateInput(): ProstateStructuredInput {
     pelvicSidewallInvolvement: "none",
     boneInvolvement: "none",
     otherDistantMetastasis: "none",
-    piQualOverall: "2_acceptable",
-    piQualT2WSubscore: "3",
-    piQualDWISubscore: "3",
+    // PI-QUAL v2 (de Rooij 2024) defaults: optimal-quality scan as the
+    // baseline. Most studies in routine practice meet the 4/4 + 4/4 + DCE+
+    // criterion that maps to overall PI-QUAL 3 (optimal); the radiologist
+    // downgrades when artefacts or protocol limitations are present.
+    piQualOverall: "3_optimal",
+    piQualT2WSubscore: "4",
+    piQualDWISubscore: "4",
   };
 }
 
@@ -898,34 +1134,75 @@ export function createEmptyProstateLesion(lesionIndex: number): ProstateLesion {
 export function hasMinimumProstateFields(
   input: ProstateStructuredInput
 ): boolean {
-  if (isAbsent(input.studyDate)) return false;
-  if (isAbsent(input.clinicalIndication)) return false;
-  if (typeof input.psaNgPerMl !== "number" || input.psaNgPerMl <= 0) {
-    return false;
+  return getMissingProstateFields(input).length === 0;
+}
+
+/**
+ * Diagnostic counterpart to `hasMinimumProstateFields`. Returns a list of
+ * Korean-labelled descriptions of every required field that is currently
+ * empty/zero/missing, in the order the user encounters them in the form.
+ *
+ * Returning an empty array means the form is ready for submission (i.e.
+ * `hasMinimumProstateFields(input) === true`). The list is rendered above
+ * the Generate button so the user can see exactly what is blocking
+ * submission instead of facing a silently disabled button.
+ */
+export function getMissingProstateFields(
+  input: ProstateStructuredInput
+): string[] {
+  const missing: string[] = [];
+
+  // Section 1 — Clinical context
+  if (isAbsent(input.studyDate)) {
+    missing.push("Section 1 — 검사일 (Study date)");
   }
+  if (isAbsent(input.clinicalIndication)) {
+    missing.push("Section 1 — 임상 적응증 (Clinical indication)");
+  }
+  if (typeof input.psaNgPerMl !== "number" || input.psaNgPerMl <= 0) {
+    missing.push("Section 1 — PSA (ng/mL)");
+  }
+
+  // Section 3 — Whole-gland & PI-QUAL
   if (
     typeof input.prostateVolumeMl !== "number" ||
     input.prostateVolumeMl <= 0
   ) {
-    return false;
+    missing.push(
+      "Section 3 — 전립선 크기 W × H × AP (Volume 자동계산을 위해 세 값 모두 필요)"
+    );
   }
-  if (isAbsent(input.piQualOverall)) return false;
+  if (isAbsent(input.piQualOverall)) {
+    missing.push("Section 3 — PI-QUAL 영상 품질 (overall)");
+  }
 
+  // Section 2 — Lesions (skipped on negative MRI)
   if (input.noSuspiciousLesion) {
-    return true;
+    return missing;
   }
 
-  if (!Array.isArray(input.lesions) || input.lesions.length < 1) return false;
+  if (!Array.isArray(input.lesions) || input.lesions.length < 1) {
+    missing.push(
+      "Section 2 — 병변 1개 이상 (Add lesion 버튼을 눌러 추가하거나, 'No suspicious lesion'을 체크)"
+    );
+    return missing;
+  }
 
   const first = input.lesions[0];
-  if (isAbsent(first.t2wScore)) return false;
-  if (isAbsent(first.dwiScore)) return false;
+  if (isAbsent(first.t2wScore)) {
+    missing.push("Section 2 — Lesion 1 T2W score");
+  }
+  if (isAbsent(first.dwiScore)) {
+    missing.push("Section 2 — Lesion 1 DWI score");
+  }
   if (
     !Array.isArray(first.sectorMapLocation) ||
     first.sectorMapLocation.length < 1
   ) {
-    return false;
+    missing.push(
+      "Section 2 — Lesion 1 sector 위치 1개 이상 (PI-RADS 38-sector 맵에서 선택)"
+    );
   }
 
-  return true;
+  return missing;
 }

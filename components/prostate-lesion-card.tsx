@@ -4,26 +4,24 @@ import * as React from "react";
 import { AlertTriangle, ChevronDown, ChevronUp, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  CRANIOCAUDAL_LEVEL_OPTIONS,
   DCE_RESULT_OPTIONS,
   EPE_RISK_OPTIONS,
-  LATERALITY_OPTIONS,
   NVB_INVOLVEMENT_OPTIONS,
   PIRADS_SCORE_OPTIONS,
   PRIOR_MRI_COMPARISON_OPTIONS,
   PROSTATE_SECTOR_CODES_FULL,
   PROSTATE_SECTOR_CODES_SIMPLIFIED,
   ZONE_OPTIONS,
-  type CraniocaudalLevel,
   type DceResult,
   type EpeRisk,
-  type Laterality,
   type NvbInvolvement,
   type PiradsScore,
   type PriorMriComparison,
   type Zone,
 } from "@/lib/prompts/disease-templates/prostate-fields";
 import {
+  deriveCraniocaudalLevelFromSectors,
+  deriveLateralityFromSectors,
   derivePiradsCategory,
   type ProstateLesion,
 } from "@/lib/prompts/disease-templates/prostate-serializer";
@@ -175,18 +173,6 @@ const ZONE_LABEL: Record<Zone, string> = {
   transition_zone_TZ: "TZ · 이행대",
   central_zone_CZ: "CZ · 중심대",
   anterior_fibromuscular_stroma_AFMS: "AFMS · 전섬유근간질",
-};
-
-const CRANIOCAUDAL_LABEL: Record<CraniocaudalLevel, string> = {
-  base: "Base · 기저부",
-  mid_gland: "Mid · 중간",
-  apex: "Apex · 첨부",
-};
-
-const LATERALITY_LABEL: Record<Laterality, string> = {
-  right: "Right · 우측",
-  left: "Left · 좌측",
-  midline_bilateral: "Midline / Bilateral · 중앙/양측",
 };
 
 const DCE_LABEL: Record<DceResult, string> = {
@@ -468,43 +454,28 @@ export function ProstateLesionCard({
             />
           </FieldRow>
 
-          {/* 2. Sector map location — multi-select with disclosure */}
+          {/* 2. Sector map location — multi-select with disclosure.
+             Sector codes encode laterality + craniocaudal level + zone in a
+             single PI-RADS v2.1 token (e.g. "R-mid-PZpl"). The lesion's
+             `laterality` and `craniocaudalLevel` fields are auto-derived
+             from this list to keep the form aligned with the published
+             sector map and to avoid contradictory dual entry. */}
           <SectorPicker
             id={fieldId("sector")}
             selected={lesion.sectorMapLocation}
-            onChange={(next) =>
-              onChange({ ...lesion, sectorMapLocation: next })
-            }
+            onChange={(next) => {
+              const derivedLat = deriveLateralityFromSectors(next);
+              const derivedLvl = deriveCraniocaudalLevelFromSectors(next);
+              onChange({
+                ...lesion,
+                sectorMapLocation: next,
+                laterality: derivedLat ?? lesion.laterality,
+                craniocaudalLevel: derivedLvl ?? lesion.craniocaudalLevel,
+              });
+            }}
           />
 
-          {/* 3. Craniocaudal level */}
-          <FieldRow label="Craniocaudal level · 상하 위치">
-            <SegmentedControl<CraniocaudalLevel>
-              name={fieldId("cranio")}
-              ariaLabel="Craniocaudal level"
-              value={lesion.craniocaudalLevel}
-              options={toLabeledOptions(
-                CRANIOCAUDAL_LEVEL_OPTIONS,
-                CRANIOCAUDAL_LABEL
-              )}
-              onChange={(next) =>
-                onChange({ ...lesion, craniocaudalLevel: next })
-              }
-            />
-          </FieldRow>
-
-          {/* 4. Laterality */}
-          <FieldRow label="Laterality · 측면">
-            <SegmentedControl<Laterality>
-              name={fieldId("laterality")}
-              ariaLabel="Laterality"
-              value={lesion.laterality}
-              options={toLabeledOptions(LATERALITY_OPTIONS, LATERALITY_LABEL)}
-              onChange={(next) => onChange({ ...lesion, laterality: next })}
-            />
-          </FieldRow>
-
-          {/* 5. Size — max axial (required) */}
+          {/* 3. Size — max axial (required) */}
           <NumberField
             id={fieldId("sizeMax")}
             label="Size (max axial) · 최대축 직경"
@@ -518,7 +489,7 @@ export function ProstateLesionCard({
             step="1"
           />
 
-          {/* 6. Size — orthogonal axial (optional) */}
+          {/* 4. Size — orthogonal axial (optional) */}
           <NumberField
             id={fieldId("sizeOrtho")}
             label="Size (orthogonal axial) · 직교축 직경"
@@ -533,7 +504,7 @@ export function ProstateLesionCard({
             step="1"
           />
 
-          {/* 7. Size — craniocaudal (optional) */}
+          {/* 5. Size — craniocaudal (optional) */}
           <NumberField
             id={fieldId("sizeCC")}
             label="Size (craniocaudal) · 상하 직경"
@@ -546,7 +517,7 @@ export function ProstateLesionCard({
             step="1"
           />
 
-          {/* 8. T2W score — zone-adapted rubric hint */}
+          {/* 6. T2W score — zone-adapted rubric hint */}
           <FieldRow label={`T2W score (${rubricLabel})`} required>
             <SegmentedControl<PiradsScore>
               name={fieldId("t2w")}
@@ -557,7 +528,7 @@ export function ProstateLesionCard({
             />
           </FieldRow>
 
-          {/* 9. DWI score */}
+          {/* 7. DWI score */}
           <FieldRow label={`DWI score (${rubricLabel})`} required>
             <SegmentedControl<PiradsScore>
               name={fieldId("dwi")}
@@ -568,7 +539,7 @@ export function ProstateLesionCard({
             />
           </FieldRow>
 
-          {/* 10. DCE result + bpMRI suppression note */}
+          {/* 8. DCE result + bpMRI suppression note */}
           <FieldRow label="DCE result · 동적조영" className="md:col-span-2">
             <SegmentedControl<DceResult>
               name={fieldId("dce")}
@@ -587,7 +558,7 @@ export function ProstateLesionCard({
             </p>
           </FieldRow>
 
-          {/* 11. Overall PI-RADS — auto-derived (locked) with override toggle.
+          {/* 9. Overall PI-RADS — auto-derived (locked) with override toggle.
               Spans both columns so the override row + justification text fit
               comfortably on desktop. */}
           <fieldset className="md:col-span-2 rounded-lg border border-border p-3 flex flex-col gap-3">
@@ -655,7 +626,7 @@ export function ProstateLesionCard({
             )}
           </fieldset>
 
-          {/* 12. ADC mean value (optional) */}
+          {/* 10. ADC mean value (optional) */}
           <NumberField
             id={fieldId("adc")}
             label="ADC mean value · ADC 평균값"
@@ -667,7 +638,7 @@ export function ProstateLesionCard({
             step="1"
           />
 
-          {/* 13. Biopsy target — checkbox */}
+          {/* 11. Biopsy target — checkbox */}
           <fieldset className="rounded-lg border border-border p-3 flex flex-col gap-2">
             <legend
               id={`${fieldId("biopsy")}-legend`}
@@ -715,7 +686,7 @@ export function ProstateLesionCard({
             </div>
           )}
 
-          {/* 14. EPE risk (Mehralivand) — RadioCardGroup with semantic tones */}
+          {/* 12. EPE risk (Mehralivand) — RadioCardGroup with semantic tones */}
           <FieldRow
             label="EPE risk (Mehralivand) · 피막외 침범 위험"
             className="md:col-span-2"
@@ -732,7 +703,7 @@ export function ProstateLesionCard({
             />
           </FieldRow>
 
-          {/* 15. Neurovascular bundle involvement (optional) */}
+          {/* 13. Neurovascular bundle involvement (optional) */}
           <FieldRow
             label="Neurovascular bundle · 신경혈관다발"
             optional
@@ -752,7 +723,7 @@ export function ProstateLesionCard({
             />
           </FieldRow>
 
-          {/* 16. Prior MRI comparison — conditional on parentPriorMRIDate (E-1) */}
+          {/* 14. Prior MRI comparison — conditional on parentPriorMRIDate (E-1) */}
           {parentPriorMRIDate && (
             <FieldRow
               label="Prior MRI comparison · 이전 MRI 비교"

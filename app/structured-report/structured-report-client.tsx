@@ -15,13 +15,18 @@ import { ModelSelector } from "@/components/model-selector";
 import { DiseaseCategoryIndicator } from "@/components/disease-category-indicator";
 import { ReferencesDialog } from "@/components/references-dialog";
 import { StructuredReportOutput } from "@/components/structured-report-output";
-import { getDiseaseCategoryMetadata } from "@/lib/prompts/disease-registry";
 import {
+  DISEASE_REGISTRY,
+  getDiseaseCategoryMetadata,
+} from "@/lib/prompts/disease-registry";
+import {
+  getMissingRccFields,
   hasMinimumStructuredFields,
   serializeRccStructuredInput,
 } from "@/lib/prompts/disease-templates/rcc-serializer";
 import type { RccStructuredInput } from "@/lib/prompts/disease-templates/rcc-serializer";
 import {
+  getMissingProstateFields,
   hasMinimumProstateFields,
   serializeProstateStructuredInput,
 } from "@/lib/prompts/disease-templates/prostate-serializer";
@@ -121,6 +126,21 @@ function hasMinimumFormFields(state: StructuredFormState): boolean {
       return hasMinimumStructuredFields(state.input);
     case "ProstateCancer":
       return hasMinimumProstateFields(state.input);
+  }
+}
+
+/**
+ * Disease-aware dispatcher returning the list of currently-missing required
+ * fields, with user-facing Korean labels. Empty list means the form is ready
+ * for submission. Used by the UI to render an inline checklist above the
+ * Generate button when it would otherwise be silently disabled.
+ */
+function getMissingFormFields(state: StructuredFormState): string[] {
+  switch (state.kind) {
+    case "RCC":
+      return getMissingRccFields(state.input);
+    case "ProstateCancer":
+      return getMissingProstateFields(state.input);
   }
 }
 
@@ -393,7 +413,11 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
             <DiseaseCategoryIndicator
               category={disease}
               variant="hero"
-              index={1}
+              index={
+                (Object.keys(DISEASE_REGISTRY) as DiseaseCategory[]).indexOf(
+                  disease
+                ) + 1
+              }
             />
             <ReferencesDialog
               size="lg"
@@ -497,15 +521,40 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
                   Cancel generation
                 </Button>
               ) : (
-                <Button
-                  onClick={handleGenerate}
-                  disabled={!hasMinimumFormFields(formState)}
-                  className="w-full bg-gradient-to-r from-primary to-primary/90 shadow-md shadow-primary/20 transition-all hover:shadow-lg hover:shadow-primary/30 disabled:from-muted disabled:to-muted disabled:shadow-none"
-                  size="lg"
-                >
-                  <Send className="mr-2 h-4 w-4" />
-                  Generate structured report
-                </Button>
+                <>
+                  {(() => {
+                    const missing = getMissingFormFields(formState);
+                    if (missing.length === 0) return null;
+                    return (
+                      <div
+                        role="status"
+                        aria-live="polite"
+                        className="rounded-md border border-amber-300/60 bg-amber-50/80 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-700/50 dark:bg-amber-950/40 dark:text-amber-200"
+                      >
+                        <p className="font-medium">
+                          필수 입력란이 비어 있습니다
+                          <span className="ml-1 font-normal text-amber-800/80 dark:text-amber-200/80">
+                            ({missing.length}개 항목 누락)
+                          </span>
+                        </p>
+                        <ul className="mt-1.5 ml-4 list-disc space-y-0.5 text-xs leading-relaxed">
+                          {missing.map((label) => (
+                            <li key={label}>{label}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    );
+                  })()}
+                  <Button
+                    onClick={handleGenerate}
+                    disabled={!hasMinimumFormFields(formState)}
+                    className="w-full bg-gradient-to-r from-primary to-primary/90 shadow-md shadow-primary/20 transition-all hover:shadow-lg hover:shadow-primary/30 disabled:from-muted disabled:to-muted disabled:shadow-none"
+                    size="lg"
+                  >
+                    <Send className="mr-2 h-4 w-4" />
+                    Generate structured report
+                  </Button>
+                </>
               )}
             </CardContent>
           </Card>
