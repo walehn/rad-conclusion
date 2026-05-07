@@ -7,6 +7,7 @@ import type { ConclusionStyle, ConclusionLang, PromptVersion } from "@/lib/promp
 import { requireApiSession } from "@/lib/auth/guard";
 import { validateCsrfOrFail } from "@/lib/auth/csrf";
 import { resolveApiKey } from "@/lib/api-keys/resolve";
+import { perfLog } from "@/lib/perf-log";
 
 const requestSchema = z.object({
   findings: z.string().min(1, "Findings text is required"),
@@ -23,6 +24,10 @@ const requestSchema = z.object({
 });
 
 export async function POST(req: Request) {
+  // Perf instrumentation: capture entry time before any auth work so the
+  // (auth + csrf + parse) overhead can be subtracted from the LLM-only window.
+  const tReq = performance.now();
+
   const { session, response } = await requireApiSession();
   if (response) return response;
 
@@ -68,6 +73,23 @@ export async function POST(req: Request) {
 
     const reasoningEffort = promptVersion === "v2" ? "medium" : "low";
 
+    // Perf instrumentation: t at LLM-call boundary so TTFT excludes auth/parse.
+    // promptVersion is included so concurrent v1+v2 (compareMode) requests can
+    // be grouped in `jq` post-processing.
+    const tLLMStart = performance.now();
+    const modelId =
+      process.env.RAD_LOCAL_MODEL ?? model ?? "default";
+    const baseTags = {
+      route: "/api/generate",
+      provider,
+      modelId,
+      promptVersion,
+      style,
+      lang,
+      title,
+    } as const;
+    let firstTokenLogged = false;
+
     const result = streamText({
       model: llmModel,
       system: systemPrompt,
@@ -76,6 +98,42 @@ export async function POST(req: Request) {
       topP: 0.9,
       providerOptions: {
         openai: { reasoningEffort },
+      },
+      onChunk: ({ chunk }) => {
+        if (firstTokenLogged) return;
+        if (chunk.type !== "text-delta") return;
+        firstTokenLogged = true;
+        try {
+          perfLog({
+            perf: "gen",
+            stage: "ttft",
+            ...baseTags,
+            ms: Math.round(performance.now() - tLLMStart),
+            preLLMMs: Math.round(tLLMStart - tReq),
+          });
+        } catch {
+          /* observability must never break the stream */
+        }
+      },
+      onFinish: ({ usage, finishReason }) => {
+        try {
+          const totalMs = performance.now() - tLLMStart;
+          const completion = usage?.completionTokens ?? 0;
+          const tps =
+            totalMs > 0 ? (completion / (totalMs / 1000)) : 0;
+          perfLog({
+            perf: "gen",
+            stage: "finish",
+            ...baseTags,
+            totalMs: Math.round(totalMs),
+            promptTokens: usage?.promptTokens ?? null,
+            completionTokens: completion,
+            tps: Number(tps.toFixed(1)),
+            finishReason,
+          });
+        } catch {
+          /* swallow to keep parity with onChunk */
+        }
       },
       onError: ({ error }) => {
         console.error("[generate] streamText error:", error);

@@ -28,6 +28,7 @@ import {
 import { requireApiSession } from "@/lib/auth/guard";
 import { validateCsrfOrFail } from "@/lib/auth/csrf";
 import { resolveApiKey } from "@/lib/api-keys/resolve";
+import { perfLog } from "@/lib/perf-log";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -56,6 +57,10 @@ const requestSchema = z.object({
 });
 
 export async function POST(req: Request) {
+  // Perf instrumentation: capture entry time before any auth work so the
+  // (auth + csrf + parse) overhead can be subtracted from the LLM-only window.
+  const tReq = performance.now();
+
   const { session, response } = await requireApiSession();
   if (response) return response;
 
@@ -102,13 +107,65 @@ export async function POST(req: Request) {
       findings,
     });
 
+    // Perf instrumentation: t at LLM-call boundary so TTFT excludes auth/parse.
+    // disease (RCC/ProstateCancer) lets us group by disease in `jq` analysis.
+    const tLLMStart = performance.now();
+    const modelId = process.env.RAD_LOCAL_MODEL ?? model;
+    const maxTokensConfig = 2048;
+    const baseTags = {
+      route: "/api/structured-report/generate",
+      provider,
+      modelId,
+      disease: diseaseCategory,
+      modality: modality ?? "Auto",
+      lang,
+      maxTokensConfig,
+    } as const;
+    let firstTokenLogged = false;
+
     const result = streamText({
       model: llmModel,
       system: systemPrompt,
       prompt: userPrompt,
       temperature: 0.3,
       topP: 0.9,
-      maxTokens: 2048,
+      maxTokens: maxTokensConfig,
+      onChunk: ({ chunk }) => {
+        if (firstTokenLogged) return;
+        if (chunk.type !== "text-delta") return;
+        firstTokenLogged = true;
+        try {
+          perfLog({
+            perf: "gen",
+            stage: "ttft",
+            ...baseTags,
+            ms: Math.round(performance.now() - tLLMStart),
+            preLLMMs: Math.round(tLLMStart - tReq),
+          });
+        } catch {
+          /* observability must never break the stream */
+        }
+      },
+      onFinish: ({ usage, finishReason }) => {
+        try {
+          const totalMs = performance.now() - tLLMStart;
+          const completion = usage?.completionTokens ?? 0;
+          const tps =
+            totalMs > 0 ? (completion / (totalMs / 1000)) : 0;
+          perfLog({
+            perf: "gen",
+            stage: "finish",
+            ...baseTags,
+            totalMs: Math.round(totalMs),
+            promptTokens: usage?.promptTokens ?? null,
+            completionTokens: completion,
+            tps: Number(tps.toFixed(1)),
+            finishReason,
+          });
+        } catch {
+          /* swallow to keep parity with onChunk */
+        }
+      },
       onError: ({ error }) => {
         console.error(
           "[structured-report/generate] streamText error:",

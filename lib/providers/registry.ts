@@ -3,6 +3,22 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import type { ProviderName, ProviderInfo } from "./types";
 import { LOCAL_PROVIDER_DEFAULTS } from "./local-config";
+import { perfLog } from "@/lib/perf-log";
+
+// Best-effort URL extraction so the perf log shows path (and origin when easy)
+// without leaking auth tokens that may live in query strings.
+function describeFetchUrl(input: RequestInfo | URL): string {
+  try {
+    if (typeof input === "string") return input;
+    if (input instanceof URL) return input.toString();
+    if (typeof Request !== "undefined" && input instanceof Request) {
+      return input.url;
+    }
+  } catch {
+    /* fall through */
+  }
+  return "<unknown>";
+}
 
 // vLLM (Qwen) emits empty content when its <think> channel exhausts max_tokens.
 // We force-disable thinking via the OpenAI-compat `chat_template_kwargs` field,
@@ -17,7 +33,22 @@ const localFetch: typeof fetch = async (input, init) => {
       /* leave body untouched if not JSON */
     }
   }
-  return fetch(input as RequestInfo, init);
+  // Perf instrumentation: time-to-headers from upstream (vLLM/Ollama). This is
+  // the prefill+queue contribution as seen from Next.js, NOT the total stream
+  // duration — the stream body is still read by the AI SDK consumer.
+  const t0 = performance.now();
+  const res = await fetch(input as RequestInfo, init);
+  try {
+    perfLog({
+      perf: "localFetch",
+      upstreamHeadersMs: Math.round(performance.now() - t0),
+      status: res.status,
+      url: describeFetchUrl(input as RequestInfo | URL),
+    });
+  } catch {
+    /* observability must never break the request path */
+  }
+  return res;
 };
 
 export function getModel(
