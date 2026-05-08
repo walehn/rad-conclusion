@@ -4,7 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Stethoscope, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { notionTokens, C } from "@/components/notion-tone";
 
 interface LoginFormProps {
   csrfToken: string;
@@ -74,31 +74,60 @@ export function LoginForm({ csrfToken, nextPath }: LoginFormProps): React.ReactE
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/30">
-      <div className="h-1 bg-gradient-to-r from-primary via-primary/80 to-primary/60" />
-      <div className="mx-auto flex min-h-[calc(100vh-0.25rem)] max-w-md flex-col justify-center px-4 py-10 sm:px-6">
+    <div
+      className="min-h-screen"
+      style={{ ...notionTokens, background: C.canvas }}
+    >
+      <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-10 sm:px-6">
         <div className="mb-8 flex flex-col items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20">
-            <Stethoscope className="h-7 w-7 text-primary" />
+          <div
+            className="grid h-12 w-12 place-items-center rounded-xl"
+            style={{
+              background: C.accentBg,
+              color: C.primary,
+              border: `1px solid ${C.hairlineSoft}`,
+            }}
+          >
+            <Stethoscope className="h-7 w-7" />
           </div>
           <div className="text-center">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            <h1
+              className="text-[28px] font-semibold"
+              style={{ color: C.ink, letterSpacing: "-0.4px" }}
+            >
               Rad Conclusion
             </h1>
-            <p className="text-sm text-muted-foreground">
+            <p
+              className="mt-1 text-[14px]"
+              style={{ color: C.slate }}
+            >
               계정으로 로그인하여 계속 진행하세요
             </p>
           </div>
         </div>
 
-        <Card className="shadow-sm ring-1 ring-border/50">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-lg font-semibold text-foreground">
+        <div
+          className="rounded-xl border p-6"
+          style={{
+            background: C.card,
+            borderColor: C.hairline,
+          }}
+        >
+          <div className="mb-4">
+            <div
+              className="text-[11px] font-medium uppercase"
+              style={{ color: C.steel, letterSpacing: "0.08em" }}
+            >
+              Sign in
+            </div>
+            <div
+              className="mt-0.5 text-[17px] font-semibold"
+              style={{ color: C.ink, letterSpacing: "-0.2px" }}
+            >
               로그인
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
+            </div>
+          </div>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
               {/* Hidden CSRF field for defensive progressive enhancement. */}
               <input type="hidden" name="csrf_token" value={csrfToken} />
 
@@ -112,19 +141,19 @@ export function LoginForm({ csrfToken, nextPath }: LoginFormProps): React.ReactE
                   htmlFor="email"
                   className="text-sm font-medium text-foreground"
                 >
-                  이메일
+                  아이디
                 </label>
                 <input
                   id="email"
                   name="email"
-                  type="email"
-                  autoComplete="email"
+                  type="text"
+                  autoComplete="username"
                   required
                   disabled={loading}
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  placeholder="you@example.com"
+                  placeholder="cmcabdomen 또는 you@example.com"
                 />
               </div>
 
@@ -160,8 +189,13 @@ export function LoginForm({ csrfToken, nextPath }: LoginFormProps): React.ReactE
               <Button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-gradient-to-r from-primary to-primary/90 shadow-md shadow-primary/20 transition-all hover:shadow-lg hover:shadow-primary/30 disabled:from-muted disabled:to-muted disabled:shadow-none"
+                className="w-full font-medium"
                 size="lg"
+                style={{
+                  background: C.primary,
+                  color: "#ffffff",
+                  borderRadius: 9999,
+                }}
               >
                 {loading ? (
                   "로그인 중..."
@@ -173,10 +207,12 @@ export function LoginForm({ csrfToken, nextPath }: LoginFormProps): React.ReactE
                 )}
               </Button>
             </form>
-          </CardContent>
-        </Card>
+          </div>
 
-        <p className="mt-6 text-center text-xs text-muted-foreground">
+        <p
+          className="mt-6 text-center text-[12px]"
+          style={{ color: C.steel }}
+        >
           계정 문의는 관리자에게 연락해 주세요.
         </p>
       </div>
