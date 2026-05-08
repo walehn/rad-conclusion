@@ -8,18 +8,25 @@ import {
   ChevronRight,
   FileText,
   Plus,
-  Sparkles,
   Hash,
   Clock,
   ArrowRight,
   PanelLeftClose,
   PanelLeftOpen,
   Settings,
-  Smile,
   ClipboardList,
   Stethoscope,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  notionTokens,
+  C,
+  SidebarSection,
+  SidebarItem,
+  PropRow,
+  EmojiPickerTrigger,
+  REPORT_EMOJI,
+} from "@/components/notion-tone";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { DiseaseCategoryIndicator } from "@/components/disease-category-indicator";
 import type { DiseaseCategory } from "@/lib/prompts/disease-registry";
@@ -49,45 +56,6 @@ interface Props {
  */
 export function StructuredReportSelectorClient({ entries }: Props) {
   const router = useRouter();
-
-  // Notion token override scoped to this page.
-  const notionTokens = {
-    "--color-background": "#fafaf9",
-    "--color-foreground": "#37352f",
-    "--color-muted": "#f0eeec",
-    "--color-muted-foreground": "#787671",
-    "--color-border": "#e5e3df",
-    "--color-input": "#e5e3df",
-    "--color-ring": "#5645d4",
-    "--color-primary": "#5645d4",
-    "--color-primary-foreground": "#ffffff",
-    "--color-secondary": "#f6f5f4",
-    "--color-secondary-foreground": "#37352f",
-    "--color-card": "#ffffff",
-    "--color-card-foreground": "#37352f",
-    "--color-popover": "#ffffff",
-    "--color-popover-foreground": "#37352f",
-    "--color-accent": "#f0eeec",
-    "--color-accent-foreground": "#37352f",
-  } as React.CSSProperties;
-
-  const C = {
-    canvas: "#fafaf9",
-    surface: "#f6f5f4",
-    surfaceSoft: "#fbfaf8",
-    card: "#ffffff",
-    hairline: "#e5e3df",
-    hairlineSoft: "#ede9e4",
-    ink: "#1a1a1a",
-    charcoal: "#37352f",
-    slate: "#5d5b54",
-    steel: "#787671",
-    stone: "#a4a097",
-    primary: "#5645d4",
-    accentBg: "#e6e0f5",
-    accentText: "#5645d4",
-    cardLavender: "#f5f2fa",
-  };
 
   // ── UX state (sidebar collapse, page emoji) ────────────────
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
@@ -304,7 +272,11 @@ export function StructuredReportSelectorClient({ entries }: Props) {
                 setPageEmoji(null);
                 setEmojiPickerOpen(false);
               }}
-              C={C}
+              fallback={
+                <ClipboardList className="h-7 w-7" style={{ color: C.charcoal }} />
+              }
+              emojis={REPORT_EMOJI}
+              popoverLabel="Report icons"
             />
 
             <h1
@@ -484,265 +456,3 @@ export function StructuredReportSelectorClient({ entries }: Props) {
   );
 }
 
-/* ─── Notion-tone helpers (inlined for now; extract later) ───── */
-
-function SidebarSection({
-  title,
-  children,
-  mt,
-  action,
-}: {
-  title: string;
-  children: React.ReactNode;
-  mt?: number;
-  action?: React.ReactNode;
-}) {
-  return (
-    <div style={{ marginTop: mt ?? 12 }}>
-      <div
-        className="flex items-center justify-between px-2 pb-1 text-[11px] font-medium"
-        style={{ color: "#787671", letterSpacing: "0.04em" }}
-      >
-        <span>{title}</span>
-        {action && (
-          <span
-            className="rounded p-1"
-            style={{ color: "#787671" }}
-            aria-hidden
-          >
-            {action}
-          </span>
-        )}
-      </div>
-      <div className="flex flex-col">{children}</div>
-    </div>
-  );
-}
-
-function SidebarItem({
-  children,
-  icon,
-  active,
-  onClick,
-}: {
-  children: React.ReactNode;
-  icon?: React.ReactNode;
-  active?: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex items-center gap-2 rounded-md px-2 py-1 text-left text-[13px] transition-colors"
-      style={{
-        background: active ? "#ece8f7" : "transparent",
-        color: active ? "#37352f" : "#5d5b54",
-        fontWeight: active ? 500 : 400,
-      }}
-    >
-      <span style={{ color: active ? "#5645d4" : "#a4a097" }}>{icon}</span>
-      <span className="truncate">{children}</span>
-    </button>
-  );
-}
-
-function PropRow({
-  label,
-  value,
-  pillBg,
-  pillColor,
-  muted,
-}: {
-  label: string;
-  value: string;
-  pillBg?: string;
-  pillColor?: string;
-  muted?: boolean;
-}) {
-  return (
-    <>
-      <dt
-        className="flex items-center gap-1.5 py-1.5 text-[13px]"
-        style={{ color: "#787671" }}
-      >
-        {label}
-      </dt>
-      <dd className="flex items-center py-1.5">
-        {pillBg ? (
-          <span
-            className="inline-flex items-center rounded px-2 py-0.5 text-[12px]"
-            style={{
-              background: pillBg,
-              color: pillColor ?? "#37352f",
-              fontWeight: 500,
-            }}
-          >
-            {value}
-          </span>
-        ) : (
-          <span
-            className="text-[13px]"
-            style={{ color: muted ? "#787671" : "#37352f" }}
-          >
-            {value}
-          </span>
-        )}
-      </dd>
-    </>
-  );
-}
-
-const REPORT_EMOJI = [
-  "📋",
-  "📊",
-  "📝",
-  "🩺",
-  "🩻",
-  "🧠",
-  "🫀",
-  "🫁",
-  "🦴",
-  "🩸",
-  "🔬",
-  "🧪",
-  "📁",
-  "📄",
-  "🗂️",
-  "✅",
-  "⚕️",
-  "🔍",
-];
-
-function EmojiPickerTrigger({
-  emoji,
-  open,
-  onOpenChange,
-  onSelect,
-  onClear,
-  C,
-}: {
-  emoji: string | null;
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  onSelect: (emoji: string) => void;
-  onClear: () => void;
-  C: {
-    surface: string;
-    hairlineSoft: string;
-    charcoal: string;
-    steel: string;
-    hairline: string;
-  };
-}) {
-  const wrapperRef = React.useRef<HTMLDivElement>(null);
-
-  React.useEffect(() => {
-    if (!open) return;
-    function onDocClick(e: MouseEvent) {
-      if (
-        wrapperRef.current &&
-        !wrapperRef.current.contains(e.target as Node)
-      ) {
-        onOpenChange(false);
-      }
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onOpenChange(false);
-    }
-    document.addEventListener("mousedown", onDocClick);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDocClick);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open, onOpenChange]);
-
-  return (
-    <div ref={wrapperRef} className="relative mt-6 inline-block">
-      <button
-        type="button"
-        onClick={() => onOpenChange(!open)}
-        aria-label="Change page icon"
-        title="Click to change icon"
-        className="group relative inline-flex items-center justify-center rounded-md transition-all hover:bg-[#f0eeec] hover:ring-2 hover:ring-offset-1"
-        style={{
-          width: 56,
-          height: 56,
-          background: emoji ? "transparent" : C.surface,
-          border: emoji
-            ? "1px solid transparent"
-            : `1px solid ${C.hairlineSoft}`,
-          fontSize: 36,
-          lineHeight: 1,
-          ["--tw-ring-color" as string]: "#d6d9fc",
-        }}
-      >
-        {emoji ? (
-          <span aria-hidden>{emoji}</span>
-        ) : (
-          <ClipboardList className="h-7 w-7" style={{ color: C.charcoal }} />
-        )}
-        <span
-          aria-hidden
-          className="pointer-events-none absolute -bottom-1 -right-1 grid h-5 w-5 place-items-center rounded-full bg-white opacity-0 shadow-sm transition-opacity group-hover:opacity-100"
-          style={{ color: "#5645d4", border: `1px solid ${C.hairline}` }}
-        >
-          <Smile className="h-3 w-3" />
-        </span>
-      </button>
-
-      {open && (
-        <div
-          role="dialog"
-          aria-label="Choose page icon"
-          className="absolute z-20 mt-2 w-[280px] rounded-lg border p-3 shadow-lg"
-          style={{
-            top: "100%",
-            left: 0,
-            background: "#ffffff",
-            borderColor: C.hairline,
-            boxShadow:
-              "0 14px 28px -10px rgba(15,15,15,0.18), 0 2px 6px rgba(15,15,15,0.06)",
-          }}
-        >
-          <div className="flex items-center justify-between pb-2">
-            <span
-              className="text-[11px] font-medium uppercase"
-              style={{ color: C.steel, letterSpacing: "0.08em" }}
-            >
-              Report icons
-            </span>
-            <button
-              type="button"
-              onClick={onClear}
-              className="text-[12px] underline-offset-2 hover:underline"
-              style={{ color: C.steel }}
-            >
-              Remove
-            </button>
-          </div>
-          <div className="grid grid-cols-6 gap-1">
-            {REPORT_EMOJI.map((e) => (
-              <button
-                key={e}
-                type="button"
-                onClick={() => onSelect(e)}
-                aria-label={`Choose ${e}`}
-                className="grid h-9 w-9 place-items-center rounded text-[20px] transition-colors hover:bg-[#f0eeec]"
-              >
-                {e}
-              </button>
-            ))}
-          </div>
-          <div
-            className="mt-2 border-t pt-2 text-[11px]"
-            style={{ borderColor: C.hairlineSoft, color: C.steel }}
-          >
-            Click any icon to apply. Saved per browser.
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}

@@ -18,9 +18,20 @@ import {
   ArrowRight,
   PanelLeftClose,
   PanelLeftOpen,
-  Smile,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  notionTokens,
+  C,
+  SidebarSection,
+  SidebarItem,
+  Block,
+  CalloutBlock,
+  OutputBlock,
+  PropRow,
+  EmojiPickerTrigger,
+  MEDICAL_EMOJI,
+} from "@/components/notion-tone";
 import { FindingsInput } from "@/components/findings-input";
 import { OptionsPanel } from "@/components/options-panel";
 import { ModelSelector } from "@/components/model-selector";
@@ -330,54 +341,12 @@ export function ConclusionClient() {
     ? chatV1.isLoading || chatV2.isLoading
     : isLoading;
 
-  // Notion-toned token override scoped to this page. Restrained for clinical
-  // use: warm off-white canvas, charcoal ink, single muted-purple accent,
-  // hairline borders instead of shadows. No emoji dots or pastel cards.
-  const notionTokens = {
-    "--color-background": "#fafaf9",
-    "--color-foreground": "#37352f",
-    "--color-muted": "#f0eeec",
-    "--color-muted-foreground": "#787671",
-    "--color-border": "#e5e3df",
-    "--color-input": "#e5e3df",
-    "--color-ring": "#5645d4",
-    "--color-primary": "#5645d4",
-    "--color-primary-foreground": "#ffffff",
-    "--color-secondary": "#f6f5f4",
-    "--color-secondary-foreground": "#37352f",
-    "--color-card": "#ffffff",
-    "--color-card-foreground": "#37352f",
-    "--color-popover": "#ffffff",
-    "--color-popover-foreground": "#37352f",
-    "--color-accent": "#f0eeec",
-    "--color-accent-foreground": "#37352f",
-  } as React.CSSProperties;
-
+  // Local style helpers for this page only (palette comes from notion-tone).
   const headingStyle: React.CSSProperties = {
-    color: "#1a1a1a",
+    color: C.ink,
     letterSpacing: "-0.4px",
   };
-  const subtleStyle: React.CSSProperties = { color: "#5d5b54" };
-
-  // Notion-style colors used inline for the workspace shell.
-  const C = {
-    canvas: "#fafaf9",
-    surface: "#f6f5f4",
-    surfaceSoft: "#fbfaf8",
-    card: "#ffffff",
-    hairline: "#e5e3df",
-    hairlineSoft: "#ede9e4",
-    ink: "#1a1a1a",
-    charcoal: "#37352f",
-    slate: "#5d5b54",
-    steel: "#787671",
-    stone: "#a4a097",
-    primary: "#5645d4",
-    primaryDeep: "#4534b3",
-    accentBg: "#e6e0f5",
-    accentText: "#5645d4",
-    cardLavender: "#f5f2fa",
-  };
+  const subtleStyle: React.CSSProperties = { color: C.slate };
 
   const charsCount = findings.trim().length;
   const standardLabel =
@@ -571,7 +540,11 @@ export function ConclusionClient() {
                 setPageEmoji(null);
                 setEmojiPickerOpen(false);
               }}
-              C={C}
+              fallback={
+                <Stethoscope className="h-7 w-7" style={{ color: C.charcoal }} />
+              }
+              emojis={MEDICAL_EMOJI}
+              popoverLabel="Medical icons"
             />
 
             {/* Page title */}
@@ -599,7 +572,7 @@ export function ConclusionClient() {
               className="mt-6 grid grid-cols-1 gap-y-1.5 text-[13px] sm:grid-cols-[120px_1fr]"
               style={{ color: C.charcoal }}
             >
-              <PropRow label="Modality" value="MRI / CT / Mammography" iconColor={C.stone} />
+              <PropRow label="Modality" value="MRI / CT / Mammography" />
               <PropRow
                 label="Standard"
                 value={standardLabel}
@@ -740,7 +713,6 @@ export function ConclusionClient() {
                         bg: C.surface,
                         color: C.slate,
                       }}
-                      C={C}
                     >
                       <ConclusionOutput
                         content={processedV1}
@@ -758,7 +730,6 @@ export function ConclusionClient() {
                         bg: C.accentBg,
                         color: C.primary,
                       }}
-                      C={C}
                       highlight
                     >
                       <ConclusionOutput
@@ -845,7 +816,7 @@ export function ConclusionClient() {
                       )}
                   </div>
                 ) : (
-                  <OutputBlock label="Output" title="Conclusion" C={C}>
+                  <OutputBlock label="Output" title="Conclusion">
                     <ConclusionOutput
                       content={processedContent}
                       isLoading={isLoading}
@@ -887,409 +858,3 @@ export function ConclusionClient() {
   );
 }
 
-/* ─── Notion-style helper components ───────────────────────────── */
-
-function SidebarSection({
-  title,
-  children,
-  mt,
-  action,
-}: {
-  title: string;
-  children: React.ReactNode;
-  mt?: number;
-  action?: React.ReactNode;
-}) {
-  return (
-    <div style={{ marginTop: mt ?? 12 }}>
-      <div
-        className="flex items-center justify-between px-2 pb-1 text-[11px] font-medium"
-        style={{ color: "#787671", letterSpacing: "0.04em" }}
-      >
-        <span>{title}</span>
-        {action}
-      </div>
-      <div className="flex flex-col">{children}</div>
-    </div>
-  );
-}
-
-function SidebarItem({
-  children,
-  icon,
-  active,
-}: {
-  children: React.ReactNode;
-  icon?: React.ReactNode;
-  active?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      className="flex items-center gap-2 rounded-md px-2 py-1 text-left text-[13px] transition-colors"
-      style={{
-        background: active ? "#ece8f7" : "transparent",
-        color: active ? "#37352f" : "#5d5b54",
-        fontWeight: active ? 500 : 400,
-      }}
-    >
-      <span style={{ color: active ? "#5645d4" : "#a4a097" }}>{icon}</span>
-      <span className="truncate">{children}</span>
-    </button>
-  );
-}
-
-function PropRow({
-  label,
-  value,
-  pillBg,
-  pillColor,
-  muted,
-  iconColor: _iconColor,
-}: {
-  label: string;
-  value: string;
-  pillBg?: string;
-  pillColor?: string;
-  muted?: boolean;
-  iconColor?: string;
-}) {
-  return (
-    <>
-      <dt
-        className="flex items-center gap-1.5 py-1.5 text-[13px]"
-        style={{ color: "#787671" }}
-      >
-        {label}
-      </dt>
-      <dd className="flex items-center py-1.5">
-        {pillBg ? (
-          <span
-            className="inline-flex items-center rounded px-2 py-0.5 text-[12px]"
-            style={{
-              background: pillBg,
-              color: pillColor ?? "#37352f",
-              fontWeight: 500,
-            }}
-          >
-            {value}
-          </span>
-        ) : (
-          <span
-            className="text-[13px]"
-            style={{
-              color: muted ? "#787671" : "#37352f",
-            }}
-          >
-            {value}
-          </span>
-        )}
-      </dd>
-    </>
-  );
-}
-
-function Block({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="mt-7">
-      <div className="flex items-baseline justify-between">
-        <h2
-          className="text-[15px] font-semibold"
-          style={{ color: "#1a1a1a", letterSpacing: "-0.1px" }}
-        >
-          {label}
-        </h2>
-        {hint && (
-          <span className="text-[12px]" style={{ color: "#787671" }}>
-            {hint}
-          </span>
-        )}
-      </div>
-      <div
-        className="mt-2 rounded-lg border p-4"
-        style={{ borderColor: "#e5e3df", background: "#ffffff" }}
-      >
-        {children}
-      </div>
-    </section>
-  );
-}
-
-function OutputBlock({
-  label,
-  title,
-  pill,
-  children,
-  C,
-  highlight,
-}: {
-  label: string;
-  title: string;
-  pill?: { text: string; bg: string; color: string };
-  children: React.ReactNode;
-  C: { hairline: string; charcoal: string; ink: string; steel: string; accentBg: string };
-  highlight?: boolean;
-}) {
-  return (
-    <section>
-      <div className="flex items-center justify-between">
-        <div>
-          <div
-            className="text-[11px] font-medium uppercase"
-            style={{ color: C.steel, letterSpacing: "0.08em" }}
-          >
-            {label}
-          </div>
-          <h3
-            className="mt-0.5 text-[20px] font-semibold"
-            style={{ color: C.ink, letterSpacing: "-0.2px" }}
-          >
-            {title}
-          </h3>
-        </div>
-        {pill && (
-          <span
-            className="rounded-full px-2.5 py-1 text-[11px] font-medium"
-            style={{ background: pill.bg, color: pill.color }}
-          >
-            {pill.text}
-          </span>
-        )}
-      </div>
-      <div
-        className="mt-3 rounded-lg border p-4"
-        style={{
-          background: "#ffffff",
-          borderColor: highlight ? C.accentBg : C.hairline,
-        }}
-      >
-        {children}
-      </div>
-    </section>
-  );
-}
-
-/* ─── Notion-style callout block ───────────────────────────────
-   A single block of content with a coloured left bar and tinted
-   background, used to draw the eye toward the most important
-   input on the page. */
-function CalloutBlock({
-  label,
-  hint,
-  note,
-  children,
-  barColor,
-  tint,
-  borderColor,
-}: {
-  label: string;
-  hint?: string;
-  note?: string;
-  children: React.ReactNode;
-  barColor: string;
-  tint: string;
-  borderColor: string;
-}) {
-  return (
-    <section className="mt-7">
-      <div className="flex items-baseline justify-between">
-        <h2
-          className="text-[15px] font-semibold"
-          style={{ color: "#1a1a1a", letterSpacing: "-0.1px" }}
-        >
-          {label}
-        </h2>
-        {hint && (
-          <span className="text-[12px]" style={{ color: "#787671" }}>
-            {hint}
-          </span>
-        )}
-      </div>
-      <div
-        className="mt-2 flex overflow-hidden rounded-lg border"
-        style={{ background: tint, borderColor: borderColor }}
-      >
-        <div
-          aria-hidden
-          className="shrink-0"
-          style={{ width: 4, background: barColor }}
-        />
-        <div className="flex-1 p-4">
-          {note && (
-            <p
-              className="mb-3 text-[13px]"
-              style={{ color: "#5d5b54", lineHeight: 1.55 }}
-            >
-              {note}
-            </p>
-          )}
-          {children}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ─── Notion-style emoji picker trigger ────────────────────────
-   Click the icon tile to open a small popover with a curated
-   medical emoji set. Keyboard-friendly (Esc closes), click-out
-   closes, and 'Remove' returns to the default Stethoscope mark. */
-const MEDICAL_EMOJI = [
-  "🩺",
-  "🩻",
-  "🧠",
-  "🫀",
-  "🫁",
-  "🦴",
-  "🩸",
-  "💉",
-  "💊",
-  "🧬",
-  "🔬",
-  "🧪",
-  "🩹",
-  "⚕️",
-  "📋",
-  "📝",
-  "🔍",
-  "📊",
-];
-
-function EmojiPickerTrigger({
-  emoji,
-  open,
-  onOpenChange,
-  onSelect,
-  onClear,
-  C,
-}: {
-  emoji: string | null;
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  onSelect: (emoji: string) => void;
-  onClear: () => void;
-  C: { surface: string; hairlineSoft: string; charcoal: string; steel: string; hairline: string };
-}) {
-  const wrapperRef = React.useRef<HTMLDivElement>(null);
-
-  // Close on outside click and Escape.
-  React.useEffect(() => {
-    if (!open) return;
-    function onDocClick(e: MouseEvent) {
-      if (
-        wrapperRef.current &&
-        !wrapperRef.current.contains(e.target as Node)
-      ) {
-        onOpenChange(false);
-      }
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onOpenChange(false);
-    }
-    document.addEventListener("mousedown", onDocClick);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDocClick);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open, onOpenChange]);
-
-  return (
-    <div ref={wrapperRef} className="relative mt-6 inline-block">
-      <button
-        type="button"
-        onClick={() => onOpenChange(!open)}
-        aria-label="Change page icon"
-        title="Click to change icon"
-        className="group relative inline-flex items-center justify-center rounded-md transition-all hover:bg-[#f0eeec] hover:ring-2 hover:ring-offset-1"
-        style={{
-          width: 56,
-          height: 56,
-          background: emoji ? "transparent" : C.surface,
-          border: emoji
-            ? "1px solid transparent"
-            : `1px solid ${C.hairlineSoft}`,
-          fontSize: 36,
-          lineHeight: 1,
-          ["--tw-ring-color" as string]: "#d6d9fc",
-        }}
-      >
-        {emoji ? (
-          <span aria-hidden>{emoji}</span>
-        ) : (
-          <Stethoscope className="h-7 w-7" style={{ color: C.charcoal }} />
-        )}
-        <span
-          aria-hidden
-          className="pointer-events-none absolute -bottom-1 -right-1 grid h-5 w-5 place-items-center rounded-full bg-white opacity-0 shadow-sm transition-opacity group-hover:opacity-100"
-          style={{
-            color: "#5645d4",
-            border: `1px solid ${C.hairline}`,
-          }}
-        >
-          <Smile className="h-3 w-3" />
-        </span>
-      </button>
-
-      {open && (
-        <div
-          role="dialog"
-          aria-label="Choose page icon"
-          className="absolute z-20 mt-2 w-[280px] rounded-lg border p-3 shadow-lg"
-          style={{
-            top: "100%",
-            left: 0,
-            background: "#ffffff",
-            borderColor: C.hairline,
-            boxShadow:
-              "0 14px 28px -10px rgba(15,15,15,0.18), 0 2px 6px rgba(15,15,15,0.06)",
-          }}
-        >
-          <div className="flex items-center justify-between pb-2">
-            <span
-              className="text-[11px] font-medium uppercase"
-              style={{ color: C.steel, letterSpacing: "0.08em" }}
-            >
-              Medical icons
-            </span>
-            <button
-              type="button"
-              onClick={onClear}
-              className="text-[12px] underline-offset-2 hover:underline"
-              style={{ color: C.steel }}
-            >
-              Remove
-            </button>
-          </div>
-          <div className="grid grid-cols-6 gap-1">
-            {MEDICAL_EMOJI.map((e) => (
-              <button
-                key={e}
-                type="button"
-                onClick={() => onSelect(e)}
-                aria-label={`Choose ${e}`}
-                className="grid h-9 w-9 place-items-center rounded text-[20px] transition-colors hover:bg-[#f0eeec]"
-              >
-                {e}
-              </button>
-            ))}
-          </div>
-          <div
-            className="mt-2 border-t pt-2 text-[11px]"
-            style={{ borderColor: C.hairlineSoft, color: C.steel }}
-          >
-            Click any icon to apply. Saved per browser.
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
