@@ -198,7 +198,29 @@ const C = {
 
 ## 5. Reusable Components
 
-모두 `app/conclusion/conclusion-client.tsx` 의 파일 끝에 정의되어 있습니다. 다른 페이지에서 재사용하려면 별도 모듈로 추출하는 것이 좋습니다 — 추출 위치 제안: `components/notion-tone/{Block,CalloutBlock,OutputBlock,SidebarSection,SidebarItem,PropRow,EmojiPickerTrigger}.tsx`.
+전부 `components/notion-tone/` 모듈로 추출되어 있습니다. 새 페이지에서는 한 줄 import로 모두 가져올 수 있습니다:
+
+```tsx
+import {
+  notionTokens, C, type NotionPalette,
+  Block, CalloutBlock, OutputBlock,
+  SidebarSection, SidebarItem,
+  PropRow,
+  EmojiPickerTrigger, MEDICAL_EMOJI, REPORT_EMOJI,
+} from "@/components/notion-tone";
+```
+
+모듈 구성:
+
+```
+components/notion-tone/
+├── tokens.ts        notionTokens(CSS-var override) + C palette + NotionPalette
+├── sidebar.tsx      SidebarSection / SidebarItem
+├── blocks.tsx       Block / CalloutBlock / OutputBlock
+├── prop-row.tsx     PropRow
+├── emoji-picker.tsx EmojiPickerTrigger + MEDICAL_EMOJI / REPORT_EMOJI
+└── index.ts         re-exports
+```
 
 ### 5.1 `Block`
 
@@ -266,7 +288,6 @@ function Block({ label, hint, children }: {
   label="Variant V1"
   title="Basic"
   pill={{ text: "baseline", bg: C.surface, color: C.slate }}
-  C={C}
 >
   ...
 </OutputBlock>
@@ -275,14 +296,13 @@ function Block({ label, hint, children }: {
   label="Variant V2"
   title="Advanced — Dx / DDx"
   pill={{ text: "experimental", bg: C.accentBg, color: C.primary }}
-  C={C}
   highlight
 >
   ...
 </OutputBlock>
 ```
 
-`highlight` props 는 강조용 — 보더가 `C.accentBg` 로 lavender 톤 변경.
+`highlight` props 는 강조용 — 보더가 `C.accentBg` 로 lavender 톤 변경. 팔레트는 모듈에서 자체 import 하므로 `C` prop 을 따로 넘기지 않습니다.
 
 ### 5.4 `SidebarSection` / `SidebarItem`
 
@@ -332,7 +352,7 @@ function Block({ label, hint, children }: {
 
 ### 5.6 `EmojiPickerTrigger`
 
-페이지 아이콘 자리. 클릭하면 popover 가 열리고 18종 의료 emoji 그리드. localStorage 동기화.
+페이지 아이콘 자리. 클릭하면 popover 가 열리고 18종 의료 emoji 그리드. localStorage 동기화는 호출하는 페이지 책임.
 
 ```tsx
 const [pageEmoji, setPageEmoji] = React.useState<string | null>("🩺");
@@ -344,16 +364,20 @@ const [emojiPickerOpen, setEmojiPickerOpen] = React.useState(false);
   onOpenChange={setEmojiPickerOpen}
   onSelect={(e) => { setPageEmoji(e); setEmojiPickerOpen(false); }}
   onClear={() => { setPageEmoji(null); setEmojiPickerOpen(false); }}
-  C={C}
+  fallback={<Stethoscope className="h-7 w-7" style={{ color: C.charcoal }} />}
+  emojis={MEDICAL_EMOJI}        // 또는 REPORT_EMOJI
+  popoverLabel="Medical icons"
 />
 ```
 
 **동작**:
 - 외부 클릭 / Esc 로 닫힘
 - hover 시 우하단 흰 원에 작은 `Smile` 아이콘 + lavender ring (affordance)
-- "Remove" 버튼으로 emoji 해제 → 기본 lucide 아이콘 (현재는 `Stethoscope`) 으로 폴백
-- 18종 emoji: 🩺 🩻 🧠 🫀 🫁 🦴 🩸 💉 💊 🧬 🔬 🧪 🩹 ⚕️ 📋 📝 🔍 📊
-- 다른 도메인이면 `MEDICAL_EMOJI` 배열만 갈아끼우면 됨
+- "Remove" 버튼으로 emoji 해제 → `fallback` 으로 폴백 (호출자가 lucide 아이콘 등을 전달)
+- 두 emoji 프리셋 제공:
+  - `MEDICAL_EMOJI` — 🩺 🩻 🧠 🫀 🫁 🦴 🩸 💉 💊 🧬 🔬 🧪 🩹 ⚕️ 📋 📝 🔍 📊 (conclusion 페이지 기본)
+  - `REPORT_EMOJI` — 📋 📊 📝 🩺 🩻 🧠 🫀 🫁 🦴 🩸 🔬 🧪 📁 📄 🗂️ ✅ ⚕️ 🔍 (structured-report 기본)
+- 다른 도메인이면 `emojis` prop에 임의 배열을 넘기면 됨
 
 ---
 
@@ -465,10 +489,13 @@ Client Component 라도 첫 렌더는 서버에서 일어납니다. `document` /
 
 | 파일 | 역할 |
 | --- | --- |
+| `components/notion-tone/` | **공유 모듈** — 모든 페이지가 여기서 import |
 | `design-md/notion/DESIGN.md` | 원본 DESIGN.md (VoltAgent 컬렉션) |
 | `app/design-demo/notion/page.tsx` | 원본 톤 데모 (마케팅 변형, 풀 컬러) |
 | `app/design-demo/page.tsx` | 4종 디자인 비교 인덱스 |
-| `app/conclusion/conclusion-client.tsx` | 절제된 임상용 변형 (이 가이드의 표준 구현) |
+| `app/conclusion/conclusion-client.tsx` | 표준 구현 (단일 페이지 + A/B output) |
+| `app/structured-report/structured-report-selector-client.tsx` | 카드 그리드 셀렉터 변형 |
+| `app/structured-report/structured-report-client.tsx` | 폼 + 스트리밍 출력 변형 |
 | `app/globals.css` | **건드리지 말 것** — 다른 페이지의 medical teal 톤 보존 |
 
 ---
@@ -478,3 +505,4 @@ Client Component 라도 첫 렌더는 서버에서 일어납니다. `document` /
 | 일자 | 변경 |
 | --- | --- |
 | 2026-05-08 | 초안 작성. `app/conclusion` 적용 후 정리. |
+| 2026-05-08 | `components/notion-tone/` 모듈로 추출. import 경로 / `EmojiPickerTrigger.fallback` 시그니처 / `OutputBlock` props 갱신. `/structured-report` 두 라우트 적용 사례 추가. |
