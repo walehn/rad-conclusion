@@ -2,12 +2,54 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Settings } from "lucide-react";
+import {
+  Settings,
+  Search,
+  ChevronRight,
+  FileText,
+  Plus,
+  Hash,
+  Clock,
+  PanelLeftClose,
+  PanelLeftOpen,
+  ClipboardList,
+  Stethoscope,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ProviderCard } from "@/components/settings/provider-card";
 import { loadProviderSettings } from "@/lib/storage/settings-store";
 import type { ProviderSettings, ProviderName } from "@/lib/providers/types";
 import { CSRF_COOKIE_NAME } from "@/lib/auth/csrf-constants";
+import {
+  notionTokens,
+  C,
+  SidebarSection,
+  SidebarItem,
+  Block,
+  CalloutBlock,
+  EmojiPickerTrigger,
+} from "@/components/notion-tone";
+import { ThemeToggle } from "@/components/theme-toggle";
+import {
+  DISEASE_REGISTRY,
+  diseaseCategoryToSlug,
+  type DiseaseCategory,
+} from "@/lib/prompts/disease-registry";
+
+const SETTINGS_EMOJI = [
+  "⚙️",
+  "🔧",
+  "🔑",
+  "🛡️",
+  "🔒",
+  "👤",
+  "🌐",
+  "📋",
+  "🩺",
+  "📊",
+  "✅",
+  "🔔",
+] as const;
 
 /** Reads the double-submit CSRF token from the non-httpOnly cookie. */
 function getCsrfToken(): string {
@@ -34,6 +76,51 @@ export default function SettingsClient() {
   const [storedKeys, setStoredKeys] = React.useState<StoredKeyInfo[]>([]);
   const [showMigrationBanner, setShowMigrationBanner] = React.useState(false);
   const [migrating, setMigrating] = React.useState(false);
+
+  // ── Notion-tone UX state ──────────────────────────────────
+  const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
+  const [pageEmoji, setPageEmoji] = React.useState<string | null>("⚙️");
+  const [emojiPickerOpen, setEmojiPickerOpen] = React.useState(false);
+  const [hydrated, setHydrated] = React.useState(false);
+
+  React.useEffect(() => {
+    try {
+      const c = localStorage.getItem("radc.sidebar-collapsed");
+      if (c === "1") setSidebarCollapsed(true);
+      const e = localStorage.getItem("radc.settings-page-emoji");
+      if (e) setPageEmoji(e);
+    } catch {}
+    setHydrated(true);
+  }, []);
+
+  React.useEffect(() => {
+    if (!hydrated) return;
+    try {
+      localStorage.setItem(
+        "radc.sidebar-collapsed",
+        sidebarCollapsed ? "1" : "0",
+      );
+    } catch {}
+  }, [sidebarCollapsed, hydrated]);
+
+  React.useEffect(() => {
+    if (!hydrated) return;
+    try {
+      if (pageEmoji)
+        localStorage.setItem("radc.settings-page-emoji", pageEmoji);
+      else localStorage.removeItem("radc.settings-page-emoji");
+    } catch {}
+  }, [pageEmoji, hydrated]);
+
+  const diseaseEntries = React.useMemo(
+    () =>
+      (Object.keys(DISEASE_REGISTRY) as DiseaseCategory[]).map((cat) => ({
+        category: cat,
+        slug: diseaseCategoryToSlug(cat),
+        meta: DISEASE_REGISTRY[cat],
+      })),
+    [],
+  );
 
   // Load server-side stored keys and check for migration opportunity
   React.useEffect(() => {
@@ -213,108 +300,329 @@ export default function SettingsClient() {
   const getStoredKeyInfo = (providerId: string): StoredKeyInfo | undefined =>
     storedKeys.find((k) => k.provider === providerId);
 
-  if (loading) {
-    return (
-      <div className="mx-auto min-h-screen max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-center py-20">
-          <p className="text-muted-foreground">Loading settings...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="mx-auto min-h-screen max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
-      {/* Header */}
-      <header className="mb-8 flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Back to home"
-          onClick={() => router.back()}
+    <div
+      className="min-h-screen"
+      style={{ ...notionTokens, background: C.canvas }}
+    >
+      <div
+        className={
+          sidebarCollapsed
+            ? "grid"
+            : "grid lg:grid-cols-[260px_minmax(0,1fr)]"
+        }
+      >
+        {/* ── Workspace sidebar ─────────────────────────────── */}
+        {!sidebarCollapsed && (
+          <aside
+            className="hidden border-r lg:block"
+            style={{
+              background: C.surfaceSoft,
+              borderColor: C.hairlineSoft,
+              position: "sticky",
+              top: 56,
+              alignSelf: "flex-start",
+              height: "calc(100vh - 56px)",
+              overflowY: "auto",
+            }}
+          >
+            <div className="flex h-full flex-col px-3 py-4 text-[14px]">
+              <div
+                className="group flex items-center gap-2 rounded-md px-2 py-1.5"
+                style={{ color: C.charcoal }}
+              >
+                <span
+                  className="grid h-6 w-6 place-items-center rounded-md"
+                  style={{
+                    background: C.accentBg,
+                    color: C.primary,
+                    fontWeight: 700,
+                    fontSize: 12,
+                  }}
+                >
+                  R
+                </span>
+                <div className="leading-tight">
+                  <div className="font-medium" style={{ color: C.charcoal }}>
+                    Radiology
+                  </div>
+                  <div className="text-[11px]" style={{ color: C.steel }}>
+                    Workspace
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Collapse sidebar"
+                  onClick={() => setSidebarCollapsed(true)}
+                  className="ml-auto rounded p-1 transition-opacity hover:bg-[#ece8f7]"
+                  style={{ color: C.steel }}
+                  title="Collapse sidebar"
+                >
+                  <PanelLeftClose className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div
+                className="mt-3 flex items-center gap-2 rounded-md px-2 py-1.5"
+                style={{ background: C.surface, color: C.steel }}
+              >
+                <Search className="h-3.5 w-3.5" />
+                <span className="text-[13px]">Search…</span>
+                <span
+                  className="ml-auto rounded px-1.5 py-0.5 text-[10px]"
+                  style={{ background: C.canvas, color: C.steel }}
+                >
+                  ⌘K
+                </span>
+              </div>
+
+              <SidebarSection title="Quick access" mt={10}>
+                <SidebarItem
+                  icon={<Stethoscope className="h-3.5 w-3.5" />}
+                  onClick={() => router.push("/conclusion")}
+                >
+                  New conclusion
+                </SidebarItem>
+                <SidebarItem
+                  icon={<ClipboardList className="h-3.5 w-3.5" />}
+                  onClick={() => router.push("/structured-report")}
+                >
+                  Structured reports
+                </SidebarItem>
+                <SidebarItem icon={<FileText className="h-3.5 w-3.5" />}>
+                  Drafts
+                </SidebarItem>
+                <SidebarItem icon={<Clock className="h-3.5 w-3.5" />}>
+                  Recent
+                </SidebarItem>
+              </SidebarSection>
+
+              <SidebarSection
+                title="Templates"
+                mt={6}
+                action={<Plus className="h-3.5 w-3.5" />}
+              >
+                {diseaseEntries.map(({ category, slug, meta }) => (
+                  <SidebarItem
+                    key={category}
+                    icon={
+                      <Hash
+                        className="h-3.5 w-3.5"
+                        style={{ color: C.stone }}
+                      />
+                    }
+                    onClick={() =>
+                      router.push(`/structured-report/${slug}`)
+                    }
+                  >
+                    {meta.displayNameKo}
+                  </SidebarItem>
+                ))}
+              </SidebarSection>
+
+              <div className="mt-auto flex items-center gap-1 pt-4">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start gap-2"
+                  style={{ color: C.charcoal, background: "#ece8f7" }}
+                >
+                  <Settings className="h-4 w-4" style={{ color: C.primary }} />
+                  Settings
+                </Button>
+                <ThemeToggle />
+              </div>
+            </div>
+          </aside>
+        )}
+
+        {/* ── Main page area ────────────────────────────────── */}
+        <main
+          className="px-4 sm:px-8 lg:px-14"
+          style={{ background: C.canvas }}
         >
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div className="flex items-center gap-3">
-          <Settings className="h-7 w-7 text-primary" />
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-            <p className="text-sm text-muted-foreground">
-              Configure LLM providers and API keys
-            </p>
-          </div>
-        </div>
-      </header>
-
-      {/* Migration Banner */}
-      {showMigrationBanner && (
-        <div className="mb-6 rounded-md border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/30">
-          <p className="mb-3 text-sm text-amber-900 dark:text-amber-200">
-            브라우저에 저장된 API 키를 서버로 마이그레이션하면 모든 기기에서
-            사용할 수 있습니다.
-          </p>
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              onClick={handleMigrate}
-              disabled={migrating}
-              className="bg-amber-600 text-white hover:bg-amber-700"
+          {sidebarCollapsed && (
+            <button
+              type="button"
+              aria-label="Open sidebar"
+              onClick={() => setSidebarCollapsed(false)}
+              className="hidden lg:flex items-center gap-1.5 mt-4 -ml-2 rounded-md px-2 py-1 text-[12px] transition-colors hover:bg-[#f0eeec]"
+              style={{ color: C.steel }}
             >
-              {migrating ? "마이그레이션 중..." : "서버로 마이그레이션"}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={handleMigrateDismiss}
-              disabled={migrating}
-            >
-              나중에
-            </Button>
-          </div>
-        </div>
-      )}
+              <PanelLeftOpen className="h-4 w-4" />
+              <span>Open sidebar</span>
+            </button>
+          )}
 
-      {/* Provider Cards */}
-      <div className="grid gap-6">
-        {settings.map((provider) => {
-          const storedInfo = getStoredKeyInfo(provider.id);
-          return (
-            <ProviderCard
-              key={provider.id}
-              settings={provider}
-              onChange={(updated) => {
-                handleProviderChange(updated);
-                // If api key was cleared, delete from server
-                if (
-                  updated.id !== "local" &&
-                  !updated.apiKey &&
-                  storedInfo?.hasKey
-                ) {
-                  deleteApiKeyFromServer(updated.id as ProviderName).catch(
-                    console.error
-                  );
-                }
-                // If api key was set, save to server
-                if (updated.id !== "local" && updated.apiKey) {
-                  handleApiKeySave(
-                    updated.id as ProviderName,
-                    updated.apiKey
-                  ).catch(console.error);
-                }
+          <div className="mx-auto max-w-3xl py-10">
+            {/* Breadcrumb */}
+            <nav
+              className="flex items-center gap-1.5 text-[12px]"
+              style={{ color: C.steel }}
+            >
+              <span>Workspace</span>
+              <ChevronRight className="h-3 w-3" />
+              <span style={{ color: C.charcoal }}>Settings</span>
+            </nav>
+
+            <EmojiPickerTrigger
+              emoji={pageEmoji}
+              open={emojiPickerOpen}
+              onOpenChange={setEmojiPickerOpen}
+              onSelect={(e) => {
+                setPageEmoji(e);
+                setEmojiPickerOpen(false);
               }}
-              onValidate={handleValidate}
-              hasStoredKey={storedInfo?.hasKey ?? false}
+              onClear={() => {
+                setPageEmoji(null);
+                setEmojiPickerOpen(false);
+              }}
+              fallback={
+                <Settings className="h-7 w-7" style={{ color: C.charcoal }} />
+              }
+              emojis={SETTINGS_EMOJI}
+              popoverLabel="Settings icons"
             />
-          );
-        })}
-      </div>
 
-      {/* Info */}
-      <div className="mt-8 rounded-md border border-input bg-muted/50 p-4">
-        <p className="text-sm text-muted-foreground">
-          API 키는 서버에 암호화되어 저장되며 모든 기기에서 사용할 수 있습니다.
-          키는 LLM 제공자 API에 직접 전달되며 평문으로 저장되지 않습니다.
-        </p>
+            <h1
+              className="mt-4 text-balance"
+              style={{
+                fontSize: 44,
+                fontWeight: 700,
+                lineHeight: 1.15,
+                letterSpacing: "-0.6px",
+                color: C.ink,
+              }}
+            >
+              Settings
+            </h1>
+            <p
+              className="mt-2 text-[15px]"
+              style={{ color: C.slate, lineHeight: 1.55 }}
+            >
+              LLM 제공자와 API 키를 설정합니다. 키는 서버에 암호화되어 저장되며
+              모든 기기에서 사용할 수 있습니다.
+            </p>
+
+            <div
+              className="my-8 h-px"
+              style={{ background: C.hairlineSoft }}
+            />
+
+            {loading ? (
+              <div
+                className="rounded-lg border p-12 text-center text-[14px]"
+                style={{
+                  borderColor: C.hairline,
+                  background: C.surfaceSoft,
+                  color: C.slate,
+                }}
+              >
+                Loading settings…
+              </div>
+            ) : (
+              <>
+                {showMigrationBanner && (
+                  <CalloutBlock
+                    label="Migration available"
+                    note="브라우저에 저장된 API 키를 서버로 마이그레이션하면 모든 기기에서 사용할 수 있습니다."
+                    barColor="#dd5b00"
+                    tint="#fff4d6"
+                    borderColor="#f3d97a"
+                  >
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={handleMigrate}
+                        disabled={migrating}
+                        style={{
+                          background: "#dd5b00",
+                          color: "#ffffff",
+                          borderRadius: 9999,
+                        }}
+                      >
+                        {migrating ? "마이그레이션 중..." : "서버로 마이그레이션"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleMigrateDismiss}
+                        disabled={migrating}
+                        style={{ color: C.slate }}
+                      >
+                        나중에
+                      </Button>
+                    </div>
+                  </CalloutBlock>
+                )}
+
+                <Block
+                  label="Providers"
+                  hint={`${settings.length} configured`}
+                >
+                  <div className="grid gap-4">
+                    {settings.map((provider) => {
+                      const storedInfo = getStoredKeyInfo(provider.id);
+                      return (
+                        <ProviderCard
+                          key={provider.id}
+                          settings={provider}
+                          onChange={(updated) => {
+                            handleProviderChange(updated);
+                            if (
+                              updated.id !== "local" &&
+                              !updated.apiKey &&
+                              storedInfo?.hasKey
+                            ) {
+                              deleteApiKeyFromServer(
+                                updated.id as ProviderName,
+                              ).catch(console.error);
+                            }
+                            if (updated.id !== "local" && updated.apiKey) {
+                              handleApiKeySave(
+                                updated.id as ProviderName,
+                                updated.apiKey,
+                              ).catch(console.error);
+                            }
+                          }}
+                          onValidate={handleValidate}
+                          hasStoredKey={storedInfo?.hasKey ?? false}
+                        />
+                      );
+                    })}
+                  </div>
+                </Block>
+
+                <Block label="Security" hint="How API keys are stored">
+                  <p
+                    className="text-[13px]"
+                    style={{ color: C.slate, lineHeight: 1.55 }}
+                  >
+                    API 키는 서버에 암호화되어 저장되며 모든 기기에서 사용할 수
+                    있습니다. 키는 LLM 제공자 API에 직접 전달되며 평문으로
+                    저장되지 않습니다.
+                  </p>
+                </Block>
+              </>
+            )}
+
+            {/* Footer */}
+            <footer
+              className="mt-16 flex flex-col items-start gap-2 border-t pt-6 text-[12px] sm:flex-row sm:items-center sm:justify-between"
+              style={{ borderColor: C.hairlineSoft, color: C.steel }}
+            >
+              <span>Rad Conclusion · Settings</span>
+              <button
+                type="button"
+                onClick={() => router.back()}
+                className="inline-flex items-center gap-1"
+                style={{ color: C.slate }}
+              >
+                ← Back
+              </button>
+            </footer>
+          </div>
+        </main>
       </div>
     </div>
   );
