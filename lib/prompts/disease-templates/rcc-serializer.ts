@@ -193,17 +193,24 @@ function sizeComparisonLine(mass: RccMass): string {
 /**
  * Serialize a single mass into a fixed-order line list (no header).
  *
- * Output line count depends on massType:
- *  - Cystic                              → 16 lines (full canonical order)
- *  - Solid / undefined / any other       → 14 lines (Bosniak and Predominantly
- *                                          cystic lines are omitted entirely;
- *                                          both fields apply only to confirmed
- *                                          cystic masses per Bosniak v2019)
+ * Output line count depends on massType and thrombusKind:
+ *  - Cystic + venous thrombus            → 16 lines (full canonical order)
+ *  - Cystic, no venous thrombus          → 15 lines (Bland line omitted)
+ *  - Solid / undefined + venous thrombus → 14 lines (Bosniak/Predominantly
+ *                                          cystic omitted; Bland kept)
+ *  - Solid / undefined, no venous thrombus → 13 lines (Bland also omitted)
+ *
+ * The Bland (non-tumor) thrombus line is gated on a Renal vein / IVC tumor
+ * thrombus selection — mirroring the UI, which only exposes the Bland field
+ * under the same condition. This prevents "Not specified in input" leaking
+ * into the LLM prompt for a field the user could not have filled.
  *
  * Undefined fields produce "Not specified in input".
  */
 function serializeRccMass(mass: RccMass): string[] {
   const isCystic = mass.massType === "Cystic";
+  const hasVenousThrombus =
+    mass.thrombusKind === "Renal vein" || mass.thrombusKind === "IVC";
 
   const lines: string[] = [
     `- Side: ${strOrNotSpecified(mass.side)}`,
@@ -226,8 +233,16 @@ function serializeRccMass(mass: RccMass): string[] {
     `- Macroscopic fat: ${strOrNotSpecified(mass.macroFat)}`,
     `- Solid enhancement: ${strOrNotSpecified(mass.solidEnhancement)}`,
     `- Distance to collecting system: ${numCmOrNotSpecified(mass.distanceCm)}`,
-    `- Venous tumor thrombus: ${thrombusLine(mass)}`,
-    `- Bland (non-tumor) thrombus: ${strOrNotSpecified(mass.blandThrombus)}`,
+    `- Venous tumor thrombus: ${thrombusLine(mass)}`
+  );
+
+  if (hasVenousThrombus) {
+    lines.push(
+      `- Bland (non-tumor) thrombus: ${strOrNotSpecified(mass.blandThrombus)}`
+    );
+  }
+
+  lines.push(
     `- Growth rate: ${growthRateOrNotSpecified(mass.growthRate)}`,
     `- Size comparison: ${sizeComparisonLine(mass)}`
   );

@@ -5,18 +5,20 @@ import {
 } from "@/lib/prompts/disease-templates/rcc-serializer";
 
 describe("serializeRccStructuredInput", () => {
-  // Test 1: Empty mass (single mass, no fields) → "Mass 1:" header + 14 NA lines.
+  // Test 1: Empty mass (single mass, no fields) → "Mass 1:" header + 13 NA lines.
   // massType is undefined here, so Bosniak and Predominantly cystic are omitted
-  // entirely (those two lines render only when massType === "Cystic"). The
-  // serializer outputs them only after a confirmed cystic classification, so
-  // an empty/unselected mass renders the 14-line core canonical order.
-  it("returns Mass 1 header plus 14 'Not specified in input' lines for an empty mass", () => {
+  // (those two lines render only when massType === "Cystic"). Additionally,
+  // the Bland (non-tumor) thrombus line is omitted because the UI gates that
+  // field on a Renal vein / IVC tumor thrombus selection — without one, the
+  // user could not have filled the field, so the serializer drops the line.
+  it("returns Mass 1 header plus 13 'Not specified in input' lines for an empty mass", () => {
     const result = serializeRccStructuredInput({ masses: [{}] });
     const lines = result.split("\n");
     expect(lines[0]).toBe("Mass 1:");
-    expect(lines).toHaveLength(15);
+    expect(lines).toHaveLength(14);
     expect(result).not.toContain("- Bosniak:");
     expect(result).not.toContain("- Predominantly cystic:");
+    expect(result).not.toContain("- Bland (non-tumor) thrombus:");
     for (const line of lines.slice(1)) {
       expect(line).toMatch(/Not specified in input$/);
     }
@@ -98,6 +100,27 @@ describe("serializeRccStructuredInput", () => {
     });
     expect(result).toContain("Mass 1:\n");
     expect(result).toContain("- Venous tumor thrombus: None");
+  });
+
+  // Test 7b: thrombusKind "None" → Bland (non-tumor) thrombus line omitted.
+  // The UI hides the Bland field unless thrombusKind is Renal vein / IVC, so
+  // emitting the line here would surface "Not specified in input" for a field
+  // the user could not have filled.
+  it("omits the Bland (non-tumor) thrombus line when thrombusKind is None", () => {
+    const result = serializeRccStructuredInput({
+      masses: [{ thrombusKind: "None" }],
+    });
+    expect(result).not.toContain("- Bland (non-tumor) thrombus:");
+  });
+
+  // Test 7c: thrombusKind "Renal vein" → Bland line emitted (NA when unset).
+  it("emits the Bland (non-tumor) thrombus line when thrombusKind is Renal vein", () => {
+    const result = serializeRccStructuredInput({
+      masses: [{ thrombusKind: "Renal vein" }],
+    });
+    expect(result).toContain(
+      "- Bland (non-tumor) thrombus: Not specified in input"
+    );
   });
 
   // Test 8: thrombusKind "IVC" + thrombusLevel "II" → combined Neves-Mayo line
@@ -252,10 +275,12 @@ describe("serializeRccStructuredInput", () => {
     expect(blocks[1]).toContain("- Bosniak: IIF");
     expect(blocks[1]).not.toContain("Not applicable (solid mass)");
 
-    // Solid block: header + 14 lines = 15 total
-    expect(blocks[0].split("\n")).toHaveLength(15);
-    // Cystic block: header + 16 lines = 17 total
-    expect(blocks[1].split("\n")).toHaveLength(17);
+    // Solid block: header + 13 lines = 14 total (Bosniak/Predominantly cystic
+    // omitted for Solid; Bland omitted because no venous thrombus is set)
+    expect(blocks[0].split("\n")).toHaveLength(14);
+    // Cystic block: header + 15 lines = 16 total (Bland omitted because no
+    // venous thrombus is set)
+    expect(blocks[1].split("\n")).toHaveLength(16);
   });
 
   // -------------------------------------------------------------------------
