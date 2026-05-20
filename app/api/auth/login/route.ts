@@ -21,7 +21,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const loginSchema = z.object({
-  email: z.string().trim().toLowerCase().email().max(254),
+  email: z.string().trim().toLowerCase().min(1).max(254),
   password: z.string().min(1).max(1024),
   next: z.string().optional(),
 });
@@ -37,7 +37,7 @@ function sanitizeNext(next: string | undefined): string {
   return next;
 }
 
-const GENERIC_AUTH_ERROR = '이메일 또는 비밀번호가 올바르지 않습니다';
+const GENERIC_AUTH_ERROR = '아이디 또는 비밀번호가 올바르지 않습니다';
 
 export async function POST(request: Request): Promise<Response> {
   // 1. Parse and validate input (do not leak which field failed).
