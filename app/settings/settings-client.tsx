@@ -22,8 +22,7 @@ import { loadProviderSettings } from "@/lib/storage/settings-store";
 import type { ProviderSettings, ProviderName } from "@/lib/providers/types";
 import { CSRF_COOKIE_NAME } from "@/lib/auth/csrf-constants";
 import {
-  notionTokens,
-  C,
+  useNotionPalette,
   SidebarSection,
   SidebarItem,
   Block,
@@ -72,6 +71,7 @@ const LOCAL_STORAGE_KEY = "rad-conclusion-provider-settings";
 
 export default function SettingsClient() {
   const router = useRouter();
+  const { c, tokens } = useNotionPalette();
   const [settings, setSettings] = React.useState<ProviderSettings[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [storedKeys, setStoredKeys] = React.useState<StoredKeyInfo[]>([]);
@@ -304,7 +304,7 @@ export default function SettingsClient() {
   return (
     <div
       className="min-h-screen"
-      style={{ ...notionTokens, background: C.canvas }}
+      style={{ ...tokens, background: c.canvas }}
     >
       <div
         className={
@@ -318,8 +318,8 @@ export default function SettingsClient() {
           <aside
             className="hidden border-r lg:block"
             style={{
-              background: C.surfaceSoft,
-              borderColor: C.hairlineSoft,
+              background: c.surfaceSoft,
+              borderColor: c.hairlineSoft,
               position: "sticky",
               top: 56,
               alignSelf: "flex-start",
@@ -330,13 +330,13 @@ export default function SettingsClient() {
             <div className="flex h-full flex-col px-3 py-4 text-[14px]">
               <div
                 className="group flex items-center gap-2 rounded-md px-2 py-1.5"
-                style={{ color: C.charcoal }}
+                style={{ color: c.charcoal }}
               >
                 <span
                   className="grid h-6 w-6 place-items-center rounded-md"
                   style={{
-                    background: C.accentBg,
-                    color: C.primary,
+                    background: c.accentBg,
+                    color: c.primary,
                     fontWeight: 700,
                     fontSize: 12,
                   }}
@@ -344,10 +344,10 @@ export default function SettingsClient() {
                   R
                 </span>
                 <div className="leading-tight">
-                  <div className="font-medium" style={{ color: C.charcoal }}>
+                  <div className="font-medium" style={{ color: c.charcoal }}>
                     Radiology
                   </div>
-                  <div className="text-[11px]" style={{ color: C.steel }}>
+                  <div className="text-[11px]" style={{ color: c.steel }}>
                     Workspace
                   </div>
                 </div>
@@ -355,9 +355,15 @@ export default function SettingsClient() {
                   type="button"
                   aria-label="Collapse sidebar"
                   onClick={() => setSidebarCollapsed(true)}
-                  className="ml-auto rounded p-1 transition-opacity hover:bg-[#ece8f7]"
-                  style={{ color: C.steel }}
+                  className="ml-auto rounded p-1 transition-opacity"
+                  style={{ color: c.steel }}
                   title="Collapse sidebar"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = c.accentHover;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                  }}
                 >
                   <PanelLeftClose className="h-4 w-4" />
                 </button>
@@ -365,13 +371,13 @@ export default function SettingsClient() {
 
               <div
                 className="mt-3 flex items-center gap-2 rounded-md px-2 py-1.5"
-                style={{ background: C.surface, color: C.steel }}
+                style={{ background: c.surface, color: c.steel }}
               >
                 <Search className="h-3.5 w-3.5" />
                 <span className="text-[13px]">Search…</span>
                 <span
                   className="ml-auto rounded px-1.5 py-0.5 text-[10px]"
-                  style={{ background: C.canvas, color: C.steel }}
+                  style={{ background: c.canvas, color: c.steel }}
                 >
                   ⌘K
                 </span>
@@ -409,7 +415,7 @@ export default function SettingsClient() {
                     icon={
                       <Hash
                         className="h-3.5 w-3.5"
-                        style={{ color: C.stone }}
+                        style={{ color: c.stone }}
                       />
                     }
                     onClick={() =>
@@ -426,9 +432,9 @@ export default function SettingsClient() {
                   variant="ghost"
                   size="sm"
                   className="w-full justify-start gap-2"
-                  style={{ color: C.charcoal, background: "#ece8f7" }}
+                  style={{ color: c.charcoal, background: c.accentHover }}
                 >
-                  <Settings className="h-4 w-4" style={{ color: C.primary }} />
+                  <Settings className="h-4 w-4" style={{ color: c.primary }} />
                   Settings
                 </Button>
                 <ThemeToggle />
@@ -440,15 +446,21 @@ export default function SettingsClient() {
         {/* ── Main page area ────────────────────────────────── */}
         <main
           className="px-4 sm:px-8 lg:px-14"
-          style={{ background: C.canvas }}
+          style={{ background: c.canvas }}
         >
           {sidebarCollapsed && (
             <button
               type="button"
               aria-label="Open sidebar"
               onClick={() => setSidebarCollapsed(false)}
-              className="hidden lg:flex items-center gap-1.5 mt-4 -ml-2 rounded-md px-2 py-1 text-[12px] transition-colors hover:bg-[#f0eeec]"
-              style={{ color: C.steel }}
+              className="hidden lg:flex items-center gap-1.5 mt-4 -ml-2 rounded-md px-2 py-1 text-[12px] transition-colors"
+              style={{ color: c.steel }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = c.mutedHover;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+              }}
             >
               <PanelLeftOpen className="h-4 w-4" />
               <span>Open sidebar</span>
@@ -459,11 +471,11 @@ export default function SettingsClient() {
             {/* Breadcrumb */}
             <nav
               className="flex items-center gap-1.5 text-[12px]"
-              style={{ color: C.steel }}
+              style={{ color: c.steel }}
             >
               <span>Workspace</span>
               <ChevronRight className="h-3 w-3" />
-              <span style={{ color: C.charcoal }}>Settings</span>
+              <span style={{ color: c.charcoal }}>Settings</span>
             </nav>
 
             <EmojiPickerTrigger
@@ -479,7 +491,7 @@ export default function SettingsClient() {
                 setEmojiPickerOpen(false);
               }}
               fallback={
-                <Settings className="h-7 w-7" style={{ color: C.charcoal }} />
+                <Settings className="h-7 w-7" style={{ color: c.charcoal }} />
               }
               emojis={SETTINGS_EMOJI}
               popoverLabel="Settings icons"
@@ -492,14 +504,14 @@ export default function SettingsClient() {
                 fontWeight: 700,
                 lineHeight: 1.15,
                 letterSpacing: "-0.6px",
-                color: C.ink,
+                color: c.ink,
               }}
             >
               Settings
             </h1>
             <p
               className="mt-2 text-[15px]"
-              style={{ color: C.slate, lineHeight: 1.55 }}
+              style={{ color: c.slate, lineHeight: 1.55 }}
             >
               LLM 제공자와 API 키를 설정합니다. 키는 서버에 암호화되어 저장되며
               모든 기기에서 사용할 수 있습니다.
@@ -507,16 +519,16 @@ export default function SettingsClient() {
 
             <div
               className="my-8 h-px"
-              style={{ background: C.hairlineSoft }}
+              style={{ background: c.hairlineSoft }}
             />
 
             {loading ? (
               <div
                 className="rounded-lg border p-12 text-center text-[14px]"
                 style={{
-                  borderColor: C.hairline,
-                  background: C.surfaceSoft,
-                  color: C.slate,
+                  borderColor: c.hairline,
+                  background: c.surfaceSoft,
+                  color: c.slate,
                 }}
               >
                 Loading settings…
@@ -527,9 +539,9 @@ export default function SettingsClient() {
                   <CalloutBlock
                     label="Migration available"
                     note="브라우저에 저장된 API 키를 서버로 마이그레이션하면 모든 기기에서 사용할 수 있습니다."
-                    barColor="#dd5b00"
-                    tint="#fff4d6"
-                    borderColor="#f3d97a"
+                    barColor={c.warningBar}
+                    tint={c.warningTint}
+                    borderColor={c.warningBorder}
                   >
                     <div className="flex gap-2">
                       <Button
@@ -537,8 +549,8 @@ export default function SettingsClient() {
                         onClick={handleMigrate}
                         disabled={migrating}
                         style={{
-                          background: "#dd5b00",
-                          color: "#ffffff",
+                          background: c.warningBar,
+                          color: c.primaryForeground,
                           borderRadius: 9999,
                         }}
                       >
@@ -549,7 +561,7 @@ export default function SettingsClient() {
                         variant="ghost"
                         onClick={handleMigrateDismiss}
                         disabled={migrating}
-                        style={{ color: C.slate }}
+                        style={{ color: c.slate }}
                       >
                         나중에
                       </Button>
@@ -597,7 +609,7 @@ export default function SettingsClient() {
                 <Block label="Security" hint="How API keys are stored">
                   <p
                     className="text-[13px]"
-                    style={{ color: C.slate, lineHeight: 1.55 }}
+                    style={{ color: c.slate, lineHeight: 1.55 }}
                   >
                     API 키는 서버에 암호화되어 저장되며 모든 기기에서 사용할 수
                     있습니다. 키는 LLM 제공자 API에 직접 전달되며 평문으로
@@ -614,14 +626,14 @@ export default function SettingsClient() {
             {/* Footer */}
             <footer
               className="mt-16 flex flex-col items-start gap-2 border-t pt-6 text-[12px] sm:flex-row sm:items-center sm:justify-between"
-              style={{ borderColor: C.hairlineSoft, color: C.steel }}
+              style={{ borderColor: c.hairlineSoft, color: c.steel }}
             >
               <span>Rad Conclusion · Settings</span>
               <button
                 type="button"
                 onClick={() => router.back()}
                 className="inline-flex items-center gap-1"
-                style={{ color: C.slate }}
+                style={{ color: c.slate }}
               >
                 ← Back
               </button>

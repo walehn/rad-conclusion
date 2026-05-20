@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { C } from "./tokens";
+import { useNotionPalette } from "./tokens";
 
 /**
  * Notion-tone sidebar primitives.
@@ -19,17 +19,18 @@ export function SidebarSection({
   mt?: number;
   action?: React.ReactNode;
 }) {
+  const { c } = useNotionPalette();
   return (
     <div style={{ marginTop: mt ?? 12 }}>
       <div
         className="flex items-center justify-between px-2 pb-1 text-[11px] font-medium"
-        style={{ color: C.steel, letterSpacing: "0.04em" }}
+        style={{ color: c.steel, letterSpacing: "0.04em" }}
       >
         <span>{title}</span>
         {action && (
           <span
             className="rounded p-1"
-            style={{ color: C.steel }}
+            style={{ color: c.steel }}
             aria-hidden
           >
             {action}
@@ -52,18 +53,19 @@ export function SidebarItem({
   active?: boolean;
   onClick?: () => void;
 }) {
+  const { c } = useNotionPalette();
   return (
     <button
       type="button"
       onClick={onClick}
       className="flex items-center gap-2 rounded-md px-2 py-1 text-left text-[13px] transition-colors"
       style={{
-        background: active ? "#ece8f7" : "transparent",
-        color: active ? C.charcoal : C.slate,
+        background: active ? c.accentHover : "transparent",
+        color: active ? c.charcoal : c.slate,
         fontWeight: active ? 500 : 400,
       }}
     >
-      <span style={{ color: active ? C.primary : C.stone }}>{icon}</span>
+      <span style={{ color: active ? c.primary : c.stone }}>{icon}</span>
       <span className="truncate">{children}</span>
     </button>
   );

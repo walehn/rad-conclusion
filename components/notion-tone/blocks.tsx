@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { C } from "./tokens";
+import { useNotionPalette } from "./tokens";
 
 /**
  * Three Notion-style block containers used across radiology pages:
@@ -21,24 +21,25 @@ export function Block({
   hint?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  const { c } = useNotionPalette();
   return (
     <section className="mt-7">
       <div className="flex items-baseline justify-between gap-3">
         <h2
           className="text-[15px] font-semibold"
-          style={{ color: C.ink, letterSpacing: "-0.1px" }}
+          style={{ color: c.ink, letterSpacing: "-0.1px" }}
         >
           {label}
         </h2>
         {hint && (
-          <span className="text-[12px]" style={{ color: C.steel }}>
+          <span className="text-[12px]" style={{ color: c.steel }}>
             {hint}
           </span>
         )}
       </div>
       <div
         className="mt-2 rounded-lg border p-4"
-        style={{ borderColor: C.hairline, background: C.card }}
+        style={{ borderColor: c.hairline, background: c.card }}
       >
         {children}
       </div>
@@ -51,9 +52,9 @@ export function CalloutBlock({
   hint,
   note,
   children,
-  barColor = C.primary,
-  tint = C.cardLavender,
-  borderColor = C.accentBg,
+  barColor,
+  tint,
+  borderColor,
 }: {
   label: string;
   hint?: React.ReactNode;
@@ -63,35 +64,39 @@ export function CalloutBlock({
   tint?: string;
   borderColor?: string;
 }) {
+  const { c } = useNotionPalette();
+  const resolvedBar = barColor ?? c.primary;
+  const resolvedTint = tint ?? c.cardLavender;
+  const resolvedBorder = borderColor ?? c.accentBg;
   return (
     <section className="mt-7">
       <div className="flex items-baseline justify-between gap-3">
         <h2
           className="text-[15px] font-semibold"
-          style={{ color: C.ink, letterSpacing: "-0.1px" }}
+          style={{ color: c.ink, letterSpacing: "-0.1px" }}
         >
           {label}
         </h2>
         {hint && (
-          <span className="text-[12px]" style={{ color: C.steel }}>
+          <span className="text-[12px]" style={{ color: c.steel }}>
             {hint}
           </span>
         )}
       </div>
       <div
         className="mt-2 flex overflow-hidden rounded-lg border"
-        style={{ background: tint, borderColor }}
+        style={{ background: resolvedTint, borderColor: resolvedBorder }}
       >
         <div
           aria-hidden
           className="shrink-0"
-          style={{ width: 4, background: barColor }}
+          style={{ width: 4, background: resolvedBar }}
         />
         <div className="flex-1 p-4">
           {note && (
             <p
               className="mb-3 text-[13px]"
-              style={{ color: C.slate, lineHeight: 1.55 }}
+              style={{ color: c.slate, lineHeight: 1.55 }}
             >
               {note}
             </p>
@@ -116,19 +121,20 @@ export function OutputBlock({
   children: React.ReactNode;
   highlight?: boolean;
 }) {
+  const { c } = useNotionPalette();
   return (
     <section>
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <div
             className="text-[11px] font-medium uppercase"
-            style={{ color: C.steel, letterSpacing: "0.08em" }}
+            style={{ color: c.steel, letterSpacing: "0.08em" }}
           >
             {label}
           </div>
           <h3
             className="mt-0.5 truncate text-[20px] font-semibold"
-            style={{ color: C.ink, letterSpacing: "-0.2px" }}
+            style={{ color: c.ink, letterSpacing: "-0.2px" }}
           >
             {title}
           </h3>
@@ -145,8 +151,8 @@ export function OutputBlock({
       <div
         className="mt-3 rounded-lg border p-4"
         style={{
-          background: C.card,
-          borderColor: highlight ? C.accentBg : C.hairline,
+          background: c.card,
+          borderColor: highlight ? c.accentBg : c.hairline,
         }}
       >
         {children}

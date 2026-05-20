@@ -22,8 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import {
-  notionTokens,
-  C,
+  useNotionPalette,
   SidebarSection,
   SidebarItem,
   Block,
@@ -101,7 +100,7 @@ function getCsrfToken(): string {
   return (
     document.cookie
       .split("; ")
-      .find((c) => c.startsWith("csrf_token="))
+      .find((cookie) => cookie.startsWith("csrf_token="))
       ?.split("=")[1] ?? ""
   );
 }
@@ -195,6 +194,7 @@ function getMinimumFieldsErrorMessage(disease: DiseaseCategory): string {
 }
 
 export function StructuredReportClient({ disease }: { disease: DiseaseCategory }) {
+  const { c, tokens } = useNotionPalette();
   const [formState, setFormState] = React.useState<StructuredFormState>(
     () => createInitialFormState(disease)
   );
@@ -227,7 +227,7 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
       setClientSettings(localSettings);
 
       const merged = serverRes.map((sp) => {
-        const cs = localSettings.find((c) => c.id === sp.name);
+        const cs = localSettings.find((s) => s.id === sp.name);
         const clientAvailable =
           cs?.enabled &&
           (cs.id === "local" ? !!cs.hostUrl : !!cs.apiKey);
@@ -410,8 +410,8 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
 
   React.useEffect(() => {
     try {
-      const c = localStorage.getItem("radc.sidebar-collapsed");
-      if (c === "1") setSidebarCollapsed(true);
+      const collapsed = localStorage.getItem("radc.sidebar-collapsed");
+      if (collapsed === "1") setSidebarCollapsed(true);
       const e = localStorage.getItem("radc.reports-page-emoji");
       if (e) setPageEmoji(e);
     } catch {}
@@ -456,7 +456,7 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
   return (
     <div
       className="min-h-screen"
-      style={{ ...notionTokens, background: C.canvas }}
+      style={{ ...tokens, background: c.canvas }}
     >
       <div
         className={
@@ -470,8 +470,8 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
           <aside
             className="hidden border-r lg:block"
             style={{
-              background: C.surfaceSoft,
-              borderColor: C.hairlineSoft,
+              background: c.surfaceSoft,
+              borderColor: c.hairlineSoft,
               position: "sticky",
               top: 56,
               alignSelf: "flex-start",
@@ -482,13 +482,13 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
             <div className="flex h-full flex-col px-3 py-4 text-[14px]">
               <div
                 className="group flex items-center gap-2 rounded-md px-2 py-1.5"
-                style={{ color: C.charcoal }}
+                style={{ color: c.charcoal }}
               >
                 <span
                   className="grid h-6 w-6 place-items-center rounded-md"
                   style={{
-                    background: C.accentBg,
-                    color: C.primary,
+                    background: c.accentBg,
+                    color: c.primary,
                     fontWeight: 700,
                     fontSize: 12,
                   }}
@@ -496,10 +496,10 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
                   R
                 </span>
                 <div className="leading-tight">
-                  <div className="font-medium" style={{ color: C.charcoal }}>
+                  <div className="font-medium" style={{ color: c.charcoal }}>
                     Radiology
                   </div>
-                  <div className="text-[11px]" style={{ color: C.steel }}>
+                  <div className="text-[11px]" style={{ color: c.steel }}>
                     Workspace
                   </div>
                 </div>
@@ -507,9 +507,15 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
                   type="button"
                   aria-label="Collapse sidebar"
                   onClick={() => setSidebarCollapsed(true)}
-                  className="ml-auto rounded p-1 transition-opacity hover:bg-[#ece8f7]"
-                  style={{ color: C.steel }}
+                  className="ml-auto rounded p-1 transition-opacity"
+                  style={{ color: c.steel }}
                   title="Collapse sidebar"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = c.accentHover;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                  }}
                 >
                   <PanelLeftClose className="h-4 w-4" />
                 </button>
@@ -517,13 +523,13 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
 
               <div
                 className="mt-3 flex items-center gap-2 rounded-md px-2 py-1.5"
-                style={{ background: C.surface, color: C.steel }}
+                style={{ background: c.surface, color: c.steel }}
               >
                 <Search className="h-3.5 w-3.5" />
                 <span className="text-[13px]">Search…</span>
                 <span
                   className="ml-auto rounded px-1.5 py-0.5 text-[10px]"
-                  style={{ background: C.canvas, color: C.steel }}
+                  style={{ background: c.canvas, color: c.steel }}
                 >
                   ⌘K
                 </span>
@@ -564,7 +570,7 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
                         className="h-3.5 w-3.5"
                         style={{
                           color:
-                            category === disease ? C.primary : C.stone,
+                            category === disease ? c.primary : c.stone,
                         }}
                       />
                     }
@@ -583,7 +589,7 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
                   size="sm"
                   className="w-full justify-start gap-2"
                   onClick={() => router.push("/settings")}
-                  style={{ color: C.steel }}
+                  style={{ color: c.steel }}
                 >
                   <Settings className="h-4 w-4" />
                   Settings
@@ -597,15 +603,21 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
         {/* ── Main page area ────────────────────────────────── */}
         <main
           className="px-4 sm:px-8 lg:px-14"
-          style={{ background: C.canvas }}
+          style={{ background: c.canvas }}
         >
           {sidebarCollapsed && (
             <button
               type="button"
               aria-label="Open sidebar"
               onClick={() => setSidebarCollapsed(false)}
-              className="hidden lg:flex items-center gap-1.5 mt-4 -ml-2 rounded-md px-2 py-1 text-[12px] transition-colors hover:bg-[#f0eeec]"
-              style={{ color: C.steel }}
+              className="hidden lg:flex items-center gap-1.5 mt-4 -ml-2 rounded-md px-2 py-1 text-[12px] transition-colors"
+              style={{ color: c.steel }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = c.mutedHover;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+              }}
             >
               <PanelLeftOpen className="h-4 w-4" />
               <span>Open sidebar</span>
@@ -616,21 +628,21 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
             {/* Breadcrumb */}
             <nav
               className="flex items-center gap-1.5 text-[12px]"
-              style={{ color: C.steel }}
+              style={{ color: c.steel }}
             >
-              <Link href="/structured-report" style={{ color: C.steel }}>
+              <Link href="/structured-report" style={{ color: c.steel }}>
                 Workspace
               </Link>
               <ChevronRight className="h-3 w-3" />
               <Link
                 href="/structured-report"
                 className="hover:underline"
-                style={{ color: C.steel }}
+                style={{ color: c.steel }}
               >
                 Structured reports
               </Link>
               <ChevronRight className="h-3 w-3" />
-              <span style={{ color: C.charcoal }}>{meta.displayNameKo}</span>
+              <span style={{ color: c.charcoal }}>{meta.displayNameKo}</span>
             </nav>
 
             <EmojiPickerTrigger
@@ -648,7 +660,7 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
               fallback={
                 <ClipboardList
                   className="h-7 w-7"
-                  style={{ color: C.charcoal }}
+                  style={{ color: c.charcoal }}
                 />
               }
               emojis={REPORT_EMOJI}
@@ -662,14 +674,14 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
                 fontWeight: 700,
                 lineHeight: 1.15,
                 letterSpacing: "-0.6px",
-                color: C.ink,
+                color: c.ink,
               }}
             >
               {meta.displayNameKo} 구조화 리포트
             </h1>
             <p
               className="mt-2 text-[15px]"
-              style={{ color: C.slate, lineHeight: 1.55 }}
+              style={{ color: c.slate, lineHeight: 1.55 }}
             >
               6개 섹션(CLINICAL INFORMATION / TECHNIQUE / COMPARISON /
               FINDINGS / STAGING / IMPRESSION)으로 구조화된 리포트를
@@ -696,23 +708,23 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
             {/* Property bar */}
             <dl
               className="mt-6 grid grid-cols-1 gap-y-1.5 text-[13px] sm:grid-cols-[120px_1fr]"
-              style={{ color: C.charcoal }}
+              style={{ color: c.charcoal }}
             >
               <PropRow
                 label="Disease"
                 value={meta.displayNameKo}
-                pillBg={C.accentBg}
-                pillColor={C.primary}
+                pillBg={c.accentBg}
+                pillColor={c.primary}
               />
               <PropRow
                 label="Modality"
                 value={modality === "Auto" ? "Auto-detect" : modality}
-                pillBg={C.surface}
+                pillBg={c.surface}
               />
               <PropRow
                 label="Language"
                 value={langLabel}
-                pillBg={C.surface}
+                pillBg={c.surface}
               />
               <PropRow
                 label="Status"
@@ -725,24 +737,24 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
                 }
                 pillBg={
                   isStreaming
-                    ? C.accentBg
+                    ? c.accentBg
                     : missingFields.length > 0
-                    ? "#fff4d6"
-                    : "#dff5e3"
+                    ? c.warningTint
+                    : c.surface
                 }
                 pillColor={
                   isStreaming
-                    ? C.primary
+                    ? c.primary
                     : missingFields.length > 0
-                    ? "#7a5a00"
-                    : "#0a6a2c"
+                    ? c.warningText
+                    : c.successText
                 }
               />
             </dl>
 
             <div
               className="my-8 h-px"
-              style={{ background: C.hairlineSoft }}
+              style={{ background: c.hairlineSoft }}
             />
 
             {/* ── Workspace 2-column layout ──────────────────── */}
@@ -767,7 +779,7 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
                         className="mb-1.5 block text-[13px] font-medium"
                         id="modality-hint-label"
                         htmlFor="modality-hint-control"
-                        style={{ color: C.charcoal }}
+                        style={{ color: c.charcoal }}
                       >
                         Modality hint
                       </label>
@@ -781,7 +793,7 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
                       />
                       <p
                         className="mt-1.5 text-[12px]"
-                        style={{ color: C.steel }}
+                        style={{ color: c.steel }}
                       >
                         Auto: 입력 텍스트에서 modality를 자동 유추합니다.
                         구체적인 modality를 선택하면 프롬프트에 hint로
@@ -843,16 +855,16 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
                         aria-live="polite"
                         className="rounded-md border px-3 py-2.5 text-[13px]"
                         style={{
-                          borderColor: "#f3d97a",
-                          background: "#fff8e1",
-                          color: "#7a5a00",
+                          borderColor: c.warningBorder,
+                          background: c.warningTint,
+                          color: c.warningText,
                         }}
                       >
                         <p className="font-medium">
                           필수 입력란이 비어 있습니다
                           <span
                             className="ml-1 font-normal"
-                            style={{ color: "#a07a00" }}
+                            style={{ color: c.warningBar }}
                           >
                             ({missingFields.length}개 항목 누락)
                           </span>
@@ -871,14 +883,14 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
                 <div
                   className="mt-6 flex flex-col gap-3 rounded-xl p-5 sm:flex-row sm:items-center sm:justify-between"
                   style={{
-                    background: C.cardLavender,
-                    border: `1px solid ${C.accentBg}`,
+                    background: c.cardLavender,
+                    border: `1px solid ${c.accentBg}`,
                   }}
                 >
                   <div className="min-w-0">
                     <div
                       className="text-[14px] font-medium"
-                      style={{ color: C.charcoal }}
+                      style={{ color: c.charcoal }}
                     >
                       {isStreaming
                         ? "Generating report…"
@@ -886,7 +898,7 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
                     </div>
                     <div
                       className="text-[13px]"
-                      style={{ color: C.slate, marginTop: 2 }}
+                      style={{ color: c.slate, marginTop: 2 }}
                     >
                       {isStreaming
                         ? "Cancel anytime to keep the partial output."
@@ -899,8 +911,8 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
                       variant="outline"
                       size="lg"
                       style={{
-                        borderColor: C.hairline,
-                        color: C.charcoal,
+                        borderColor: c.hairline,
+                        color: c.charcoal,
                         borderRadius: 9999,
                         padding: "0 22px",
                         height: 44,
@@ -916,8 +928,8 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
                       size="lg"
                       className="font-medium"
                       style={{
-                        background: C.primary,
-                        color: "#ffffff",
+                        background: c.primary,
+                        color: c.primaryForeground,
                         borderRadius: 9999,
                         padding: "0 22px",
                         height: 44,
@@ -943,8 +955,8 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
                     isStreaming
                       ? {
                           text: "streaming",
-                          bg: C.accentBg,
-                          color: C.primary,
+                          bg: c.accentBg,
+                          color: c.primary,
                         }
                       : undefined
                   }
@@ -964,7 +976,7 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
             {/* Footer */}
             <footer
               className="mt-16 flex flex-col items-start gap-2 border-t pt-6 text-[12px] sm:flex-row sm:items-center sm:justify-between"
-              style={{ borderColor: C.hairlineSoft, color: C.steel }}
+              style={{ borderColor: c.hairlineSoft, color: c.steel }}
             >
               <span>
                 Rad Conclusion — Structured radiology report generator. For
@@ -973,7 +985,7 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
               <Link
                 href="/structured-report"
                 className="inline-flex items-center gap-1"
-                style={{ color: C.slate }}
+                style={{ color: c.slate }}
               >
                 ← All disease templates
               </Link>

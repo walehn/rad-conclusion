@@ -19,8 +19,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  notionTokens,
-  C,
+  useNotionPalette,
   SidebarSection,
   SidebarItem,
   PropRow,
@@ -55,6 +54,7 @@ interface Props {
  * as a real navigation item to /structured-report/<slug>.
  */
 export function StructuredReportSelectorClient({ entries }: Props) {
+  const { c, tokens } = useNotionPalette();
   const router = useRouter();
 
   // ── UX state (sidebar collapse, page emoji) ────────────────
@@ -65,8 +65,8 @@ export function StructuredReportSelectorClient({ entries }: Props) {
 
   React.useEffect(() => {
     try {
-      const c = localStorage.getItem("radc.sidebar-collapsed");
-      if (c === "1") setSidebarCollapsed(true);
+      const collapsed = localStorage.getItem("radc.sidebar-collapsed");
+      if (collapsed === "1") setSidebarCollapsed(true);
       const e = localStorage.getItem("radc.reports-page-emoji");
       if (e) setPageEmoji(e);
     } catch {}
@@ -94,7 +94,7 @@ export function StructuredReportSelectorClient({ entries }: Props) {
   return (
     <div
       className="min-h-screen"
-      style={{ ...notionTokens, background: C.canvas }}
+      style={{ ...tokens, background: c.canvas }}
     >
       <div
         className={
@@ -108,8 +108,8 @@ export function StructuredReportSelectorClient({ entries }: Props) {
           <aside
             className="hidden border-r lg:block"
             style={{
-              background: C.surfaceSoft,
-              borderColor: C.hairlineSoft,
+              background: c.surfaceSoft,
+              borderColor: c.hairlineSoft,
               position: "sticky",
               top: 56,
               alignSelf: "flex-start",
@@ -120,13 +120,13 @@ export function StructuredReportSelectorClient({ entries }: Props) {
             <div className="flex h-full flex-col px-3 py-4 text-[14px]">
               <div
                 className="group flex items-center gap-2 rounded-md px-2 py-1.5"
-                style={{ color: C.charcoal }}
+                style={{ color: c.charcoal }}
               >
                 <span
                   className="grid h-6 w-6 place-items-center rounded-md"
                   style={{
-                    background: C.accentBg,
-                    color: C.primary,
+                    background: c.accentBg,
+                    color: c.primary,
                     fontWeight: 700,
                     fontSize: 12,
                   }}
@@ -134,10 +134,10 @@ export function StructuredReportSelectorClient({ entries }: Props) {
                   R
                 </span>
                 <div className="leading-tight">
-                  <div className="font-medium" style={{ color: C.charcoal }}>
+                  <div className="font-medium" style={{ color: c.charcoal }}>
                     Radiology
                   </div>
-                  <div className="text-[11px]" style={{ color: C.steel }}>
+                  <div className="text-[11px]" style={{ color: c.steel }}>
                     Workspace
                   </div>
                 </div>
@@ -145,9 +145,15 @@ export function StructuredReportSelectorClient({ entries }: Props) {
                   type="button"
                   aria-label="Collapse sidebar"
                   onClick={() => setSidebarCollapsed(true)}
-                  className="ml-auto rounded p-1 transition-opacity hover:bg-[#ece8f7]"
-                  style={{ color: C.steel }}
+                  className="ml-auto rounded p-1 transition-opacity"
+                  style={{ color: c.steel }}
                   title="Collapse sidebar"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = c.accentHover;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                  }}
                 >
                   <PanelLeftClose className="h-4 w-4" />
                 </button>
@@ -155,13 +161,13 @@ export function StructuredReportSelectorClient({ entries }: Props) {
 
               <div
                 className="mt-3 flex items-center gap-2 rounded-md px-2 py-1.5"
-                style={{ background: C.surface, color: C.steel }}
+                style={{ background: c.surface, color: c.steel }}
               >
                 <Search className="h-3.5 w-3.5" />
                 <span className="text-[13px]">Search…</span>
                 <span
                   className="ml-auto rounded px-1.5 py-0.5 text-[10px]"
-                  style={{ background: C.canvas, color: C.steel }}
+                  style={{ background: c.canvas, color: c.steel }}
                 >
                   ⌘K
                 </span>
@@ -201,7 +207,7 @@ export function StructuredReportSelectorClient({ entries }: Props) {
                     icon={
                       <Hash
                         className="h-3.5 w-3.5"
-                        style={{ color: C.stone }}
+                        style={{ color: c.stone }}
                       />
                     }
                     onClick={() =>
@@ -219,7 +225,7 @@ export function StructuredReportSelectorClient({ entries }: Props) {
                   size="sm"
                   className="w-full justify-start gap-2"
                   onClick={() => router.push("/settings")}
-                  style={{ color: C.steel }}
+                  style={{ color: c.steel }}
                 >
                   <Settings className="h-4 w-4" />
                   Settings
@@ -233,15 +239,21 @@ export function StructuredReportSelectorClient({ entries }: Props) {
         {/* ── Main page area ────────────────────────────────── */}
         <main
           className="px-4 sm:px-8 lg:px-14"
-          style={{ background: C.canvas }}
+          style={{ background: c.canvas }}
         >
           {sidebarCollapsed && (
             <button
               type="button"
               aria-label="Open sidebar"
               onClick={() => setSidebarCollapsed(false)}
-              className="hidden lg:flex items-center gap-1.5 mt-4 -ml-2 rounded-md px-2 py-1 text-[12px] transition-colors hover:bg-[#f0eeec]"
-              style={{ color: C.steel }}
+              className="hidden lg:flex items-center gap-1.5 mt-4 -ml-2 rounded-md px-2 py-1 text-[12px] transition-colors"
+              style={{ color: c.steel }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = c.mutedHover;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+              }}
             >
               <PanelLeftOpen className="h-4 w-4" />
               <span>Open sidebar</span>
@@ -252,11 +264,11 @@ export function StructuredReportSelectorClient({ entries }: Props) {
             {/* Breadcrumb */}
             <nav
               className="flex items-center gap-1.5 text-[12px]"
-              style={{ color: C.steel }}
+              style={{ color: c.steel }}
             >
               <span>Workspace</span>
               <ChevronRight className="h-3 w-3" />
-              <span style={{ color: C.charcoal }}>Structured reports</span>
+              <span style={{ color: c.charcoal }}>Structured reports</span>
             </nav>
 
             {/* Page emoji picker */}
@@ -273,7 +285,7 @@ export function StructuredReportSelectorClient({ entries }: Props) {
                 setEmojiPickerOpen(false);
               }}
               fallback={
-                <ClipboardList className="h-7 w-7" style={{ color: C.charcoal }} />
+                <ClipboardList className="h-7 w-7" style={{ color: c.charcoal }} />
               }
               emojis={REPORT_EMOJI}
               popoverLabel="Report icons"
@@ -286,14 +298,14 @@ export function StructuredReportSelectorClient({ entries }: Props) {
                 fontWeight: 700,
                 lineHeight: 1.15,
                 letterSpacing: "-0.6px",
-                color: C.ink,
+                color: c.ink,
               }}
             >
               구조화 리포트 생성기
             </h1>
             <p
               className="mt-2 text-[15px]"
-              style={{ color: C.slate, lineHeight: 1.55 }}
+              style={{ color: c.slate, lineHeight: 1.55 }}
             >
               질병을 선택하면 해당 리포트 작성 화면으로 이동합니다. 템플릿은
               표준 가이드라인(PI-RADS, ACR 등)에 정렬되어 있습니다.
@@ -302,40 +314,40 @@ export function StructuredReportSelectorClient({ entries }: Props) {
             {/* Property bar */}
             <dl
               className="mt-6 grid grid-cols-1 gap-y-1.5 text-[13px] sm:grid-cols-[120px_1fr]"
-              style={{ color: C.charcoal }}
+              style={{ color: c.charcoal }}
             >
               <PropRow
                 label="Categories"
                 value={`${entries.length} templates available`}
-                pillBg={C.surface}
+                pillBg={c.surface}
               />
               <PropRow
                 label="Standards"
                 value="PI-RADS v2.1 · ACR · 통합 영상의학"
-                pillBg={C.surface}
+                pillBg={c.surface}
               />
               <PropRow
                 label="Status"
                 value="Production ready"
-                pillBg={C.accentBg}
-                pillColor={C.primary}
+                pillBg={c.accentBg}
+                pillColor={c.primary}
               />
             </dl>
 
             <div
               className="my-8 h-px"
-              style={{ background: C.hairlineSoft }}
+              style={{ background: c.hairlineSoft }}
             />
 
             {/* Section header */}
             <div className="mb-4 flex items-baseline justify-between">
               <h2
                 className="text-[15px] font-semibold"
-                style={{ color: C.ink, letterSpacing: "-0.1px" }}
+                style={{ color: c.ink, letterSpacing: "-0.1px" }}
               >
                 Disease categories
               </h2>
-              <span className="text-[12px]" style={{ color: C.steel }}>
+              <span className="text-[12px]" style={{ color: c.steel }}>
                 {entries.length}개 등록됨
               </span>
             </div>
@@ -344,9 +356,9 @@ export function StructuredReportSelectorClient({ entries }: Props) {
               <div
                 className="rounded-lg border p-8 text-center text-[14px]"
                 style={{
-                  borderColor: C.hairline,
-                  background: C.surfaceSoft,
-                  color: C.slate,
+                  borderColor: c.hairline,
+                  background: c.surfaceSoft,
+                  color: c.slate,
                 }}
               >
                 등록된 질병이 없습니다 — No diseases registered.
@@ -360,14 +372,14 @@ export function StructuredReportSelectorClient({ entries }: Props) {
                       aria-label={`질병 선택: ${meta.displayNameKo} (#${idx + 1})`}
                       className="group block rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
                       style={{
-                        ["--tw-ring-color" as string]: C.primary,
+                        ["--tw-ring-color" as string]: c.primary,
                       }}
                     >
                       <article
                         className="h-full rounded-xl border p-5 transition-all duration-200 ease-out group-hover:-translate-y-0.5"
                         style={{
-                          borderColor: C.hairline,
-                          background: C.card,
+                          borderColor: c.hairline,
+                          background: c.card,
                         }}
                       >
                         <div className="flex items-start justify-between gap-3">
@@ -379,8 +391,8 @@ export function StructuredReportSelectorClient({ entries }: Props) {
                           <span
                             className="rounded-full px-2 py-0.5 text-[11px] font-medium"
                             style={{
-                              background: C.surface,
-                              color: C.steel,
+                              background: c.surface,
+                              color: c.steel,
                             }}
                           >
                             #{idx + 1}
@@ -389,7 +401,7 @@ export function StructuredReportSelectorClient({ entries }: Props) {
 
                         <p
                           className="mt-4 text-[14px] leading-relaxed"
-                          style={{ color: C.slate }}
+                          style={{ color: c.slate }}
                         >
                           {meta.description}
                         </p>
@@ -400,9 +412,9 @@ export function StructuredReportSelectorClient({ entries }: Props) {
                               key={m}
                               className="inline-flex items-center rounded px-2 py-0.5 text-[11px] font-medium"
                               style={{
-                                background: C.surface,
-                                color: C.charcoal,
-                                border: `1px solid ${C.hairlineSoft}`,
+                                background: c.surface,
+                                color: c.charcoal,
+                                border: `1px solid ${c.hairlineSoft}`,
                               }}
                             >
                               {m}
@@ -412,14 +424,14 @@ export function StructuredReportSelectorClient({ entries }: Props) {
 
                         <div
                           className="mt-5 flex items-center justify-between border-t pt-4 text-[13px]"
-                          style={{ borderColor: C.hairlineSoft }}
+                          style={{ borderColor: c.hairlineSoft }}
                         >
-                          <span style={{ color: C.steel }}>
+                          <span style={{ color: c.steel }}>
                             {meta.displayNameKo}
                           </span>
                           <span
                             className="inline-flex items-center gap-1 font-medium transition-transform group-hover:translate-x-0.5"
-                            style={{ color: C.primary }}
+                            style={{ color: c.primary }}
                           >
                             리포트 생성 시작
                             <ArrowRight className="h-3.5 w-3.5" />
@@ -435,7 +447,7 @@ export function StructuredReportSelectorClient({ entries }: Props) {
             {/* Footer */}
             <footer
               className="mt-16 flex flex-col items-start gap-2 border-t pt-6 text-[12px] sm:flex-row sm:items-center sm:justify-between"
-              style={{ borderColor: C.hairlineSoft, color: C.steel }}
+              style={{ borderColor: c.hairlineSoft, color: c.steel }}
             >
               <span>
                 Rad Conclusion — Structured radiology report generator. For
@@ -444,7 +456,7 @@ export function StructuredReportSelectorClient({ entries }: Props) {
               <Link
                 href="/conclusion"
                 className="inline-flex items-center gap-1"
-                style={{ color: C.slate }}
+                style={{ color: c.slate }}
               >
                 ← Back to conclusion workspace
               </Link>

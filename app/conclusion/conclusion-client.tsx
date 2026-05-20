@@ -21,8 +21,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  notionTokens,
-  C,
+  useNotionPalette,
   SidebarSection,
   SidebarItem,
   Block,
@@ -47,11 +46,12 @@ function getCsrfToken(): string {
   if (typeof document === "undefined") return "";
   return document.cookie
     .split("; ")
-    .find((c) => c.startsWith("csrf_token="))
+    .find((cookie) => cookie.startsWith("csrf_token="))
     ?.split("=")[1] ?? "";
 }
 
 export function ConclusionClient() {
+  const { c, tokens } = useNotionPalette();
   const router = useRouter();
   const [findings, setFindings] = React.useState("");
   const [style, setStyle] = React.useState<ConclusionStyle>("numbered");
@@ -82,8 +82,8 @@ export function ConclusionClient() {
   // Hydrate UX preferences from localStorage after mount.
   React.useEffect(() => {
     try {
-      const c = localStorage.getItem("radc.sidebar-collapsed");
-      if (c === "1") setSidebarCollapsed(true);
+      const collapsed = localStorage.getItem("radc.sidebar-collapsed");
+      if (collapsed === "1") setSidebarCollapsed(true);
       const e = localStorage.getItem("radc.page-emoji");
       if (e) setPageEmoji(e);
     } catch {}
@@ -120,7 +120,7 @@ export function ConclusionClient() {
 
       // Merge: a provider is available if server has env var OR client has configured it
       const merged = serverRes.map((sp) => {
-        const cs = localSettings.find((c) => c.id === sp.name);
+        const cs = localSettings.find((s) => s.id === sp.name);
         const clientAvailable = cs?.enabled && (cs.id === "local" ? !!cs.hostUrl : !!cs.apiKey);
         return {
           ...sp,
@@ -343,10 +343,10 @@ export function ConclusionClient() {
 
   // Local style helpers for this page only (palette comes from notion-tone).
   const headingStyle: React.CSSProperties = {
-    color: C.ink,
+    color: c.ink,
     letterSpacing: "-0.4px",
   };
-  const subtleStyle: React.CSSProperties = { color: C.slate };
+  const subtleStyle: React.CSSProperties = { color: c.slate };
 
   const charsCount = findings.trim().length;
   const standardLabel =
@@ -357,7 +357,7 @@ export function ConclusionClient() {
   return (
     <div
       className="min-h-screen"
-      style={{ ...notionTokens, background: C.canvas }}
+      style={{ ...tokens, background: c.canvas }}
     >
       <div
         className={
@@ -371,8 +371,8 @@ export function ConclusionClient() {
           <aside
             className="hidden border-r lg:block"
             style={{
-              background: C.surfaceSoft,
-              borderColor: C.hairlineSoft,
+              background: c.surfaceSoft,
+              borderColor: c.hairlineSoft,
               position: "sticky",
               top: 56, // AppNav height
               alignSelf: "flex-start",
@@ -384,13 +384,13 @@ export function ConclusionClient() {
             {/* Workspace header */}
             <div
               className="group flex items-center gap-2 rounded-md px-2 py-1.5"
-              style={{ color: C.charcoal }}
+              style={{ color: c.charcoal }}
             >
               <span
                 className="grid h-6 w-6 place-items-center rounded-md"
                 style={{
-                  background: C.accentBg,
-                  color: C.primary,
+                  background: c.accentBg,
+                  color: c.primary,
                   fontWeight: 700,
                   fontSize: 12,
                 }}
@@ -398,10 +398,10 @@ export function ConclusionClient() {
                 R
               </span>
               <div className="leading-tight">
-                <div className="font-medium" style={{ color: C.charcoal }}>
+                <div className="font-medium" style={{ color: c.charcoal }}>
                   Radiology
                 </div>
-                <div className="text-[11px]" style={{ color: C.steel }}>
+                <div className="text-[11px]" style={{ color: c.steel }}>
                   Workspace
                 </div>
               </div>
@@ -409,9 +409,15 @@ export function ConclusionClient() {
                 type="button"
                 aria-label="Collapse sidebar"
                 onClick={() => setSidebarCollapsed(true)}
-                className="ml-auto rounded p-1 transition-opacity hover:bg-[#ece8f7]"
-                style={{ color: C.steel }}
+                className="ml-auto rounded p-1 transition-opacity"
+                style={{ color: c.steel }}
                 title="Collapse sidebar"
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = c.accentHover;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                }}
               >
                 <PanelLeftClose className="h-4 w-4" />
               </button>
@@ -420,13 +426,13 @@ export function ConclusionClient() {
             {/* Search */}
             <div
               className="mt-3 flex items-center gap-2 rounded-md px-2 py-1.5"
-              style={{ background: C.surface, color: C.steel }}
+              style={{ background: c.surface, color: c.steel }}
             >
               <Search className="h-3.5 w-3.5" />
               <span className="text-[13px]">Search…</span>
               <span
                 className="ml-auto rounded px-1.5 py-0.5 text-[10px]"
-                style={{ background: C.canvas, color: C.steel }}
+                style={{ background: c.canvas, color: c.steel }}
               >
                 ⌘K
               </span>
@@ -452,7 +458,7 @@ export function ConclusionClient() {
               action={
                 <span
                   className="rounded p-1"
-                  style={{ color: C.steel }}
+                  style={{ color: c.steel }}
                   aria-hidden
                 >
                   <Plus className="h-3.5 w-3.5" />
@@ -470,7 +476,7 @@ export function ConclusionClient() {
                   icon={
                     <Hash
                       className="h-3.5 w-3.5"
-                      style={{ color: C.stone }}
+                      style={{ color: c.stone }}
                     />
                   }
                 >
@@ -485,7 +491,7 @@ export function ConclusionClient() {
                 size="sm"
                 className="w-full justify-start gap-2"
                 onClick={() => router.push("/settings")}
-                style={{ color: C.steel }}
+                style={{ color: c.steel }}
               >
                 <Settings className="h-4 w-4" />
                 Settings
@@ -499,7 +505,7 @@ export function ConclusionClient() {
         {/* ── Main page area ────────────────────────────────────── */}
         <main
           className="px-4 sm:px-8 lg:px-14"
-          style={{ background: C.canvas }}
+          style={{ background: c.canvas }}
         >
           {/* Collapsed-state expand toggle (Notion: floating left edge button) */}
           {sidebarCollapsed && (
@@ -507,8 +513,14 @@ export function ConclusionClient() {
               type="button"
               aria-label="Open sidebar"
               onClick={() => setSidebarCollapsed(false)}
-              className="hidden lg:flex items-center gap-1.5 mt-4 -ml-2 rounded-md px-2 py-1 text-[12px] transition-colors hover:bg-[#f0eeec]"
-              style={{ color: C.steel }}
+              className="hidden lg:flex items-center gap-1.5 mt-4 -ml-2 rounded-md px-2 py-1 text-[12px] transition-colors"
+              style={{ color: c.steel }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = c.mutedHover;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+              }}
             >
               <PanelLeftOpen className="h-4 w-4" />
               <span>Open sidebar</span>
@@ -518,13 +530,13 @@ export function ConclusionClient() {
             {/* Breadcrumb */}
             <nav
               className="flex items-center gap-1.5 text-[12px]"
-              style={{ color: C.steel }}
+              style={{ color: c.steel }}
             >
               <span>Workspace</span>
               <ChevronRight className="h-3 w-3" />
               <span>Conclusions</span>
               <ChevronRight className="h-3 w-3" />
-              <span style={{ color: C.charcoal }}>Rad Conclusion</span>
+              <span style={{ color: c.charcoal }}>Rad Conclusion</span>
             </nav>
 
             {/* Page title icon — Notion-style emoji picker trigger */}
@@ -541,7 +553,7 @@ export function ConclusionClient() {
                 setEmojiPickerOpen(false);
               }}
               fallback={
-                <Stethoscope className="h-7 w-7" style={{ color: C.charcoal }} />
+                <Stethoscope className="h-7 w-7" style={{ color: c.charcoal }} />
               }
               emojis={MEDICAL_EMOJI}
               popoverLabel="Medical icons"
@@ -555,14 +567,14 @@ export function ConclusionClient() {
                 fontWeight: 700,
                 lineHeight: 1.15,
                 letterSpacing: "-0.6px",
-                color: C.ink,
+                color: c.ink,
               }}
             >
               Rad Conclusion
             </h1>
             <p
               className="mt-2 text-[15px]"
-              style={{ color: C.slate, lineHeight: 1.55 }}
+              style={{ color: c.slate, lineHeight: 1.55 }}
             >
               AI-powered radiology conclusion generator
             </p>
@@ -570,24 +582,24 @@ export function ConclusionClient() {
             {/* Property bar (Notion page properties) */}
             <dl
               className="mt-6 grid grid-cols-1 gap-y-1.5 text-[13px] sm:grid-cols-[120px_1fr]"
-              style={{ color: C.charcoal }}
+              style={{ color: c.charcoal }}
             >
               <PropRow label="Modality" value="MRI / CT / Mammography" />
               <PropRow
                 label="Standard"
                 value={standardLabel}
-                pillBg={C.surface}
+                pillBg={c.surface}
               />
               <PropRow
                 label="Language"
                 value={langLabel}
-                pillBg={C.surface}
+                pillBg={c.surface}
               />
               <PropRow
                 label="Mode"
                 value={modeLabel}
-                pillBg={compareMode ? C.accentBg : C.surface}
-                pillColor={compareMode ? C.primary : C.charcoal}
+                pillBg={compareMode ? c.accentBg : c.surface}
+                pillColor={compareMode ? c.primary : c.charcoal}
               />
               <PropRow
                 label="Length"
@@ -598,7 +610,7 @@ export function ConclusionClient() {
 
             <div
               className="my-8 h-px"
-              style={{ background: C.hairlineSoft }}
+              style={{ background: c.hairlineSoft }}
             />
 
             {/* ── Workspace 2-column layout ──────────────────── */}
@@ -634,9 +646,9 @@ export function ConclusionClient() {
                   label="Findings"
                   hint={`${charsCount.toLocaleString()} characters · paste from your dictation`}
                   note="Paste exactly what you dictated. Don't pre-format — standards-aware parsing happens at generation time."
-                  barColor={C.primary}
-                  tint={C.cardLavender}
-                  borderColor={C.accentBg}
+                  barColor={c.primary}
+                  tint={c.cardLavender}
+                  borderColor={c.accentBg}
                 >
                   <FindingsInput
                     value={findings}
@@ -652,20 +664,20 @@ export function ConclusionClient() {
                 <div
                   className="mt-6 flex flex-col gap-3 rounded-xl p-5 sm:flex-row sm:items-center sm:justify-between"
                   style={{
-                    background: C.cardLavender,
-                    border: `1px solid ${C.accentBg}`,
+                    background: c.cardLavender,
+                    border: `1px solid ${c.accentBg}`,
                   }}
                 >
                   <div className="min-w-0">
                     <div
                       className="text-[14px] font-medium"
-                      style={{ color: C.charcoal }}
+                      style={{ color: c.charcoal }}
                     >
                       Ready to generate?
                     </div>
                     <div
                       className="text-[13px]"
-                      style={{ color: C.slate, marginTop: 2 }}
+                      style={{ color: c.slate, marginTop: 2 }}
                     >
                       {compareMode
                         ? "V1 and V2 will run in parallel for comparison."
@@ -678,8 +690,8 @@ export function ConclusionClient() {
                     className="font-medium"
                     size="lg"
                     style={{
-                      background: C.primary,
-                      color: "#ffffff",
+                      background: c.primary,
+                      color: c.primaryForeground,
                       borderRadius: 9999,
                       padding: "0 22px",
                       height: 44,
@@ -710,8 +722,8 @@ export function ConclusionClient() {
                       title="Basic"
                       pill={{
                         text: "baseline",
-                        bg: C.surface,
-                        color: C.slate,
+                        bg: c.surface,
+                        color: c.slate,
                       }}
                     >
                       <ConclusionOutput
@@ -727,8 +739,8 @@ export function ConclusionClient() {
                       title="Advanced — Dx / DDx"
                       pill={{
                         text: "experimental",
-                        bg: C.accentBg,
-                        color: C.primary,
+                        bg: c.accentBg,
+                        color: c.primary,
                       }}
                       highlight
                     >
@@ -747,20 +759,20 @@ export function ConclusionClient() {
                         <div
                           className="flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3"
                           style={{
-                            borderColor: C.hairline,
-                            background: C.surfaceSoft,
+                            borderColor: c.hairline,
+                            background: c.surfaceSoft,
                           }}
                         >
                           <div
                             className="text-[13px]"
-                            style={{ color: C.slate }}
+                            style={{ color: c.slate }}
                           >
                             {voted ? (
                               <>
                                 Voted:{" "}
                                 <span
                                   style={{
-                                    color: C.charcoal,
+                                    color: c.charcoal,
                                     fontWeight: 500,
                                   }}
                                 >
@@ -782,8 +794,8 @@ export function ConclusionClient() {
                                 size="sm"
                                 onClick={() => handleVote("v1")}
                                 style={{
-                                  borderColor: C.hairline,
-                                  color: C.charcoal,
+                                  borderColor: c.hairline,
+                                  color: c.charcoal,
                                 }}
                               >
                                 V1
@@ -793,8 +805,8 @@ export function ConclusionClient() {
                                 size="sm"
                                 onClick={() => handleVote("v2")}
                                 style={{
-                                  borderColor: C.hairline,
-                                  color: C.charcoal,
+                                  borderColor: c.hairline,
+                                  color: c.charcoal,
                                 }}
                               >
                                 V2
@@ -804,8 +816,8 @@ export function ConclusionClient() {
                                 size="sm"
                                 onClick={() => handleVote("tie")}
                                 style={{
-                                  borderColor: C.hairline,
-                                  color: C.charcoal,
+                                  borderColor: c.hairline,
+                                  color: c.charcoal,
                                 }}
                               >
                                 Tie
@@ -831,7 +843,7 @@ export function ConclusionClient() {
             {/* Footer */}
             <footer
               className="mt-16 flex flex-col items-start gap-2 border-t pt-6 text-[12px] sm:flex-row sm:items-center sm:justify-between"
-              style={{ borderColor: C.hairlineSoft, color: C.steel }}
+              style={{ borderColor: c.hairlineSoft, color: c.steel }}
             >
               <span>
                 Rad Conclusion v0.2.0 — Clinical radiology report assistant.
@@ -844,7 +856,7 @@ export function ConclusionClient() {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1"
-                  style={{ color: C.slate }}
+                  style={{ color: c.slate }}
                 >
                   <Github className="h-3.5 w-3.5" />
                   GitHub

@@ -4,7 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Stethoscope, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { notionTokens, C } from "@/components/notion-tone";
+import { useNotionPalette } from "@/components/notion-tone";
 
 interface LoginFormProps {
   csrfToken: string;
@@ -18,6 +18,7 @@ interface LoginFormProps {
  */
 export function LoginForm({ csrfToken, nextPath }: LoginFormProps): React.ReactElement {
   const router = useRouter();
+  const { c, tokens } = useNotionPalette();
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [loading, setLoading] = React.useState(false);
@@ -76,16 +77,16 @@ export function LoginForm({ csrfToken, nextPath }: LoginFormProps): React.ReactE
   return (
     <div
       className="min-h-screen"
-      style={{ ...notionTokens, background: C.canvas }}
+      style={{ ...tokens, background: c.canvas }}
     >
       <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-10 sm:px-6">
         <div className="mb-8 flex flex-col items-center gap-3">
           <div
             className="grid h-12 w-12 place-items-center rounded-xl"
             style={{
-              background: C.accentBg,
-              color: C.primary,
-              border: `1px solid ${C.hairlineSoft}`,
+              background: c.accentBg,
+              color: c.primary,
+              border: `1px solid ${c.hairlineSoft}`,
             }}
           >
             <Stethoscope className="h-7 w-7" />
@@ -93,13 +94,13 @@ export function LoginForm({ csrfToken, nextPath }: LoginFormProps): React.ReactE
           <div className="text-center">
             <h1
               className="text-[28px] font-semibold"
-              style={{ color: C.ink, letterSpacing: "-0.4px" }}
+              style={{ color: c.ink, letterSpacing: "-0.4px" }}
             >
               Rad Conclusion
             </h1>
             <p
               className="mt-1 text-[14px]"
-              style={{ color: C.slate }}
+              style={{ color: c.slate }}
             >
               계정으로 로그인하여 계속 진행하세요
             </p>
@@ -109,20 +110,20 @@ export function LoginForm({ csrfToken, nextPath }: LoginFormProps): React.ReactE
         <div
           className="rounded-xl border p-6"
           style={{
-            background: C.card,
-            borderColor: C.hairline,
+            background: c.card,
+            borderColor: c.hairline,
           }}
         >
           <div className="mb-4">
             <div
               className="text-[11px] font-medium uppercase"
-              style={{ color: C.steel, letterSpacing: "0.08em" }}
+              style={{ color: c.steel, letterSpacing: "0.08em" }}
             >
               Sign in
             </div>
             <div
               className="mt-0.5 text-[17px] font-semibold"
-              style={{ color: C.ink, letterSpacing: "-0.2px" }}
+              style={{ color: c.ink, letterSpacing: "-0.2px" }}
             >
               로그인
             </div>
@@ -192,8 +193,8 @@ export function LoginForm({ csrfToken, nextPath }: LoginFormProps): React.ReactE
                 className="w-full font-medium"
                 size="lg"
                 style={{
-                  background: C.primary,
-                  color: "#ffffff",
+                  background: c.primary,
+                  color: c.primaryForeground,
                   borderRadius: 9999,
                 }}
               >
@@ -211,7 +212,7 @@ export function LoginForm({ csrfToken, nextPath }: LoginFormProps): React.ReactE
 
         <p
           className="mt-6 text-center text-[12px]"
-          style={{ color: C.steel }}
+          style={{ color: c.steel }}
         >
           계정 문의는 관리자에게 연락해 주세요.
         </p>

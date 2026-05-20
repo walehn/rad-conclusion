@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { C } from "./tokens";
+import { useNotionPalette } from "./tokens";
 
 /**
  * Notion-style page property row.
@@ -9,7 +9,7 @@ import { C } from "./tokens";
  * Use inside a `<dl>` grid:
  *
  *   <dl className="grid grid-cols-1 gap-y-1.5 sm:grid-cols-[120px_1fr]">
- *     <PropRow label="Standard" value="PI-RADS v2.1" pillBg={C.surface} />
+ *     <PropRow label="Standard" value="PI-RADS v2.1" pillBg={c.surface} />
  *     <PropRow label="Length" value="0 characters" muted />
  *   </dl>
  */
@@ -26,11 +26,12 @@ export function PropRow({
   pillColor?: string;
   muted?: boolean;
 }) {
+  const { c } = useNotionPalette();
   return (
     <>
       <dt
         className="flex items-center gap-1.5 py-1.5 text-[13px]"
-        style={{ color: C.steel }}
+        style={{ color: c.steel }}
       >
         {label}
       </dt>
@@ -40,7 +41,7 @@ export function PropRow({
             className="inline-flex items-center rounded px-2 py-0.5 text-[12px]"
             style={{
               background: pillBg,
-              color: pillColor ?? C.charcoal,
+              color: pillColor ?? c.charcoal,
               fontWeight: 500,
             }}
           >
@@ -49,7 +50,7 @@ export function PropRow({
         ) : (
           <span
             className="text-[13px]"
-            style={{ color: muted ? C.steel : C.charcoal }}
+            style={{ color: muted ? c.steel : c.charcoal }}
           >
             {value}
           </span>

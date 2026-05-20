@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { C } from "@/components/notion-tone";
+import { useNotionPalette } from "@/components/notion-tone";
 import { CSRF_COOKIE_NAME } from "@/lib/auth/csrf-constants";
 
 const MIN_PASSWORD_LENGTH = 8;
@@ -42,6 +42,7 @@ interface Feedback {
  * password.
  */
 export function PasswordChangeForm() {
+  const { c } = useNotionPalette();
   const [currentPassword, setCurrentPassword] = React.useState("");
   const [newPassword, setNewPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
@@ -169,8 +170,8 @@ export function PasswordChangeForm() {
           type="submit"
           disabled={submitting}
           style={{
-            background: C.primary,
-            color: "#ffffff",
+            background: c.primary,
+            color: c.primaryForeground,
             borderRadius: 9999,
             paddingInline: 18,
           }}
@@ -182,8 +183,7 @@ export function PasswordChangeForm() {
             role={feedback.kind === "error" ? "alert" : "status"}
             className="text-[13px]"
             style={{
-              color:
-                feedback.kind === "success" ? "#2f7a3b" : "#b3261e",
+              color: feedback.kind === "success" ? c.successText : c.errorText,
               lineHeight: 1.5,
             }}
           >
@@ -214,18 +214,19 @@ function FieldRow({
   autoComplete: string;
   hint?: string;
 }) {
+  const { c } = useNotionPalette();
   return (
     <div className="grid gap-1.5">
       <label
         htmlFor={id}
         className="text-[13px] font-medium"
-        style={{ color: C.charcoal }}
+        style={{ color: c.charcoal }}
       >
         {label}
         {hint && (
           <span
             className="ml-2 text-[11px] font-normal"
-            style={{ color: C.steel }}
+            style={{ color: c.steel }}
           >
             {hint}
           </span>

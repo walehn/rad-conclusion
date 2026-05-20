@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Smile } from "lucide-react";
-import { C } from "./tokens";
+import { useNotionPalette } from "./tokens";
 
 /**
  * Notion-style emoji picker trigger.
@@ -83,6 +83,7 @@ export function EmojiPickerTrigger({
   emojis = MEDICAL_EMOJI,
   popoverLabel = "Medical icons",
 }: Props) {
+  const { c } = useNotionPalette();
   const wrapperRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -113,24 +114,34 @@ export function EmojiPickerTrigger({
         onClick={() => onOpenChange(!open)}
         aria-label="Change page icon"
         title="Click to change icon"
-        className="group relative inline-flex items-center justify-center rounded-md transition-all hover:bg-[#f0eeec] hover:ring-2 hover:ring-offset-1"
+        className="group relative inline-flex items-center justify-center rounded-md transition-all hover:ring-2 hover:ring-offset-1"
         style={{
           width: 56,
           height: 56,
-          background: emoji ? "transparent" : C.surface,
+          background: emoji ? "transparent" : c.surface,
           border: emoji
             ? "1px solid transparent"
-            : `1px solid ${C.hairlineSoft}`,
+            : `1px solid ${c.hairlineSoft}`,
           fontSize: 36,
           lineHeight: 1,
-          ["--tw-ring-color" as string]: "#d6d9fc",
+          ["--tw-ring-color" as string]: c.ringTint,
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = c.mutedHover;
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = emoji ? "transparent" : c.surface;
         }}
       >
         {emoji ? <span aria-hidden>{emoji}</span> : fallback}
         <span
           aria-hidden
-          className="pointer-events-none absolute -bottom-1 -right-1 grid h-5 w-5 place-items-center rounded-full bg-white opacity-0 shadow-sm transition-opacity group-hover:opacity-100"
-          style={{ color: C.primary, border: `1px solid ${C.hairline}` }}
+          className="pointer-events-none absolute -bottom-1 -right-1 grid h-5 w-5 place-items-center rounded-full opacity-0 shadow-sm transition-opacity group-hover:opacity-100"
+          style={{
+            background: c.card,
+            color: c.primary,
+            border: `1px solid ${c.hairline}`,
+          }}
         >
           <Smile className="h-3 w-3" />
         </span>
@@ -144,16 +155,16 @@ export function EmojiPickerTrigger({
           style={{
             top: "100%",
             left: 0,
-            background: "#ffffff",
-            borderColor: C.hairline,
+            background: c.card,
+            borderColor: c.hairline,
             boxShadow:
-              "0 14px 28px -10px rgba(15,15,15,0.18), 0 2px 6px rgba(15,15,15,0.06)",
+              "0 14px 28px -10px rgba(0,0,0,0.35), 0 2px 6px rgba(0,0,0,0.15)",
           }}
         >
           <div className="flex items-center justify-between pb-2">
             <span
               className="text-[11px] font-medium uppercase"
-              style={{ color: C.steel, letterSpacing: "0.08em" }}
+              style={{ color: c.steel, letterSpacing: "0.08em" }}
             >
               {popoverLabel}
             </span>
@@ -161,7 +172,7 @@ export function EmojiPickerTrigger({
               type="button"
               onClick={onClear}
               className="text-[12px] underline-offset-2 hover:underline"
-              style={{ color: C.steel }}
+              style={{ color: c.steel }}
             >
               Remove
             </button>
@@ -173,7 +184,13 @@ export function EmojiPickerTrigger({
                 type="button"
                 onClick={() => onSelect(e)}
                 aria-label={`Choose ${e}`}
-                className="grid h-9 w-9 place-items-center rounded text-[20px] transition-colors hover:bg-[#f0eeec]"
+                className="grid h-9 w-9 place-items-center rounded text-[20px] transition-colors"
+                onMouseEnter={(ev) => {
+                  ev.currentTarget.style.background = c.mutedHover;
+                }}
+                onMouseLeave={(ev) => {
+                  ev.currentTarget.style.background = "transparent";
+                }}
               >
                 {e}
               </button>
@@ -181,7 +198,7 @@ export function EmojiPickerTrigger({
           </div>
           <div
             className="mt-2 border-t pt-2 text-[11px]"
-            style={{ borderColor: C.hairlineSoft, color: C.steel }}
+            style={{ borderColor: c.hairlineSoft, color: c.steel }}
           >
             Click any icon to apply. Saved per browser.
           </div>
