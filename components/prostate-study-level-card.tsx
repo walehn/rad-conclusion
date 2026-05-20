@@ -622,6 +622,13 @@ export function ProstateStudyLevelCard({
 
   const showEauRisk = value.clinicalIndication === "staging_after_diagnosis";
 
+  // Negative MRI suppresses AJCC/EAU staging UI per prostate.ts NEGATIVE CASE
+  // HANDLING: the serializer emits "AJCC TNM staging: not applicable on
+  // negative MRI" and the prompt forces the STAGING section to a single
+  // "Not applicable" line, so the auto-derived T/N/M cards and the EAU risk
+  // badge would only confuse the radiologist.
+  const showStaging = !value.noSuspiciousLesion;
+
   return (
     <Card className="shadow-sm ring-1 ring-border/50">
       <CardHeader className="pb-4">
@@ -883,7 +890,10 @@ export function ProstateStudyLevelCard({
             />
           </FieldRow>
 
-          {/* 9. Auto-derived staging block (cT / cN / cM) with override */}
+          {/* 9. Auto-derived staging block (cT / cN / cM) with override.
+             Hidden on negative MRI: AJCC categorisation is replaced by the
+             "Not applicable" line in the rendered STAGING section. */}
+          {showStaging && (
           <fieldset className="md:col-span-2 rounded-lg border border-border p-3 flex flex-col gap-3">
             <legend
               id={`${id("staging")}-legend`}
@@ -1017,9 +1027,12 @@ export function ProstateStudyLevelCard({
               </Button>
             </div>
           </fieldset>
+          )}
 
-          {/* 10. EAU risk group — only when clinicalIndication = staging_after_diagnosis (S-1) */}
-          {showEauRisk && (
+          {/* 10. EAU risk group — only when clinicalIndication = staging_after_diagnosis (S-1).
+             Also suppressed on negative MRI (no measurable disease → no risk
+             stratification). */}
+          {showStaging && showEauRisk && (
             <div className="md:col-span-2 rounded-lg border border-border p-3 flex flex-col gap-1">
               <span className="text-[0.9375rem] font-bold tracking-tight text-foreground">
                 EAU risk group · EAU 위험 분류

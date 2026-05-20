@@ -160,6 +160,10 @@ function DateInput({
   optional = false,
   required = false,
   className,
+  min,
+  max,
+  disabled = false,
+  helperText,
 }: {
   id: string;
   label: string;
@@ -168,6 +172,10 @@ function DateInput({
   optional?: boolean;
   required?: boolean;
   className?: string;
+  min?: string;
+  max?: string;
+  disabled?: boolean;
+  helperText?: React.ReactNode;
 }) {
   return (
     <div
@@ -202,12 +210,18 @@ function DateInput({
         id={id}
         type="date"
         value={value ?? ""}
+        min={min}
+        max={max}
+        disabled={disabled}
         onChange={(e) => {
           const v = e.target.value === "" ? undefined : e.target.value;
           onChange(v);
         }}
-        className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
       />
+      {helperText && (
+        <p className="text-xs text-muted-foreground">{helperText}</p>
+      )}
     </div>
   );
 }
@@ -269,6 +283,61 @@ export function ProstateClinicalContextCard({
     } else {
       onChange({ ...value, priorBiopsyStatus: next });
     }
+  };
+
+  // ---------------------------------------------------------------------
+  // PSA measurement date ↔ psaDateOffsetDays bridge.
+  // The canonical structured field stays `psaDateOffsetDays` (0–365) so the
+  // serializer and downstream prompts are untouched, but the UI exposes a
+  // date picker that converts to/from the offset automatically. This avoids
+  // forcing the radiologist to count days by hand. All math runs in UTC at
+  // midnight to dodge DST half-day drift on `Date.parse`.
+  // ---------------------------------------------------------------------
+  const PSA_OFFSET_MAX_DAYS = 365;
+  const MS_PER_DAY = 86_400_000;
+  const toUTCMidnight = (iso: string): number | undefined => {
+    // Expect "YYYY-MM-DD" from <input type="date">; reject anything else so
+    // a malformed value never silently produces NaN math.
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+    if (!m) return undefined;
+    const ms = Date.UTC(
+      Number.parseInt(m[1], 10),
+      Number.parseInt(m[2], 10) - 1,
+      Number.parseInt(m[3], 10)
+    );
+    return Number.isNaN(ms) ? undefined : ms;
+  };
+  const fromUTCMidnight = (ms: number): string => {
+    return new Date(ms).toISOString().slice(0, 10);
+  };
+
+  const derivedPsaMeasurementDate = React.useMemo<string | undefined>(() => {
+    if (!value.studyDate || value.psaDateOffsetDays === undefined)
+      return undefined;
+    const studyMs = toUTCMidnight(value.studyDate);
+    if (studyMs === undefined) return undefined;
+    return fromUTCMidnight(studyMs - value.psaDateOffsetDays * MS_PER_DAY);
+  }, [value.studyDate, value.psaDateOffsetDays]);
+
+  const psaDateMin = React.useMemo<string | undefined>(() => {
+    if (!value.studyDate) return undefined;
+    const studyMs = toUTCMidnight(value.studyDate);
+    if (studyMs === undefined) return undefined;
+    return fromUTCMidnight(studyMs - PSA_OFFSET_MAX_DAYS * MS_PER_DAY);
+  }, [value.studyDate]);
+
+  const handlePsaMeasurementDateChange = (next: string | undefined) => {
+    if (next === undefined) {
+      onChange({ ...value, psaDateOffsetDays: undefined });
+      return;
+    }
+    if (!value.studyDate) return;
+    const studyMs = toUTCMidnight(value.studyDate);
+    const psaMs = toUTCMidnight(next);
+    if (studyMs === undefined || psaMs === undefined) return;
+    const diff = Math.round((studyMs - psaMs) / MS_PER_DAY);
+    const clamped = Math.max(0, Math.min(PSA_OFFSET_MAX_DAYS, diff));
+    onChange({ ...value, psaDateOffsetDays: clamped });
   };
 
   return (
@@ -401,17 +470,30 @@ export function ProstateClinicalContextCard({
             required
           />
 
-          {/* 6. PSA date offset (days) — optional, 0–365 */}
-          <NumberField
-            id={id("psaOffset")}
-            label="PSA date offset · PSA 측정일과 검사일 간격"
-            value={value.psaDateOffsetDays}
-            onChange={(v) => onChange({ ...value, psaDateOffsetDays: v })}
-            unit="days"
+          {/* 6. PSA measurement date — optional. The structured input keeps
+              the offset (days from study date) as the canonical field, but
+              the UI presents a date picker and converts on the fly so the
+              radiologist never has to count days manually. Restricted to
+              [studyDate − 365, studyDate]; clearing the date drops the
+              offset. Disabled until a study date is entered. */}
+          <DateInput
+            id={id("psaDate")}
+            label="PSA measurement date · PSA 측정일"
+            value={derivedPsaMeasurementDate}
+            onChange={handlePsaMeasurementDateChange}
             optional
-            min="0"
-            max="365"
-            step="1"
+            min={psaDateMin}
+            max={value.studyDate || undefined}
+            disabled={!value.studyDate}
+            helperText={
+              !value.studyDate
+                ? "검사일을 먼저 입력하면 PSA 측정일을 선택할 수 있습니다."
+                : value.psaDateOffsetDays === undefined
+                  ? "선택 시 검사일과의 차이가 자동 계산됩니다."
+                  : value.psaDateOffsetDays === 0
+                    ? "검사일과 동일 (0 days)"
+                    : `검사일 ${value.psaDateOffsetDays}일 전`
+            }
           />
 
           {/* 7. Prior biopsy status — required (8 values).

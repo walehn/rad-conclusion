@@ -882,60 +882,173 @@ function wholeGlandStagingBlock(input: ProstateStructuredInput): string[] {
     );
   }
   pushBullet(lines, "Prostate volume", formatMl(input.prostateVolumeMl));
-  pushBullet(
-    lines,
-    "Seminal vesicle invasion (whole gland)",
-    input.seminalVesicleInvasionWholeGland
-  );
-  pushBullet(lines, "Bladder neck involvement", input.bladderNeckInvolvement);
-  pushBullet(
-    lines,
-    "External sphincter involvement",
-    input.externalSphincterInvolvement
-  );
-  pushBullet(lines, "Rectal involvement", input.rectalInvolvement);
-  pushBullet(
-    lines,
-    "Pelvic sidewall involvement",
-    input.pelvicSidewallInvolvement
-  );
 
-  // Lymph node emit. When neither regional nor non-regional nodes were entered,
-  // emit an explicit negative line so the LLM cannot fabricate "indeterminate"
-  // wording. This pairs with deriveClinicalN's default-N0 behaviour: empty
-  // arrays are treated as a deliberate negative assessment, not unknown.
+  // ---------------------------------------------------------------------
+  // Whole-gland review + nodal/distant sweep.
+  //
+  // Positive MRI (default): emit every category as an individual bullet —
+  // the LLM needs each value to write a per-structure assessment paragraph
+  // in FINDINGS and to support cT/cN/cM derivation downstream.
+  //
+  // Negative MRI (noSuspiciousLesion=true): collapse every category whose
+  // value is "none" / empty into a single consolidated "sweep" bullet so
+  // the LLM cannot inflate the report with eight separate "unremarkable"
+  // paragraphs. Categories with a non-"none" finding (e.g. incidentally
+  // detected enlarged node, equivocal bone signal) are still emitted as
+  // their own bullet so the radiologist's input survives verbatim.
+  // ---------------------------------------------------------------------
+  const isNegativeMRI = input.noSuspiciousLesion === true;
   const regionalLn = input.regionalLymphNodes ?? [];
   const nonRegionalLn = input.nonRegionalLymphNodes ?? [];
-  if (regionalLn.length === 0 && nonRegionalLn.length === 0) {
-    lines.push(
-      "- Lymph nodes: no suspicious regional or non-regional lymph nodes (clinical N0)"
-    );
-  } else {
-    lines.push(
-      ...lymphNodeLines("Regional lymph nodes", input.regionalLymphNodes)
-    );
-    lines.push(
-      ...lymphNodeLines(
-        "Non-regional lymph nodes",
-        input.nonRegionalLymphNodes
-      )
-    );
-  }
 
-  pushBullet(lines, "Bone involvement", input.boneInvolvement);
-  if (
-    input.boneLesionLocations !== undefined &&
-    input.boneLesionLocations.length > 0
-  ) {
-    lines.push(
-      `- Bone lesion locations: ${input.boneLesionLocations.join(", ")}`
+  if (!isNegativeMRI) {
+    pushBullet(
+      lines,
+      "Seminal vesicle invasion (whole gland)",
+      input.seminalVesicleInvasionWholeGland
     );
+    pushBullet(lines, "Bladder neck involvement", input.bladderNeckInvolvement);
+    pushBullet(
+      lines,
+      "External sphincter involvement",
+      input.externalSphincterInvolvement
+    );
+    pushBullet(lines, "Rectal involvement", input.rectalInvolvement);
+    pushBullet(
+      lines,
+      "Pelvic sidewall involvement",
+      input.pelvicSidewallInvolvement
+    );
+
+    // When neither regional nor non-regional nodes were entered, emit an
+    // explicit negative line so the LLM cannot fabricate "indeterminate"
+    // wording. This pairs with deriveClinicalN's default-N0 behaviour:
+    // empty arrays are treated as a deliberate negative assessment.
+    if (regionalLn.length === 0 && nonRegionalLn.length === 0) {
+      lines.push(
+        "- Lymph nodes: no suspicious regional or non-regional lymph nodes (clinical N0)"
+      );
+    } else {
+      lines.push(
+        ...lymphNodeLines("Regional lymph nodes", input.regionalLymphNodes)
+      );
+      lines.push(
+        ...lymphNodeLines(
+          "Non-regional lymph nodes",
+          input.nonRegionalLymphNodes
+        )
+      );
+    }
+
+    pushBullet(lines, "Bone involvement", input.boneInvolvement);
+    if (
+      input.boneLesionLocations !== undefined &&
+      input.boneLesionLocations.length > 0
+    ) {
+      lines.push(
+        `- Bone lesion locations: ${input.boneLesionLocations.join(", ")}`
+      );
+    }
+    pushBullet(lines, "Other distant metastasis", input.otherDistantMetastasis);
+  } else {
+    // Negative MRI: split each category into "negative" vs "abnormal".
+    // Negative ones feed a single consolidated sweep line; abnormal ones
+    // (rare but possible — e.g. incidental node) stay as their own bullet
+    // so per-structure detail is not lost.
+    const negativeSweep: string[] = [];
+    const abnormalBullets: string[] = [];
+
+    const handleEnum = <T extends string>(
+      value: T | undefined,
+      noneValue: T,
+      sweepLabel: string,
+      bulletLabel: string
+    ) => {
+      if (value === undefined) {
+        // No input recorded → still treated as negative for sweep purposes,
+        // matching the radiologist's intent when they skipped the field on
+        // a negative MRI workflow.
+        negativeSweep.push(sweepLabel);
+        return;
+      }
+      if (value === noneValue) {
+        negativeSweep.push(sweepLabel);
+      } else {
+        abnormalBullets.push(`- ${bulletLabel}: ${String(value)}`);
+      }
+    };
+
+    handleEnum(
+      input.seminalVesicleInvasionWholeGland,
+      "none",
+      "seminal vesicles",
+      "Seminal vesicle invasion (whole gland)"
+    );
+    handleEnum(
+      input.bladderNeckInvolvement,
+      "none",
+      "bladder neck",
+      "Bladder neck involvement"
+    );
+    handleEnum(
+      input.externalSphincterInvolvement,
+      "none",
+      "external sphincter",
+      "External sphincter involvement"
+    );
+    handleEnum(input.rectalInvolvement, "none", "rectum", "Rectal involvement");
+    handleEnum(
+      input.pelvicSidewallInvolvement,
+      "none",
+      "pelvic sidewall",
+      "Pelvic sidewall involvement"
+    );
+
+    if (regionalLn.length === 0 && nonRegionalLn.length === 0) {
+      negativeSweep.push("regional and non-regional lymph nodes");
+    } else {
+      abnormalBullets.push(
+        ...lymphNodeLines("Regional lymph nodes", input.regionalLymphNodes)
+      );
+      abnormalBullets.push(
+        ...lymphNodeLines(
+          "Non-regional lymph nodes",
+          input.nonRegionalLymphNodes
+        )
+      );
+    }
+
+    handleEnum(
+      input.boneInvolvement,
+      "none",
+      "imaged skeleton",
+      "Bone involvement"
+    );
+    if (
+      input.boneLesionLocations !== undefined &&
+      input.boneLesionLocations.length > 0
+    ) {
+      // If the radiologist recorded bone lesion locations on a negative
+      // prostate-MRI workflow they are by definition incidental — keep
+      // them as a discrete bullet so the LLM can mention them by location.
+      abnormalBullets.push(
+        `- Bone lesion locations: ${input.boneLesionLocations.join(", ")}`
+      );
+    }
+    handleEnum(
+      input.otherDistantMetastasis,
+      "none",
+      "distant metastatic sites",
+      "Other distant metastasis"
+    );
+
+    if (negativeSweep.length > 0) {
+      lines.push(
+        `- Whole-gland and nodal sweep: no abnormality in ${negativeSweep.join(", ")}.`
+      );
+    }
+    lines.push(...abnormalBullets);
   }
-  pushBullet(
-    lines,
-    "Other distant metastasis",
-    input.otherDistantMetastasis
-  );
 
   // Auto-derived staging — emit override values when isStagingOverridden=true,
   // otherwise emit the canonical derived value.

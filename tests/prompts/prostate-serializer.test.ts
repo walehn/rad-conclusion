@@ -1192,6 +1192,88 @@ describe("serializeProstateStructuredInput — required fields verbatim", () => 
     expect(noResult).toContain("- Target for biopsy: no");
   });
 
+  // -------------------------------------------------------------------------
+  // Negative-MRI sweep consolidation (regression guard for the
+  // "report is too long on negative MRI" fix). When noSuspiciousLesion=true
+  // and every whole-gland / nodal / distant category is "none"/empty, the
+  // eight per-category bullets are collapsed into a single sweep line so
+  // the downstream LLM cannot inflate the FINDINGS section with one
+  // unremarkable paragraph per structure.
+  // -------------------------------------------------------------------------
+  describe("negative-MRI whole-gland sweep consolidation", () => {
+    it("collapses every all-none category into a single sweep bullet", () => {
+      const result = serializeProstateStructuredInput(
+        makeInput({
+          noSuspiciousLesion: true,
+          lesions: [],
+          // all defaults below are "none" via createEmptyProstateInput()
+        })
+      );
+      expect(result).toContain(
+        "- Whole-gland and nodal sweep: no abnormality in seminal vesicles, bladder neck, external sphincter, rectum, pelvic sidewall, regional and non-regional lymph nodes, imaged skeleton, distant metastatic sites."
+      );
+      // Each per-category bullet that the positive-MRI path emits MUST be
+      // absent — that is the whole point of consolidation.
+      expect(result).not.toContain("- Seminal vesicle invasion (whole gland):");
+      expect(result).not.toContain("- Bladder neck involvement:");
+      expect(result).not.toContain("- External sphincter involvement:");
+      expect(result).not.toContain("- Rectal involvement:");
+      expect(result).not.toContain("- Pelvic sidewall involvement:");
+      expect(result).not.toContain(
+        "- Lymph nodes: no suspicious regional or non-regional lymph nodes"
+      );
+      expect(result).not.toContain("- Bone involvement:");
+      expect(result).not.toContain("- Other distant metastasis:");
+    });
+
+    it("keeps a non-'none' SVI as its own bullet and drops it from the sweep", () => {
+      const result = serializeProstateStructuredInput(
+        makeInput({
+          noSuspiciousLesion: true,
+          lesions: [],
+          seminalVesicleInvasionWholeGland: "right",
+        })
+      );
+      // Abnormal category survives as its own bullet…
+      expect(result).toContain(
+        "- Seminal vesicle invasion (whole gland): right"
+      );
+      // …and the sweep no longer mentions seminal vesicles.
+      expect(result).toMatch(/- Whole-gland and nodal sweep: no abnormality in /);
+      expect(result).not.toMatch(
+        /- Whole-gland and nodal sweep: no abnormality in[^\n]*seminal vesicles/
+      );
+    });
+
+    it("keeps incidental regional lymph nodes as discrete bullets on a negative MRI", () => {
+      const result = serializeProstateStructuredInput(
+        makeInput({
+          noSuspiciousLesion: true,
+          lesions: [],
+          regionalLymphNodes: [
+            { station: "obturator", shortAxisMm: 12, morphology: "round" },
+          ],
+        })
+      );
+      expect(result).toContain("- Regional lymph nodes:");
+      expect(result).toContain("  - Node 1: station obturator");
+      // Sweep no longer mentions lymph nodes when one is present.
+      expect(result).not.toMatch(
+        /- Whole-gland and nodal sweep: no abnormality in[^\n]*lymph nodes/
+      );
+    });
+
+    it("does NOT emit the sweep bullet on a positive MRI", () => {
+      // makeInput() defaults to noSuspiciousLesion=false with one lesion.
+      const result = serializeProstateStructuredInput(makeInput());
+      expect(result).not.toContain("- Whole-gland and nodal sweep:");
+      // Positive-MRI path keeps every per-category bullet.
+      expect(result).toContain("- Seminal vesicle invasion (whole gland):");
+      expect(result).toContain("- Bladder neck involvement:");
+      expect(result).toContain("- Bone involvement:");
+    });
+  });
+
   it("emits override justification when isPiradsOverridden=true", () => {
     const result = serializeProstateStructuredInput(
       makeInput({
