@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ProviderCard } from "@/components/settings/provider-card";
+import { PasswordChangeForm } from "@/components/settings/password-change-form";
 import { loadProviderSettings } from "@/lib/storage/settings-store";
 import type { ProviderSettings, ProviderName } from "@/lib/providers/types";
 import { CSRF_COOKIE_NAME } from "@/lib/auth/csrf-constants";
@@ -602,6 +603,10 @@ export default function SettingsClient() {
                     있습니다. 키는 LLM 제공자 API에 직접 전달되며 평문으로
                     저장되지 않습니다.
                   </p>
+                </Block>
+
+                <Block label="Password" hint="Change your account password">
+                  <PasswordChangeForm />
                 </Block>
               </>
             )}

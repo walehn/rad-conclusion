@@ -190,7 +190,7 @@ describe('POST /api/auth/login', () => {
 
     expect(res.status).toBe(401);
     const body = await res.json();
-    expect(body.error).toBe('이메일 또는 비밀번호가 올바르지 않습니다');
+    expect(body.error).toBe('아이디 또는 비밀번호가 올바르지 않습니다');
 
     // No session cookie.
     expect(cookieStoreRef.current!.store.get('rad_conclusion_session')).toBeUndefined();
@@ -337,7 +337,7 @@ describe('POST /api/auth/login', () => {
     );
     expect(res.status).toBe(401);
     const body = await res.json();
-    expect(body.error).toBe('이메일 또는 비밀번호가 올바르지 않습니다');
+    expect(body.error).toBe('아이디 또는 비밀번호가 올바르지 않습니다');
     // Crucial: verifyPassword was still invoked (with DUMMY_HASH) to flatten timing.
     expect(verifySpy).toHaveBeenCalledTimes(1);
     const [, hashUsed] = verifySpy.mock.calls[0];
