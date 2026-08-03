@@ -21,6 +21,30 @@ export interface LocalModelConfig {
    * Omit to leave the server's own --default-chat-template-kwargs untouched.
    */
   chatTemplateKwargs?: Record<string, unknown>;
+  /**
+   * Replaces `chatTemplateKwargs` when the caller asks for deeper reasoning
+   * (the v2 prompt path). These endpoints drive thinking through the chat
+   * template, so depth is expressed by turning thinking on rather than by the
+   * `reasoning_effort` parameter — see `supportsReasoningEffort`.
+   *
+   * Measured on DeepSeek-V4-Flash: off ~6s / 248 tokens, on+low ~15s / 697
+   * tokens, on+medium ~21s / 1072 tokens. `low` keeps most of the benefit.
+   *
+   * Only used by /api/generate, which sets no max_tokens. Do not enable this
+   * on a capped route: thinking can consume the whole budget and return empty
+   * content.
+   */
+  deepChatTemplateKwargs?: Record<string, unknown>;
+  /**
+   * Whether the endpoint may receive the OpenAI `reasoning_effort` parameter.
+   *
+   * On vLLM builds that drive reasoning through the chat template, sending it
+   * overrides `chatTemplateKwargs.thinking` and silently re-enables reasoning:
+   * the model then spends its whole budget on hidden thinking tokens (TTFT
+   * 13-21s, and empty content once max_tokens is reached). Off unless a model
+   * is known to handle the parameter.
+   */
+  supportsReasoningEffort?: boolean;
 }
 
 /**
@@ -36,8 +60,9 @@ export const LOCAL_MODELS: readonly LocalModelConfig[] = [
     hostEnvVar: "RAD_LOCAL_DEEPSEEK_HOST",
     // The DeepSeek-V4 chat template takes `thinking` (the server starts with
     // it enabled). Reasoning is streamed on `reasoning_content`, which the AI
-    // SDK does not surface, so leaving it on would only cost latency.
+    // SDK does not surface, so it stays off unless depth is requested.
     chatTemplateKwargs: { thinking: false },
+    deepChatTemplateKwargs: { thinking: true, reasoning_effort: "low" },
   },
   {
     id: "Qwen/Qwen3.6-35B-A3B-FP8",
@@ -47,6 +72,7 @@ export const LOCAL_MODELS: readonly LocalModelConfig[] = [
     // vLLM (Qwen) emits empty content when its <think> channel exhausts
     // max_tokens, so thinking is force-disabled.
     chatTemplateKwargs: { enable_thinking: false },
+    deepChatTemplateKwargs: { enable_thinking: true },
   },
 ];
 

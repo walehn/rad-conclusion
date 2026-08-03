@@ -1,6 +1,10 @@
 import { streamText } from "ai";
 import { z } from "zod";
-import { getModelWithKey, resolvedModelId } from "@/lib/providers/registry";
+import {
+  getModelWithKey,
+  resolvedModelId,
+  supportsReasoningEffort,
+} from "@/lib/providers/registry";
 import { buildSystemPrompt, buildUserPrompt } from "@/lib/prompts/system-prompt";
 import type { ProviderName } from "@/lib/providers/types";
 import type { ConclusionStyle, ConclusionLang, PromptVersion } from "@/lib/prompts/system-prompt";
@@ -59,8 +63,14 @@ export async function POST(req: Request) {
     const { findings, style, lang, title, provider, model, promptVersion } =
       parsed.data;
 
+    // v2 is the "think harder" prompt path. Hosted providers express that via
+    // reasoning_effort below; local endpoints via their chat template.
+    const deepReasoning = promptVersion === "v2";
+
     const apiKey = await resolveApiKey(session.userId, provider as ProviderName);
-    const llmModel = getModelWithKey(provider as ProviderName, model, apiKey);
+    const llmModel = getModelWithKey(provider as ProviderName, model, apiKey, {
+      deepReasoning,
+    });
 
     const systemPrompt = buildSystemPrompt({
       style: style as ConclusionStyle,
@@ -72,6 +82,10 @@ export async function POST(req: Request) {
     const userPrompt = buildUserPrompt({ findings, title });
 
     const reasoningEffort = promptVersion === "v2" ? "medium" : "low";
+    const sendsReasoningEffort = supportsReasoningEffort(
+      provider as ProviderName,
+      model
+    );
 
     // Perf instrumentation: t at LLM-call boundary so TTFT excludes auth/parse.
     // promptVersion is included so concurrent v1+v2 (compareMode) requests can
@@ -83,6 +97,9 @@ export async function POST(req: Request) {
       provider,
       modelId,
       promptVersion,
+      // null when withheld, so a slow TTFT can be attributed from the log.
+      reasoningEffort: sendsReasoningEffort ? reasoningEffort : null,
+      deepReasoning,
       style,
       lang,
       title,
@@ -95,9 +112,11 @@ export async function POST(req: Request) {
       prompt: userPrompt,
       temperature: 0.3,
       topP: 0.9,
-      providerOptions: {
-        openai: { reasoningEffort },
-      },
+      // Withheld from endpoints that route reasoning through the chat
+      // template — there it re-enables thinking and costs ~10s of TTFT.
+      providerOptions: sendsReasoningEffort
+        ? { openai: { reasoningEffort } }
+        : undefined,
       onChunk: ({ chunk }) => {
         if (firstTokenLogged) return;
         if (chunk.type !== "text-delta") return;

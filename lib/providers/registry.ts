@@ -49,9 +49,12 @@ function resolveLocalEntry(modelId?: string): LocalModelConfig {
 // max_tokens; DeepSeek-V4 streams reasoning on a channel the SDK ignores).
 // Inject the catalog's `chat_template_kwargs` via a fetch middleware.
 const createLocalFetch = (
-  entry: LocalModelConfig
+  entry: LocalModelConfig,
+  deepReasoning: boolean
 ): typeof fetch => async (input, init) => {
-  const kwargs = entry.chatTemplateKwargs;
+  const kwargs =
+    (deepReasoning ? entry.deepChatTemplateKwargs : undefined) ??
+    entry.chatTemplateKwargs;
   if (
     kwargs &&
     init?.body &&
@@ -93,14 +96,23 @@ const createLocalFetch = (
  * Each catalog entry may live on a different host, so the client is created
  * per request rather than shared.
  */
-function createLocalModel(modelId?: string) {
+function createLocalModel(modelId?: string, deepReasoning = false) {
   const entry = resolveLocalEntry(modelId);
   const local = createOpenAI({
     baseURL: resolveLocalHost(entry) + "/v1",
     apiKey: "not-needed",
-    fetch: createLocalFetch(entry),
+    fetch: createLocalFetch(entry, deepReasoning),
   });
   return local(entry.id);
+}
+
+/** Per-call generation options that are not part of the model identity. */
+export interface ModelOptions {
+  /**
+   * Ask for a deeper reasoning pass. Local endpoints express this through
+   * their chat template; hosted providers use `reasoning_effort` instead.
+   */
+  deepReasoning?: boolean;
 }
 
 /**
@@ -116,13 +128,27 @@ export function resolvedModelId(
   return modelId || DEFAULT_MODEL_BY_PROVIDER[provider];
 }
 
+/**
+ * Whether `reasoning_effort` may be forwarded to this provider/model.
+ * Hosted providers accept it; local endpoints opt in per catalog entry because
+ * it can override their chat-template thinking flag.
+ */
+export function supportsReasoningEffort(
+  provider: ProviderName,
+  modelId?: string
+): boolean {
+  if (provider !== "local") return true;
+  return resolveLocalEntry(modelId).supportsReasoningEffort === true;
+}
+
 export function getModel(
   provider: ProviderName,
   modelId?: string,
+  options: ModelOptions = {},
 ) {
   switch (provider) {
     case "local":
-      return createLocalModel(modelId);
+      return createLocalModel(modelId, options.deepReasoning);
     case "openai": {
       const openai = createOpenAI({
         apiKey: process.env.OPENAI_API_KEY,
@@ -155,11 +181,12 @@ export function getModelWithKey(
   provider: ProviderName,
   modelId: string | undefined,
   apiKey: string | null,
+  options: ModelOptions = {},
 ) {
   switch (provider) {
     case "local":
       // Local models need no key; the endpoint is resolved from the catalog.
-      return createLocalModel(modelId);
+      return createLocalModel(modelId, options.deepReasoning);
     case "openai": {
       const openai = createOpenAI({
         apiKey: apiKey ?? process.env.OPENAI_API_KEY,
