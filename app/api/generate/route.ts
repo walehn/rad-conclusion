@@ -1,6 +1,6 @@
 import { streamText } from "ai";
 import { z } from "zod";
-import { getModelWithKey } from "@/lib/providers/registry";
+import { getModelWithKey, resolvedModelId } from "@/lib/providers/registry";
 import { buildSystemPrompt, buildUserPrompt } from "@/lib/prompts/system-prompt";
 import type { ProviderName } from "@/lib/providers/types";
 import type { ConclusionStyle, ConclusionLang, PromptVersion } from "@/lib/prompts/system-prompt";
@@ -77,8 +77,7 @@ export async function POST(req: Request) {
     // promptVersion is included so concurrent v1+v2 (compareMode) requests can
     // be grouped in `jq` post-processing.
     const tLLMStart = performance.now();
-    const modelId =
-      process.env.RAD_LOCAL_MODEL ?? model ?? "default";
+    const modelId = resolvedModelId(provider as ProviderName, model);
     const baseTags = {
       route: "/api/generate",
       provider,

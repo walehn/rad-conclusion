@@ -59,3 +59,64 @@ export function PropRow({
     </>
   );
 }
+
+export interface PagePropertyItem {
+  label: string;
+  value: string;
+  pillBg?: string;
+  pillColor?: string;
+  muted?: boolean;
+}
+
+/**
+ * Horizontal page property bar.
+ *
+ * Replaces the 2-column `<dl>` of stacked `PropRow`s with a single
+ * flex-wrap row of inline chips, halving the vertical real estate
+ * the page hero consumes.
+ */
+export function PageProperties({ items }: { items: PagePropertyItem[] }) {
+  const { c } = useNotionPalette();
+  return (
+    <div
+      className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12px]"
+      style={{ color: c.charcoal }}
+    >
+      {items.map((item, i) => (
+        <span
+          key={`${item.label}-${i}`}
+          className="inline-flex items-center gap-1.5"
+        >
+          <span style={{ color: c.steel }}>{item.label}</span>
+          {item.pillBg ? (
+            <span
+              className="inline-flex items-center rounded px-2 py-0.5"
+              style={{
+                background: item.pillBg,
+                color: item.pillColor ?? c.charcoal,
+                fontWeight: 500,
+              }}
+            >
+              {item.value}
+            </span>
+          ) : (
+            <span
+              style={{ color: item.muted ? c.steel : c.charcoal }}
+            >
+              {item.value}
+            </span>
+          )}
+          {i < items.length - 1 && (
+            <span
+              aria-hidden
+              className="ml-1 hidden sm:inline"
+              style={{ color: c.hairline }}
+            >
+              ·
+            </span>
+          )}
+        </span>
+      ))}
+    </div>
+  );
+}

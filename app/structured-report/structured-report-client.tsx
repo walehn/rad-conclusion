@@ -28,7 +28,7 @@ import {
   Block,
   CalloutBlock,
   OutputBlock,
-  PropRow,
+  PageProperties,
   EmojiPickerTrigger,
   REPORT_EMOJI,
 } from "@/components/notion-tone";
@@ -624,7 +624,7 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
             </button>
           )}
 
-          <div className="mx-auto max-w-6xl py-10">
+          <div className="mx-auto max-w-6xl py-6">
             {/* Breadcrumb */}
             <nav
               className="flex items-center gap-1.5 text-[12px]"
@@ -645,51 +645,63 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
               <span style={{ color: c.charcoal }}>{meta.displayNameKo}</span>
             </nav>
 
-            <EmojiPickerTrigger
-              emoji={pageEmoji}
-              open={emojiPickerOpen}
-              onOpenChange={setEmojiPickerOpen}
-              onSelect={(e) => {
-                setPageEmoji(e);
-                setEmojiPickerOpen(false);
-              }}
-              onClear={() => {
-                setPageEmoji(null);
-                setEmojiPickerOpen(false);
-              }}
-              fallback={
-                <ClipboardList
-                  className="h-7 w-7"
-                  style={{ color: c.charcoal }}
-                />
-              }
-              emojis={REPORT_EMOJI}
-              popoverLabel="Report icons"
-            />
+            <div className="mt-3 flex items-start gap-3">
+              <EmojiPickerTrigger
+                emoji={pageEmoji}
+                open={emojiPickerOpen}
+                onOpenChange={setEmojiPickerOpen}
+                onSelect={(e) => {
+                  setPageEmoji(e);
+                  setEmojiPickerOpen(false);
+                }}
+                onClear={() => {
+                  setPageEmoji(null);
+                  setEmojiPickerOpen(false);
+                }}
+                fallback={
+                  <ClipboardList
+                    className="h-5 w-5"
+                    style={{ color: c.charcoal }}
+                  />
+                }
+                emojis={REPORT_EMOJI}
+                popoverLabel="Report icons"
+                size="sm"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h1
+                      className="text-balance"
+                      style={{
+                        fontSize: 26,
+                        fontWeight: 700,
+                        lineHeight: 1.2,
+                        letterSpacing: "-0.4px",
+                        color: c.ink,
+                      }}
+                    >
+                      {meta.displayNameKo} 구조화 리포트
+                    </h1>
+                    <p
+                      className="mt-0.5 text-[13px]"
+                      style={{ color: c.slate, lineHeight: 1.45 }}
+                    >
+                      6개 섹션(CLINICAL INFORMATION / TECHNIQUE / COMPARISON /
+                      FINDINGS / STAGING / IMPRESSION)으로 구조화된 리포트를
+                      생성합니다.
+                    </p>
+                  </div>
+                  <ReferencesDialog
+                    size="lg"
+                    citations={meta.standardReferences}
+                  />
+                </div>
+              </div>
+            </div>
 
-            <h1
-              className="mt-4 text-balance"
-              style={{
-                fontSize: 44,
-                fontWeight: 700,
-                lineHeight: 1.15,
-                letterSpacing: "-0.6px",
-                color: c.ink,
-              }}
-            >
-              {meta.displayNameKo} 구조화 리포트
-            </h1>
-            <p
-              className="mt-2 text-[15px]"
-              style={{ color: c.slate, lineHeight: 1.55 }}
-            >
-              6개 섹션(CLINICAL INFORMATION / TECHNIQUE / COMPARISON /
-              FINDINGS / STAGING / IMPRESSION)으로 구조화된 리포트를
-              생성합니다.
-            </p>
-
-            {/* Disease indicator inline + References dialog */}
-            <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+            {/* Disease indicator + horizontal property bar */}
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
               <DiseaseCategoryIndicator
                 category={disease}
                 variant="hero"
@@ -699,61 +711,48 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
                   ) + 1
                 }
               />
-              <ReferencesDialog
-                size="lg"
-                citations={meta.standardReferences}
+              <PageProperties
+                items={[
+                  {
+                    label: "Disease",
+                    value: meta.displayNameKo,
+                    pillBg: c.accentBg,
+                    pillColor: c.primary,
+                  },
+                  {
+                    label: "Modality",
+                    value: modality === "Auto" ? "Auto-detect" : modality,
+                    pillBg: c.surface,
+                  },
+                  {
+                    label: "Language",
+                    value: langLabel,
+                    pillBg: c.surface,
+                  },
+                  {
+                    label: "Status",
+                    value: isStreaming
+                      ? "Streaming…"
+                      : missingFields.length > 0
+                      ? `${missingFields.length} fields missing`
+                      : "Ready to generate",
+                    pillBg: isStreaming
+                      ? c.accentBg
+                      : missingFields.length > 0
+                      ? c.warningTint
+                      : c.surface,
+                    pillColor: isStreaming
+                      ? c.primary
+                      : missingFields.length > 0
+                      ? c.warningText
+                      : c.successText,
+                  },
+                ]}
               />
             </div>
 
-            {/* Property bar */}
-            <dl
-              className="mt-6 grid grid-cols-1 gap-y-1.5 text-[13px] sm:grid-cols-[120px_1fr]"
-              style={{ color: c.charcoal }}
-            >
-              <PropRow
-                label="Disease"
-                value={meta.displayNameKo}
-                pillBg={c.accentBg}
-                pillColor={c.primary}
-              />
-              <PropRow
-                label="Modality"
-                value={modality === "Auto" ? "Auto-detect" : modality}
-                pillBg={c.surface}
-              />
-              <PropRow
-                label="Language"
-                value={langLabel}
-                pillBg={c.surface}
-              />
-              <PropRow
-                label="Status"
-                value={
-                  isStreaming
-                    ? "Streaming…"
-                    : missingFields.length > 0
-                    ? `${missingFields.length} fields missing`
-                    : "Ready to generate"
-                }
-                pillBg={
-                  isStreaming
-                    ? c.accentBg
-                    : missingFields.length > 0
-                    ? c.warningTint
-                    : c.surface
-                }
-                pillColor={
-                  isStreaming
-                    ? c.primary
-                    : missingFields.length > 0
-                    ? c.warningText
-                    : c.successText
-                }
-              />
-            </dl>
-
             <div
-              className="my-8 h-px"
+              className="my-5 h-px"
               style={{ background: c.hairlineSoft }}
             />
 

@@ -22,7 +22,7 @@ import {
   useNotionPalette,
   SidebarSection,
   SidebarItem,
-  PropRow,
+  PageProperties,
   EmojiPickerTrigger,
   REPORT_EMOJI,
 } from "@/components/notion-tone";
@@ -260,7 +260,7 @@ export function StructuredReportSelectorClient({ entries }: Props) {
             </button>
           )}
 
-          <div className="mx-auto max-w-6xl py-10">
+          <div className="mx-auto max-w-6xl py-6">
             {/* Breadcrumb */}
             <nav
               className="flex items-center gap-1.5 text-[12px]"
@@ -271,71 +271,75 @@ export function StructuredReportSelectorClient({ entries }: Props) {
               <span style={{ color: c.charcoal }}>Structured reports</span>
             </nav>
 
-            {/* Page emoji picker */}
-            <EmojiPickerTrigger
-              emoji={pageEmoji}
-              open={emojiPickerOpen}
-              onOpenChange={setEmojiPickerOpen}
-              onSelect={(e) => {
-                setPageEmoji(e);
-                setEmojiPickerOpen(false);
-              }}
-              onClear={() => {
-                setPageEmoji(null);
-                setEmojiPickerOpen(false);
-              }}
-              fallback={
-                <ClipboardList className="h-7 w-7" style={{ color: c.charcoal }} />
-              }
-              emojis={REPORT_EMOJI}
-              popoverLabel="Report icons"
-            />
+            <div className="mt-3 flex items-center gap-3">
+              <EmojiPickerTrigger
+                emoji={pageEmoji}
+                open={emojiPickerOpen}
+                onOpenChange={setEmojiPickerOpen}
+                onSelect={(e) => {
+                  setPageEmoji(e);
+                  setEmojiPickerOpen(false);
+                }}
+                onClear={() => {
+                  setPageEmoji(null);
+                  setEmojiPickerOpen(false);
+                }}
+                fallback={
+                  <ClipboardList className="h-5 w-5" style={{ color: c.charcoal }} />
+                }
+                emojis={REPORT_EMOJI}
+                popoverLabel="Report icons"
+                size="sm"
+              />
+              <div className="min-w-0">
+                <h1
+                  className="text-balance"
+                  style={{
+                    fontSize: 26,
+                    fontWeight: 700,
+                    lineHeight: 1.2,
+                    letterSpacing: "-0.4px",
+                    color: c.ink,
+                  }}
+                >
+                  구조화 리포트 생성기
+                </h1>
+                <p
+                  className="mt-0.5 text-[13px]"
+                  style={{ color: c.slate, lineHeight: 1.45 }}
+                >
+                  질병을 선택하면 해당 리포트 작성 화면으로 이동합니다. 템플릿은
+                  표준 가이드라인(PI-RADS, ACR 등)에 정렬되어 있습니다.
+                </p>
+              </div>
+            </div>
 
-            <h1
-              className="mt-4 text-balance"
-              style={{
-                fontSize: 44,
-                fontWeight: 700,
-                lineHeight: 1.15,
-                letterSpacing: "-0.6px",
-                color: c.ink,
-              }}
-            >
-              구조화 리포트 생성기
-            </h1>
-            <p
-              className="mt-2 text-[15px]"
-              style={{ color: c.slate, lineHeight: 1.55 }}
-            >
-              질병을 선택하면 해당 리포트 작성 화면으로 이동합니다. 템플릿은
-              표준 가이드라인(PI-RADS, ACR 등)에 정렬되어 있습니다.
-            </p>
-
-            {/* Property bar */}
-            <dl
-              className="mt-6 grid grid-cols-1 gap-y-1.5 text-[13px] sm:grid-cols-[120px_1fr]"
-              style={{ color: c.charcoal }}
-            >
-              <PropRow
-                label="Categories"
-                value={`${entries.length} templates available`}
-                pillBg={c.surface}
+            {/* Horizontal property bar */}
+            <div className="mt-3">
+              <PageProperties
+                items={[
+                  {
+                    label: "Categories",
+                    value: `${entries.length} templates available`,
+                    pillBg: c.surface,
+                  },
+                  {
+                    label: "Standards",
+                    value: "PI-RADS v2.1 · ACR · 통합 영상의학",
+                    pillBg: c.surface,
+                  },
+                  {
+                    label: "Status",
+                    value: "Production ready",
+                    pillBg: c.accentBg,
+                    pillColor: c.primary,
+                  },
+                ]}
               />
-              <PropRow
-                label="Standards"
-                value="PI-RADS v2.1 · ACR · 통합 영상의학"
-                pillBg={c.surface}
-              />
-              <PropRow
-                label="Status"
-                value="Production ready"
-                pillBg={c.accentBg}
-                pillColor={c.primary}
-              />
-            </dl>
+            </div>
 
             <div
-              className="my-8 h-px"
+              className="my-5 h-px"
               style={{ background: c.hairlineSoft }}
             />
 

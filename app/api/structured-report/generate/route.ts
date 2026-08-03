@@ -19,7 +19,7 @@
 
 import { streamText } from "ai";
 import { z } from "zod";
-import { getModelWithKey } from "@/lib/providers/registry";
+import { getModelWithKey, resolvedModelId } from "@/lib/providers/registry";
 import type { ProviderName } from "@/lib/providers/types";
 import {
   buildReportSystemPrompt,
@@ -110,7 +110,7 @@ export async function POST(req: Request) {
     // Perf instrumentation: t at LLM-call boundary so TTFT excludes auth/parse.
     // disease (RCC/ProstateCancer) lets us group by disease in `jq` analysis.
     const tLLMStart = performance.now();
-    const modelId = process.env.RAD_LOCAL_MODEL ?? model;
+    const modelId = resolvedModelId(provider as ProviderName, model);
     const maxTokensConfig = 2048;
     const baseTags = {
       route: "/api/structured-report/generate",

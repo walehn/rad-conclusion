@@ -467,7 +467,7 @@ export default function SettingsClient() {
             </button>
           )}
 
-          <div className="mx-auto max-w-3xl py-10">
+          <div className="mx-auto max-w-3xl py-6">
             {/* Breadcrumb */}
             <nav
               className="flex items-center gap-1.5 text-[12px]"
@@ -478,47 +478,51 @@ export default function SettingsClient() {
               <span style={{ color: c.charcoal }}>Settings</span>
             </nav>
 
-            <EmojiPickerTrigger
-              emoji={pageEmoji}
-              open={emojiPickerOpen}
-              onOpenChange={setEmojiPickerOpen}
-              onSelect={(e) => {
-                setPageEmoji(e);
-                setEmojiPickerOpen(false);
-              }}
-              onClear={() => {
-                setPageEmoji(null);
-                setEmojiPickerOpen(false);
-              }}
-              fallback={
-                <Settings className="h-7 w-7" style={{ color: c.charcoal }} />
-              }
-              emojis={SETTINGS_EMOJI}
-              popoverLabel="Settings icons"
-            />
-
-            <h1
-              className="mt-4 text-balance"
-              style={{
-                fontSize: 44,
-                fontWeight: 700,
-                lineHeight: 1.15,
-                letterSpacing: "-0.6px",
-                color: c.ink,
-              }}
-            >
-              Settings
-            </h1>
-            <p
-              className="mt-2 text-[15px]"
-              style={{ color: c.slate, lineHeight: 1.55 }}
-            >
-              LLM 제공자와 API 키를 설정합니다. 키는 서버에 암호화되어 저장되며
-              모든 기기에서 사용할 수 있습니다.
-            </p>
+            <div className="mt-3 flex items-center gap-3">
+              <EmojiPickerTrigger
+                emoji={pageEmoji}
+                open={emojiPickerOpen}
+                onOpenChange={setEmojiPickerOpen}
+                onSelect={(e) => {
+                  setPageEmoji(e);
+                  setEmojiPickerOpen(false);
+                }}
+                onClear={() => {
+                  setPageEmoji(null);
+                  setEmojiPickerOpen(false);
+                }}
+                fallback={
+                  <Settings className="h-5 w-5" style={{ color: c.charcoal }} />
+                }
+                emojis={SETTINGS_EMOJI}
+                popoverLabel="Settings icons"
+                size="sm"
+              />
+              <div className="min-w-0">
+                <h1
+                  className="text-balance"
+                  style={{
+                    fontSize: 26,
+                    fontWeight: 700,
+                    lineHeight: 1.2,
+                    letterSpacing: "-0.4px",
+                    color: c.ink,
+                  }}
+                >
+                  Settings
+                </h1>
+                <p
+                  className="mt-0.5 text-[13px]"
+                  style={{ color: c.slate, lineHeight: 1.45 }}
+                >
+                  LLM 제공자와 API 키를 설정합니다. 키는 서버에 암호화되어 저장되며
+                  모든 기기에서 사용할 수 있습니다.
+                </p>
+              </div>
+            </div>
 
             <div
-              className="my-8 h-px"
+              className="my-5 h-px"
               style={{ background: c.hairlineSoft }}
             />
 

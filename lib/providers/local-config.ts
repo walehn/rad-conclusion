@@ -2,11 +2,89 @@
 // Single source of truth for local LLM provider defaults.
 // Any change to host, modelId, or label must happen here and nowhere else.
 // Enforced by AC-LOCAL-006 (ripgrep check) per SPEC-LOCAL-MODEL-001.
+//
+// This module is imported by client components, so it must stay free of
+// `process.env` access. Environment overrides are applied server-side in
+// lib/providers/registry.ts using the `hostEnvVar` declared here.
 
+export interface LocalModelConfig {
+  /** Model id exactly as served by the OpenAI-compatible endpoint. */
+  id: string;
+  /** Human-readable label shown in the model selector. */
+  label: string;
+  /** Base host, without the `/v1` suffix. */
+  host: string;
+  /** Environment variable that overrides `host` when set. */
+  hostEnvVar: string;
+  /**
+   * vLLM OpenAI-compat `chat_template_kwargs` merged into every request.
+   * Omit to leave the server's own --default-chat-template-kwargs untouched.
+   */
+  chatTemplateKwargs?: Record<string, unknown>;
+}
+
+/**
+ * Locally served models, in selector order. The first entry is the default.
+ * Each model carries its own host because they are served by separate vLLM
+ * instances on different ports.
+ */
+export const LOCAL_MODELS: readonly LocalModelConfig[] = [
+  {
+    id: "deepseek-v4-flash-0731",
+    label: "DeepSeek V4 Flash",
+    host: "http://localhost:8888",
+    hostEnvVar: "RAD_LOCAL_DEEPSEEK_HOST",
+    // The DeepSeek-V4 chat template takes `thinking` (the server starts with
+    // it enabled). Reasoning is streamed on `reasoning_content`, which the AI
+    // SDK does not surface, so leaving it on would only cost latency.
+    chatTemplateKwargs: { thinking: false },
+  },
+  {
+    id: "Qwen/Qwen3.6-35B-A3B-FP8",
+    label: "Qwen3.6 35B (A3B-FP8)",
+    host: "http://localhost:8080",
+    hostEnvVar: "RAD_LOCAL_HOST",
+    // vLLM (Qwen) emits empty content when its <think> channel exhausts
+    // max_tokens, so thinking is force-disabled.
+    chatTemplateKwargs: { enable_thinking: false },
+  },
+];
+
+/** Selected when the caller does not specify a model. */
+export const DEFAULT_LOCAL_MODEL = LOCAL_MODELS[0];
+
+/** Exact-match lookup; returns undefined for ids outside the catalog. */
+export function findLocalModel(
+  modelId: string | undefined | null
+): LocalModelConfig | undefined {
+  if (!modelId) return undefined;
+  return LOCAL_MODELS.find((m) => m.id === modelId);
+}
+
+/**
+ * Resolves a model id to its endpoint config.
+ *
+ * Ids outside the catalog (e.g. an ad-hoc RAD_LOCAL_MODEL override) inherit
+ * the default entry's host and template kwargs so an operator can point at a
+ * one-off model without editing this file.
+ */
+export function resolveLocalModel(
+  modelId?: string | null
+): LocalModelConfig {
+  const known = findLocalModel(modelId);
+  if (known) return known;
+  if (!modelId) return DEFAULT_LOCAL_MODEL;
+  return { ...DEFAULT_LOCAL_MODEL, id: modelId, label: modelId };
+}
+
+/**
+ * Back-compat surface for call sites that predate multi-model support.
+ * Always describes the default model.
+ */
 export const LOCAL_PROVIDER_DEFAULTS = {
-  host: "http://localhost:8080",
-  modelId: "Qwen/Qwen3.6-35B-A3B-FP8",
-  label: "Qwen3.6 35B (A3B-FP8)",
+  host: DEFAULT_LOCAL_MODEL.host,
+  modelId: DEFAULT_LOCAL_MODEL.id,
+  label: DEFAULT_LOCAL_MODEL.label,
 } as const;
 
 export type LocalProviderDefaults = typeof LOCAL_PROVIDER_DEFAULTS;

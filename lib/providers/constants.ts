@@ -1,5 +1,5 @@
 import type { ProviderSettings } from "./types";
-import { LOCAL_PROVIDER_DEFAULTS } from "./local-config";
+import { LOCAL_MODELS, LOCAL_PROVIDER_DEFAULTS } from "./local-config";
 
 export const PROVIDER_DEFAULTS: ProviderSettings[] = [
   {
@@ -8,13 +8,11 @@ export const PROVIDER_DEFAULTS: ProviderSettings[] = [
     enabled: false,
     hostUrl: LOCAL_PROVIDER_DEFAULTS.host,
     validationStatus: "none",
-    models: [
-      {
-        id: LOCAL_PROVIDER_DEFAULTS.modelId,
-        name: LOCAL_PROVIDER_DEFAULTS.label,
-        isDefault: true,
-      },
-    ],
+    models: LOCAL_MODELS.map((m) => ({
+      id: m.id,
+      name: m.label,
+      isDefault: m.id === LOCAL_PROVIDER_DEFAULTS.modelId,
+    })),
   },
   {
     id: "openai",

@@ -5,6 +5,8 @@ export interface ProviderInfo {
   label: string;
   defaultModel: string;
   models: string[];
+  /** Optional display names keyed by model id; falls back to the raw id. */
+  modelLabels?: Record<string, string>;
   available: boolean;
 }
 

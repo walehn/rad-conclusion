@@ -71,6 +71,16 @@ interface Props {
   emojis?: readonly string[];
   /** Section heading inside the popover. */
   popoverLabel?: string;
+  /**
+   * Visual size variant. `md` is the original 56×56 tile; `sm` renders a 40×40
+   * tile intended for compact inline page heroes.
+   */
+  size?: "md" | "sm";
+  /**
+   * Overrides the default wrapper class. Use to drop the built-in `mt-6`
+   * spacing when placing the trigger inside a flex hero row.
+   */
+  wrapperClassName?: string;
 }
 
 export function EmojiPickerTrigger({
@@ -82,6 +92,8 @@ export function EmojiPickerTrigger({
   fallback,
   emojis = MEDICAL_EMOJI,
   popoverLabel = "Medical icons",
+  size = "md",
+  wrapperClassName,
 }: Props) {
   const { c } = useNotionPalette();
   const wrapperRef = React.useRef<HTMLDivElement>(null);
@@ -107,8 +119,12 @@ export function EmojiPickerTrigger({
     };
   }, [open, onOpenChange]);
 
+  const dims = size === "sm" ? { box: 40, font: 24 } : { box: 56, font: 36 };
+  const wrapperClass =
+    wrapperClassName ?? (size === "sm" ? "relative inline-block" : "relative mt-6 inline-block");
+
   return (
-    <div ref={wrapperRef} className="relative mt-6 inline-block">
+    <div ref={wrapperRef} className={wrapperClass}>
       <button
         type="button"
         onClick={() => onOpenChange(!open)}
@@ -116,13 +132,13 @@ export function EmojiPickerTrigger({
         title="Click to change icon"
         className="group relative inline-flex items-center justify-center rounded-md transition-all hover:ring-2 hover:ring-offset-1"
         style={{
-          width: 56,
-          height: 56,
+          width: dims.box,
+          height: dims.box,
           background: emoji ? "transparent" : c.surface,
           border: emoji
             ? "1px solid transparent"
             : `1px solid ${c.hairlineSoft}`,
-          fontSize: 36,
+          fontSize: dims.font,
           lineHeight: 1,
           ["--tw-ring-color" as string]: c.ringTint,
         }}

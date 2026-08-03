@@ -27,7 +27,7 @@ import {
   Block,
   CalloutBlock,
   OutputBlock,
-  PropRow,
+  PageProperties,
   EmojiPickerTrigger,
   MEDICAL_EMOJI,
 } from "@/components/notion-tone";
@@ -526,7 +526,7 @@ export function ConclusionClient() {
               <span>Open sidebar</span>
             </button>
           )}
-          <div className="mx-auto max-w-6xl py-10">
+          <div className="mx-auto max-w-6xl py-6">
             {/* Breadcrumb */}
             <nav
               className="flex items-center gap-1.5 text-[12px]"
@@ -539,77 +539,73 @@ export function ConclusionClient() {
               <span style={{ color: c.charcoal }}>Rad Conclusion</span>
             </nav>
 
-            {/* Page title icon — Notion-style emoji picker trigger */}
-            <EmojiPickerTrigger
-              emoji={pageEmoji}
-              open={emojiPickerOpen}
-              onOpenChange={setEmojiPickerOpen}
-              onSelect={(e) => {
-                setPageEmoji(e);
-                setEmojiPickerOpen(false);
-              }}
-              onClear={() => {
-                setPageEmoji(null);
-                setEmojiPickerOpen(false);
-              }}
-              fallback={
-                <Stethoscope className="h-7 w-7" style={{ color: c.charcoal }} />
-              }
-              emojis={MEDICAL_EMOJI}
-              popoverLabel="Medical icons"
-            />
+            {/* Compact hero: emoji + title + subtitle laid out horizontally */}
+            <div className="mt-3 flex items-center gap-3">
+              <EmojiPickerTrigger
+                emoji={pageEmoji}
+                open={emojiPickerOpen}
+                onOpenChange={setEmojiPickerOpen}
+                onSelect={(e) => {
+                  setPageEmoji(e);
+                  setEmojiPickerOpen(false);
+                }}
+                onClear={() => {
+                  setPageEmoji(null);
+                  setEmojiPickerOpen(false);
+                }}
+                fallback={
+                  <Stethoscope className="h-5 w-5" style={{ color: c.charcoal }} />
+                }
+                emojis={MEDICAL_EMOJI}
+                popoverLabel="Medical icons"
+                size="sm"
+              />
+              <div className="min-w-0">
+                <h1
+                  className="text-balance"
+                  style={{
+                    fontSize: 26,
+                    fontWeight: 700,
+                    lineHeight: 1.2,
+                    letterSpacing: "-0.4px",
+                    color: c.ink,
+                  }}
+                >
+                  Rad Conclusion
+                </h1>
+                <p
+                  className="mt-0.5 text-[13px]"
+                  style={{ color: c.slate, lineHeight: 1.45 }}
+                >
+                  AI-powered radiology conclusion generator
+                </p>
+              </div>
+            </div>
 
-            {/* Page title */}
-            <h1
-              className="mt-4 text-balance"
-              style={{
-                fontSize: 44,
-                fontWeight: 700,
-                lineHeight: 1.15,
-                letterSpacing: "-0.6px",
-                color: c.ink,
-              }}
-            >
-              Rad Conclusion
-            </h1>
-            <p
-              className="mt-2 text-[15px]"
-              style={{ color: c.slate, lineHeight: 1.55 }}
-            >
-              AI-powered radiology conclusion generator
-            </p>
-
-            {/* Property bar (Notion page properties) */}
-            <dl
-              className="mt-6 grid grid-cols-1 gap-y-1.5 text-[13px] sm:grid-cols-[120px_1fr]"
-              style={{ color: c.charcoal }}
-            >
-              <PropRow label="Modality" value="MRI / CT / Mammography" />
-              <PropRow
-                label="Standard"
-                value={standardLabel}
-                pillBg={c.surface}
+            {/* Horizontal property bar */}
+            <div className="mt-3">
+              <PageProperties
+                items={[
+                  { label: "Modality", value: "MRI / CT / Mammography" },
+                  { label: "Standard", value: standardLabel, pillBg: c.surface },
+                  { label: "Language", value: langLabel, pillBg: c.surface },
+                  {
+                    label: "Mode",
+                    value: modeLabel,
+                    pillBg: compareMode ? c.accentBg : c.surface,
+                    pillColor: compareMode ? c.primary : c.charcoal,
+                  },
+                  {
+                    label: "Length",
+                    value: `${charsCount.toLocaleString()} characters`,
+                    muted: true,
+                  },
+                ]}
               />
-              <PropRow
-                label="Language"
-                value={langLabel}
-                pillBg={c.surface}
-              />
-              <PropRow
-                label="Mode"
-                value={modeLabel}
-                pillBg={compareMode ? c.accentBg : c.surface}
-                pillColor={compareMode ? c.primary : c.charcoal}
-              />
-              <PropRow
-                label="Length"
-                value={`${charsCount.toLocaleString()} characters`}
-                muted
-              />
-            </dl>
+            </div>
 
             <div
-              className="my-8 h-px"
+              className="my-5 h-px"
               style={{ background: c.hairlineSoft }}
             />
 

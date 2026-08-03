@@ -6,7 +6,8 @@ export { notionTokens, C, useNotionPalette } from "./tokens";
 export type { NotionPalette } from "./tokens";
 export { SidebarSection, SidebarItem } from "./sidebar";
 export { Block, CalloutBlock, OutputBlock } from "./blocks";
-export { PropRow } from "./prop-row";
+export { PropRow, PageProperties } from "./prop-row";
+export type { PagePropertyItem } from "./prop-row";
 export {
   EmojiPickerTrigger,
   MEDICAL_EMOJI,

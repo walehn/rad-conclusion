@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { ProviderName } from "@/lib/providers/types";
-import { LOCAL_PROVIDER_DEFAULTS } from "@/lib/providers/local-config";
+import { resolveLocalModel } from "@/lib/providers/local-config";
 import { requireApiSession } from "@/lib/auth/guard";
 import { validateCsrfOrFail } from "@/lib/auth/csrf";
 
@@ -8,6 +8,9 @@ const validateSchema = z.object({
   provider: z.enum(["local", "openai", "anthropic", "google"]),
   apiKey: z.string().min(1, "API key is required"),
   hostUrl: z.string().url().optional(),
+  // Local models are served from separate hosts, so validation needs to know
+  // which one is being tested when no explicit hostUrl is supplied.
+  model: z.string().optional(),
 });
 
 async function validateLocal(hostUrl: string): Promise<{ valid: boolean; error?: string }> {
@@ -83,9 +86,14 @@ async function validateGoogle(apiKey: string): Promise<{ valid: boolean; error?:
 
 const validators: Record<
   ProviderName,
-  (apiKey: string, hostUrl?: string) => Promise<{ valid: boolean; error?: string }>
+  (
+    apiKey: string,
+    hostUrl?: string,
+    model?: string
+  ) => Promise<{ valid: boolean; error?: string }>
 > = {
-  local: (_apiKey, hostUrl) => validateLocal(hostUrl || LOCAL_PROVIDER_DEFAULTS.host),
+  local: (_apiKey, hostUrl, model) =>
+    validateLocal(hostUrl || resolveLocalModel(model).host),
   openai: (apiKey) => validateOpenAI(apiKey),
   anthropic: (apiKey) => validateAnthropic(apiKey),
   google: (apiKey) => validateGoogle(apiKey),
@@ -109,8 +117,8 @@ export async function POST(req: Request) {
       );
     }
 
-    const { provider, apiKey, hostUrl } = parsed.data;
-    const result = await validators[provider](apiKey, hostUrl);
+    const { provider, apiKey, hostUrl, model } = parsed.data;
+    const result = await validators[provider](apiKey, hostUrl, model);
 
     return Response.json(result);
   } catch {

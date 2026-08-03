@@ -55,7 +55,7 @@ export function ModelSelector({
         >
           {models.map((m) => (
             <option key={m} value={m}>
-              {m}
+              {currentProvider?.modelLabels?.[m] ?? m}
             </option>
           ))}
         </Select>

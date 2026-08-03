@@ -261,7 +261,7 @@ export function DashboardCards() {
             </button>
           )}
 
-          <div className="mx-auto max-w-5xl py-12">
+          <div className="mx-auto max-w-5xl py-6">
             <nav
               className="flex items-center gap-1.5 text-[12px]"
               style={{ color: c.steel }}
@@ -269,48 +269,52 @@ export function DashboardCards() {
               <span style={{ color: c.charcoal }}>Workspace</span>
             </nav>
 
-            <EmojiPickerTrigger
-              emoji={pageEmoji}
-              open={emojiPickerOpen}
-              onOpenChange={setEmojiPickerOpen}
-              onSelect={(e) => {
-                setPageEmoji(e);
-                setEmojiPickerOpen(false);
-              }}
-              onClear={() => {
-                setPageEmoji(null);
-                setEmojiPickerOpen(false);
-              }}
-              fallback={
-                <Sparkles className="h-7 w-7" style={{ color: c.charcoal }} />
-              }
-              emojis={REPORT_EMOJI}
-              popoverLabel="Workspace icons"
-            />
-
-            <h1
-              className="mt-4 text-balance"
-              style={{
-                fontSize: 44,
-                fontWeight: 700,
-                lineHeight: 1.15,
-                letterSpacing: "-0.6px",
-                color: c.ink,
-              }}
-            >
-              시작할 기능을 선택하세요
-            </h1>
-            <p
-              className="mt-2 text-[15px]"
-              style={{ color: c.slate, lineHeight: 1.55 }}
-            >
-              Findings를 어떻게 처리하시겠어요? 결론 한 단락만 필요하면 결론
-              생성기, 6개 섹션의 구조화된 리포트가 필요하면 리포트 생성기를
-              선택하세요.
-            </p>
+            <div className="mt-3 flex items-center gap-3">
+              <EmojiPickerTrigger
+                emoji={pageEmoji}
+                open={emojiPickerOpen}
+                onOpenChange={setEmojiPickerOpen}
+                onSelect={(e) => {
+                  setPageEmoji(e);
+                  setEmojiPickerOpen(false);
+                }}
+                onClear={() => {
+                  setPageEmoji(null);
+                  setEmojiPickerOpen(false);
+                }}
+                fallback={
+                  <Sparkles className="h-5 w-5" style={{ color: c.charcoal }} />
+                }
+                emojis={REPORT_EMOJI}
+                popoverLabel="Workspace icons"
+                size="sm"
+              />
+              <div className="min-w-0">
+                <h1
+                  className="text-balance"
+                  style={{
+                    fontSize: 26,
+                    fontWeight: 700,
+                    lineHeight: 1.2,
+                    letterSpacing: "-0.4px",
+                    color: c.ink,
+                  }}
+                >
+                  시작할 기능을 선택하세요
+                </h1>
+                <p
+                  className="mt-0.5 text-[13px]"
+                  style={{ color: c.slate, lineHeight: 1.45 }}
+                >
+                  Findings를 어떻게 처리하시겠어요? 결론 한 단락만 필요하면 결론
+                  생성기, 6개 섹션의 구조화된 리포트가 필요하면 리포트 생성기를
+                  선택하세요.
+                </p>
+              </div>
+            </div>
 
             <div
-              className="my-8 h-px"
+              className="my-5 h-px"
               style={{ background: c.hairlineSoft }}
             />
 
