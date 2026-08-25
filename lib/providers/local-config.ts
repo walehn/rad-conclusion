@@ -60,9 +60,17 @@ export const LOCAL_MODELS: readonly LocalModelConfig[] = [
     hostEnvVar: "RAD_LOCAL_DEEPSEEK_HOST",
     // The DeepSeek-V4 chat template takes `thinking` (the server starts with
     // it enabled). Reasoning is streamed on `reasoning_content`, which the AI
-    // SDK does not surface, so it stays off unless depth is requested.
+    // SDK does not surface, so the user sees a blank screen for the entire
+    // think phase — and for /api/generate that phase IS the latency.
+    //
+    // Measured (same findings, direct vLLM call): thinking on+low ~8-10s /
+    // ~450 tokens vs off ~3-4s / ~135 tokens, with near-equivalent impression
+    // quality (off still nails Dx/DDx/recommendation). So the v2 "think
+    // harder" path keeps its richer prompt but runs thinking OFF — the prompt,
+    // not hidden reasoning, is what lifts v2 quality. Re-enable per-request if
+    // a future model shows a real quality gain from reasoning_content.
     chatTemplateKwargs: { thinking: false },
-    deepChatTemplateKwargs: { thinking: true, reasoning_effort: "low" },
+    deepChatTemplateKwargs: { thinking: false },
   },
   {
     id: "Qwen/Qwen3.6-35B-A3B-FP8",
