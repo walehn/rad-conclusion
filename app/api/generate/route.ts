@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { streamText } from "ai";
 import { z } from "zod";
 import {
@@ -12,6 +13,7 @@ import { requireApiSession } from "@/lib/auth/guard";
 import { validateCsrfOrFail } from "@/lib/auth/csrf";
 import { resolveApiKey } from "@/lib/api-keys/resolve";
 import { perfLog } from "@/lib/perf-log";
+import { recordGeneration } from "@/lib/generations/record";
 
 const requestSchema = z.object({
   findings: z.string().min(1, "Findings text is required"),
@@ -25,6 +27,9 @@ const requestSchema = z.object({
   // API keys are now managed via server environment variables only
   // apiKey and hostUrl no longer accepted from client
   promptVersion: z.enum(["v1", "v2"]).default("v1"),
+  // Groups the v1/v2 pair produced by one A/B click. Generated here when the
+  // client omits it (single mode, or any non-browser caller).
+  batchId: z.string().min(1).max(64).optional(),
 });
 
 export async function POST(req: Request) {
@@ -60,7 +65,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const { findings, style, lang, title, provider, model, promptVersion } =
+    const { findings, style, lang, title, provider, model, promptVersion, batchId } =
       parsed.data;
 
     // v2 is the "think harder" prompt path. Hosted providers express that via
@@ -105,6 +110,8 @@ export async function POST(req: Request) {
       title,
     } as const;
     let firstTokenLogged = false;
+    let ttftMs: number | null = null;
+    const resolvedBatchId = batchId ?? crypto.randomUUID();
 
     const result = streamText({
       model: llmModel,
@@ -121,21 +128,42 @@ export async function POST(req: Request) {
         if (firstTokenLogged) return;
         if (chunk.type !== "text-delta") return;
         firstTokenLogged = true;
+        ttftMs = Math.round(performance.now() - tLLMStart);
         try {
           perfLog({
             perf: "gen",
             stage: "ttft",
             ...baseTags,
-            ms: Math.round(performance.now() - tLLMStart),
+            ms: ttftMs,
             preLLMMs: Math.round(tLLMStart - tReq),
           });
         } catch {
           /* observability must never break the stream */
         }
       },
-      onFinish: ({ usage, finishReason }) => {
+      onFinish: ({ text, usage, finishReason }) => {
+        const totalMs = performance.now() - tLLMStart;
+
+        // Durable history row. Written here rather than from the browser so a
+        // closed tab or a failed follow-up request cannot lose the record.
+        recordGeneration({
+          batchId: resolvedBatchId,
+          userId: session.userId,
+          findings,
+          conclusion: text,
+          promptVersion,
+          style,
+          lang,
+          provider,
+          model: modelId,
+          finishReason,
+          promptTokens: usage?.promptTokens ?? null,
+          completionTokens: usage?.completionTokens ?? null,
+          ttftMs,
+          totalMs: Math.round(totalMs),
+        });
+
         try {
-          const totalMs = performance.now() - tLLMStart;
           const completion = usage?.completionTokens ?? 0;
           const tps =
             totalMs > 0 ? (completion / (totalMs / 1000)) : 0;

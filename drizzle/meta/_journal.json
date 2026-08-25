@@ -15,6 +15,13 @@
       "when": 1777181642528,
       "tag": "0001_amused_carmella_unuscione",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1787620837016,
+      "tag": "0002_amused_millenium_guard",
+      "breakpoints": true
     }
   ]
 }

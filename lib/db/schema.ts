@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 /**
  * Users table — stores admin-provisioned accounts with argon2id-hashed passwords.
@@ -44,3 +44,51 @@ export const userApiKeys = sqliteTable(
 
 export type UserApiKey = typeof userApiKeys.$inferSelect;
 export type NewUserApiKey = typeof userApiKeys.$inferInsert;
+
+/**
+ * Generations table — durable record of every conclusion the app produces.
+ *
+ * Written server-side from /api/generate once a stream finishes, so a record
+ * exists even if the browser navigates away or a follow-up request fails.
+ * This is the source of truth for the review screen; the evaluation JSONL
+ * queue (data/pending-evaluations.jsonl) remains a separate, best-effort
+ * feed for the LLM-judge worker.
+ *
+ * A/B compare fires v1 and v2 for the same findings; both rows share a
+ * `batchId` so the review screen can put them side by side.
+ */
+export const generations = sqliteTable(
+  'generations',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    /** Shared by every conclusion generated from one user action. */
+    batchId: text('batch_id').notNull(),
+    /** Null-able so history outlives the account that produced it. */
+    userId: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
+    findings: text('findings').notNull(),
+    /** Raw model output, before client-side post-processing. */
+    conclusion: text('conclusion').notNull(),
+    promptVersion: text('prompt_version').notNull(), // 'v1' | 'v2'
+    style: text('style').notNull(),
+    lang: text('lang').notNull(),
+    provider: text('provider').notNull(),
+    model: text('model').notNull(),
+    finishReason: text('finish_reason'),
+    promptTokens: integer('prompt_tokens'),
+    completionTokens: integer('completion_tokens'),
+    /** Time to first token, milliseconds. Null when no token ever arrived. */
+    ttftMs: integer('ttft_ms'),
+    /** Full stream duration, milliseconds. */
+    totalMs: integer('total_ms'),
+    createdAt: integer('created_at', { mode: 'timestamp' })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => ({
+    createdAtIdx: index('generations_created_at_idx').on(t.createdAt),
+    batchIdIdx: index('generations_batch_id_idx').on(t.batchId),
+  })
+);
+
+export type Generation = typeof generations.$inferSelect;
+export type NewGeneration = typeof generations.$inferInsert;

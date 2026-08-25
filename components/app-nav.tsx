@@ -44,6 +44,7 @@ export function AppNav({ userEmail }: AppNavProps): React.ReactElement | null {
   const isStructuredReport =
     pathname === "/structured-report" ||
     pathname.startsWith("/structured-report/");
+  const isReview = pathname === "/review" || pathname.startsWith("/review/");
 
   return (
     <nav
@@ -86,6 +87,12 @@ export function AppNav({ userEmail }: AppNavProps): React.ReactElement | null {
             label="구조화 리포트"
             labelShort="구조화"
             active={isStructuredReport}
+          />
+          <TabLink
+            href="/review"
+            label="생성 기록"
+            labelShort="기록"
+            active={isReview}
           />
         </div>
 

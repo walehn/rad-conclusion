@@ -37,6 +37,7 @@ import { ModelSelector } from "@/components/model-selector";
 import { ConclusionOutput } from "@/components/conclusion-output";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { postProcess } from "@/lib/post-process";
+import { genClientId } from "@/lib/utils";
 import { loadProviderSettings } from "@/lib/storage/settings-store";
 import type { ConclusionStyle, ConclusionLang } from "@/lib/prompts/system-prompt";
 import type { ProviderInfo, ProviderName, ProviderSettings } from "@/lib/providers/types";
@@ -72,6 +73,9 @@ export function ConclusionClient() {
   const startTimeRef = React.useRef<number | null>(null);
   const startTimeV1Ref = React.useRef<number | null>(null);
   const startTimeV2Ref = React.useRef<number | null>(null);
+  // Ties the v1/v2 rows of one A/B click together in the generation history.
+  // Read by /api/generate through the `body` of each useChat hook.
+  const batchIdRef = React.useRef<string>("");
 
   // ── Notion-style UX state (sidebar collapse, page emoji) ──────
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
@@ -162,6 +166,9 @@ export function ConclusionClient() {
       provider,
       model,
       promptVersion: "v1",
+      get batchId() {
+        return batchIdRef.current;
+      },
     },
     onFinish: (message) => {
       if (startTimeRef.current) {
@@ -202,6 +209,9 @@ export function ConclusionClient() {
       provider,
       model,
       promptVersion: "v1",
+      get batchId() {
+        return batchIdRef.current;
+      },
     },
     onFinish: (message) => {
       if (startTimeV1Ref.current) {
@@ -241,6 +251,9 @@ export function ConclusionClient() {
       provider,
       model,
       promptVersion: "v2",
+      get batchId() {
+        return batchIdRef.current;
+      },
     },
     onFinish: (message) => {
       if (startTimeV2Ref.current) {
@@ -297,6 +310,9 @@ export function ConclusionClient() {
     }
     setInputError("");
     setApiError("");
+    // One id per click: in A/B mode both requests carry it, so the review
+    // screen can show v1 and v2 for the same findings side by side.
+    batchIdRef.current = genClientId();
 
     if (compareMode) {
       // A/B Compare mode: fire both V1 and V2 simultaneously
