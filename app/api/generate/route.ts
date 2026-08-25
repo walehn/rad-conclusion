@@ -7,6 +7,7 @@ import {
   supportsReasoningEffort,
 } from "@/lib/providers/registry";
 import { buildSystemPrompt, buildUserPrompt } from "@/lib/prompts/system-prompt";
+import { resolveActivePromptRevision } from "@/lib/prompts/fingerprint";
 import type { ProviderName } from "@/lib/providers/types";
 import type { ConclusionStyle, ConclusionLang, PromptVersion } from "@/lib/prompts/system-prompt";
 import { requireApiSession } from "@/lib/auth/guard";
@@ -86,6 +87,12 @@ export async function POST(req: Request) {
 
     const userPrompt = buildUserPrompt({ findings, title });
 
+    // Identifies the exact prompt text behind this generation. Resolved from
+    // the live text, so an unregistered prompt edit is recorded as such
+    // rather than being attributed to the last registered revision.
+    const { revisionId: promptRevision, promptHash } =
+      resolveActivePromptRevision();
+
     const reasoningEffort = promptVersion === "v2" ? "medium" : "low";
     const sendsReasoningEffort = supportsReasoningEffort(
       provider as ProviderName,
@@ -102,6 +109,7 @@ export async function POST(req: Request) {
       provider,
       modelId,
       promptVersion,
+      promptRevision,
       // null when withheld, so a slow TTFT can be attributed from the log.
       reasoningEffort: sendsReasoningEffort ? reasoningEffort : null,
       deepReasoning,
@@ -152,6 +160,8 @@ export async function POST(req: Request) {
           findings,
           conclusion: text,
           promptVersion,
+          promptRevision,
+          promptHash,
           style,
           lang,
           provider,

@@ -12,7 +12,8 @@
     "seed:user": "tsx scripts/seed-user.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "prompt:revision": "tsx scripts/prompt-revision.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.2.0",

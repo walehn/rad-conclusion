@@ -69,6 +69,14 @@ export const generations = sqliteTable(
     /** Raw model output, before client-side post-processing. */
     conclusion: text('conclusion').notNull(),
     promptVersion: text('prompt_version').notNull(), // 'v1' | 'v2'
+    /**
+     * Registered prompt revision that produced this row ('r1', 'r2', ...), or
+     * 'unregistered' when the prompt text was edited without adding an entry
+     * to lib/prompts/revisions.ts. Null on rows written before versioning.
+     */
+    promptRevision: text('prompt_revision'),
+    /** Short sha256 of the rendered prompt set - exact text identity. */
+    promptHash: text('prompt_hash'),
     style: text('style').notNull(),
     lang: text('lang').notNull(),
     provider: text('provider').notNull(),

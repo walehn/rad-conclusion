@@ -115,6 +115,27 @@ GOOGLE_AI_API_KEY=AI...
 | **Korean** | Korean with standard radiology terms kept in English |
 | **Mixed** | Korean + English blend matching the Findings tone |
 
+### Prompt Versioning
+
+Every generated conclusion records which prompt text produced it, so history
+stays comparable after the prompt is edited.
+
+- `lib/prompts/revisions.ts` is the change log. The base revision (`r1`) is the
+  prompt as of 2026-08-25; each later entry carries its date, a summary, and
+  what changed.
+- Each revision is identified by a short sha256 over every prompt the code can
+  render (both versions, all language/style combinations).
+- `generations.prompt_revision` and `generations.prompt_hash` are stamped on
+  each row at generation time, resolved from the live prompt text.
+- `npm test` fails when `lib/prompts/system-prompt.ts` changes without a new
+  registry entry, so a prompt cannot silently drift away from its recorded id.
+
+After editing a prompt, run the suite — the failing test prints the new
+fingerprint and what to do with it. `npm run prompt:revision` prints the same
+thing plus a ready-to-paste entry, when `scripts/` is present locally.
+
+The full history is also rendered on the `/review` screen.
+
 ## Project Structure
 
 ```

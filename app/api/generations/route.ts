@@ -22,6 +22,7 @@ export const dynamic = "force-dynamic";
  *   offset batch offset (default 0)
  *   q      substring match over findings and conclusion
  *   promptVersion  'v1' | 'v2' — keeps batches that contain that version
+ *   promptRevision  prompt revision id ('r1', ...) — same batch-keeping rule
  *   provider, model  exact match
  *   mine   '1' to restrict to the caller's own generations
  */
@@ -43,6 +44,7 @@ export async function GET(request: NextRequest) {
 
     const q = searchParams.get("q")?.trim();
     const promptVersion = searchParams.get("promptVersion");
+    const promptRevision = searchParams.get("promptRevision");
     const provider = searchParams.get("provider");
     const model = searchParams.get("model");
     const mine = searchParams.get("mine") === "1";
@@ -61,6 +63,9 @@ export async function GET(request: NextRequest) {
     }
     if (promptVersion === "v1" || promptVersion === "v2") {
       filters.push(eq(generations.promptVersion, promptVersion));
+    }
+    if (promptRevision) {
+      filters.push(eq(generations.promptRevision, promptRevision));
     }
     if (provider) filters.push(eq(generations.provider, provider));
     if (model) filters.push(eq(generations.model, model));
@@ -130,6 +135,8 @@ export async function GET(request: NextRequest) {
       batch.items.push({
         id: row.id,
         promptVersion: row.promptVersion,
+        promptRevision: row.promptRevision,
+        promptHash: row.promptHash,
         conclusion: row.conclusion,
         style: row.style,
         lang: row.lang,

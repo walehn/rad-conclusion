@@ -10,10 +10,16 @@ import {
   Search,
   Loader2,
   Inbox,
+  History,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { postProcess } from "@/lib/post-process";
 import { cn } from "@/lib/utils";
+import {
+  CURRENT_PROMPT_REVISION,
+  PROMPT_REVISIONS,
+  findPromptRevision,
+} from "@/lib/prompts/revisions";
 
 interface EvaluationSummary {
   scores: Record<string, number | undefined>;
@@ -24,6 +30,9 @@ interface EvaluationSummary {
 interface GenerationItem {
   id: number;
   promptVersion: "v1" | "v2";
+  /** Registry id of the prompt text used. Null on pre-versioning rows. */
+  promptRevision: string | null;
+  promptHash: string | null;
   conclusion: string;
   style: string;
   lang: string;
@@ -73,6 +82,83 @@ function formatDuration(ms: number | null): string {
   return ms >= 1000 ? `${(ms / 1000).toFixed(1)}초` : `${ms}ms`;
 }
 
+/**
+ * Renders the prompt revision behind one conclusion.
+ *
+ * The id alone is meaningless to a reader, so the summary and the text
+ * fingerprint are attached as a tooltip. Rows written before prompt
+ * versioning existed carry no id and are labelled as such.
+ */
+function RevisionBadge({
+  revision,
+  hash,
+}: {
+  revision: string | null;
+  hash: string | null;
+}): React.ReactElement {
+  const known = findPromptRevision(revision);
+  const label = revision ?? "미기록";
+  const title = known
+    ? `${known.id} (${known.date}) — ${known.summary}${hash ? ` · ${hash}` : ""}`
+    : revision === "unregistered"
+      ? `레지스트리에 등록되지 않은 프롬프트${hash ? ` · ${hash}` : ""}`
+      : "프롬프트 버전 추적 이전에 생성된 기록";
+
+  return (
+    <span
+      title={title}
+      className={cn(
+        "rounded px-1.5 py-0.5 font-mono text-[11px] font-medium",
+        known
+          ? "bg-primary/10 text-primary"
+          : "bg-muted text-muted-foreground"
+      )}
+    >
+      {label}
+    </span>
+  );
+}
+
+/** Collapsible change log, rendered straight from lib/prompts/revisions.ts. */
+function PromptHistory(): React.ReactElement {
+  return (
+    <details className="mb-6 rounded-lg border border-border bg-card">
+      <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-foreground">
+        <span className="inline-flex items-center gap-2">
+          <History className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+          프롬프트 변경 이력
+          <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+            현재 {CURRENT_PROMPT_REVISION.id}
+          </span>
+        </span>
+      </summary>
+      <ol className="border-t border-border px-4 py-3">
+        {[...PROMPT_REVISIONS].reverse().map((rev) => (
+          <li key={rev.id} className="border-b border-border/60 py-2 last:border-b-0">
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+              <span className="font-mono text-xs font-semibold text-primary">
+                {rev.id}
+              </span>
+              <span className="text-xs text-muted-foreground">{rev.date}</span>
+              <span className="text-sm text-foreground">{rev.summary}</span>
+              <span className="font-mono text-[11px] text-muted-foreground">
+                {rev.fingerprint}
+              </span>
+            </div>
+            {rev.changes.length > 0 && (
+              <ul className="mt-1 list-disc pl-5 text-xs text-muted-foreground">
+                {rev.changes.map((change) => (
+                  <li key={change}>{change}</li>
+                ))}
+              </ul>
+            )}
+          </li>
+        ))}
+      </ol>
+    </details>
+  );
+}
+
 export function ReviewClient(): React.ReactElement {
   const [batches, setBatches] = React.useState<GenerationBatch[]>([]);
   const [total, setTotal] = React.useState(0);
@@ -85,6 +171,7 @@ export function ReviewClient(): React.ReactElement {
   const [query, setQuery] = React.useState("");
   const [search, setSearch] = React.useState("");
   const [versionFilter, setVersionFilter] = React.useState<"" | "v1" | "v2">("");
+  const [revisionFilter, setRevisionFilter] = React.useState("");
   const [mineOnly, setMineOnly] = React.useState(false);
 
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
@@ -101,6 +188,7 @@ export function ReviewClient(): React.ReactElement {
     });
     if (search) params.set("q", search);
     if (versionFilter) params.set("promptVersion", versionFilter);
+    if (revisionFilter) params.set("promptRevision", revisionFilter);
     if (mineOnly) params.set("mine", "1");
 
     fetch(`/api/generations?${params.toString()}`)
@@ -123,7 +211,7 @@ export function ReviewClient(): React.ReactElement {
     return () => {
       cancelled = true;
     };
-  }, [offset, search, versionFilter, mineOnly]);
+  }, [offset, search, versionFilter, revisionFilter, mineOnly]);
 
   // Any filter change invalidates the current page position.
   const applySearch = (): void => {
@@ -169,6 +257,8 @@ export function ReviewClient(): React.ReactElement {
           A/B 비교로 생성된 v1·v2는 같은 항목 안에 나란히 표시됩니다.
         </p>
       </header>
+
+      <PromptHistory />
 
       {/* Filters */}
       <div className="mb-6 flex flex-wrap items-center gap-2">
@@ -223,6 +313,28 @@ export function ReviewClient(): React.ReactElement {
             </button>
           ))}
         </div>
+
+        <select
+          value={revisionFilter}
+          onChange={(e) => {
+            setOffset(0);
+            setRevisionFilter(e.target.value);
+          }}
+          aria-label="프롬프트 리비전 필터"
+          className={cn(
+            "h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+          )}
+        >
+          <option value="">모든 리비전</option>
+          {[...PROMPT_REVISIONS].reverse().map((rev) => (
+            <option key={rev.id} value={rev.id}>
+              {rev.id} · {rev.date}
+            </option>
+          ))}
+          {/* Rows whose prompt text was never registered. */}
+          <option value="unregistered">미등록 프롬프트</option>
+        </select>
 
         <label className="flex items-center gap-2 text-sm text-muted-foreground">
           <input
@@ -318,6 +430,7 @@ export function ReviewClient(): React.ReactElement {
                             className="rounded bg-muted px-1.5 py-0.5 font-medium"
                           >
                             {item.promptVersion}
+                            {item.promptRevision && ` · ${item.promptRevision}`}
                             {item.totalMs !== null &&
                               ` · ${formatDuration(item.totalMs)}`}
                           </span>
@@ -354,8 +467,12 @@ export function ReviewClient(): React.ReactElement {
                             className="rounded-md border border-border bg-card p-3"
                           >
                             <div className="mb-2 flex items-center justify-between gap-2">
-                              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                              <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                 결론 · {item.promptVersion}
+                                <RevisionBadge
+                                  revision={item.promptRevision}
+                                  hash={item.promptHash}
+                                />
                               </h2>
                               <Button
                                 variant="ghost"
