@@ -7,6 +7,13 @@ export default defineConfig({
       '@': path.resolve(__dirname, './'),
     },
   },
+  // tsconfig sets jsx: "preserve" for Next's compiler, which leaves esbuild on
+  // the classic runtime and makes any .tsx component without an explicit
+  // `import React` throw "React is not defined" under test. Next itself uses
+  // the automatic runtime, so pin it here to match production.
+  esbuild: {
+    jsx: 'automatic',
+  },
   test: {
     environment: 'node',
     globals: false,
