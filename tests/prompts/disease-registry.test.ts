@@ -29,12 +29,12 @@ describe('lib/prompts/disease-registry', () => {
       expect(modalities).toHaveLength(3);
     });
 
-    it('references the core RCC standards', () => {
-      const refs = DISEASE_REGISTRY.RCC.standardReferences;
-      expect(refs).toContain('SAR 2018');
-      expect(refs).toContain('AJCC 8th');
-      expect(refs).toContain('Bosniak 2019');
-      expect(refs).toContain('Neves-Mayo');
+    it('references the core RCC standards by id', () => {
+      const ids = DISEASE_REGISTRY.RCC.standardReferences.map((r) => r.id);
+      expect(ids).toContain('sar-2019');
+      expect(ids).toContain('ajcc-8th-kidney');
+      expect(ids).toContain('bosniak-2019');
+      expect(ids).toContain('neves-mayo-1987');
     });
   });
 
@@ -176,6 +176,98 @@ describe('lib/prompts/disease-registry', () => {
       expect(meta.displayNameKo).toBe('전립선암');
       expect(meta.supportedModalities).toEqual(['MRI']);
       expect(meta.standardReferences).toHaveLength(5);
+    });
+  });
+
+  describe('DISEASE_REGISTRY — UterineMyoma entry', () => {
+    it('contains a UterineMyoma entry', () => {
+      expect(DISEASE_REGISTRY).toHaveProperty('UterineMyoma');
+      expect(DISEASE_REGISTRY.UterineMyoma.id).toBe('UterineMyoma');
+    });
+
+    it('exposes the correct English and Korean display names', () => {
+      expect(DISEASE_REGISTRY.UterineMyoma.displayName).toBe('Uterine Myoma');
+      expect(DISEASE_REGISTRY.UterineMyoma.displayNameKo).toBe('자궁근종');
+    });
+
+    // CT is deliberately absent: the template has no authored CT guidance, and
+    // the prompt dispatcher collapses a CT hint to 'Auto' rather than inventing
+    // a CT protocol description.
+    it('supports MRI and US but not CT', () => {
+      const modalities = DISEASE_REGISTRY.UterineMyoma.supportedModalities;
+      expect(modalities).toEqual(['MRI', 'US']);
+      expect(modalities).not.toContain('CT');
+    });
+
+    it('references the canonical myoma standards by id', () => {
+      const ids = DISEASE_REGISTRY.UterineMyoma.standardReferences.map(
+        (r) => r.id
+      );
+      expect(ids).toContain('figo-palm-coein-2011');
+      expect(ids).toContain('esur-leiomyoma-2018');
+      expect(ids).toContain('funaki-2007');
+    });
+
+    it('records the verified DOI for each reference', () => {
+      const byId = new Map(
+        DISEASE_REGISTRY.UterineMyoma.standardReferences.map((r) => [r.id, r])
+      );
+      expect(byId.get('figo-palm-coein-2011')?.url).toBe(
+        'https://doi.org/10.1016/j.ijgo.2010.11.011'
+      );
+      expect(byId.get('esur-leiomyoma-2018')?.url).toBe(
+        'https://doi.org/10.1007/s00330-017-5157-5'
+      );
+      expect(byId.get('funaki-2007')?.url).toBe(
+        'https://doi.org/10.1016/j.ajog.2006.08.030'
+      );
+    });
+
+    it('round-trips through diseaseCategoryToSlug / parseDiseaseCategorySlug', () => {
+      expect(diseaseCategoryToSlug('UterineMyoma')).toBe('uterine-myoma');
+      expect(parseDiseaseCategorySlug('uterine-myoma')).toBe('UterineMyoma');
+    });
+
+    it('is recognised by isDiseaseCategory and getDiseaseCategoryMetadata', () => {
+      expect(isDiseaseCategory('UterineMyoma')).toBe(true);
+      const meta = getDiseaseCategoryMetadata('UterineMyoma');
+      expect(meta.id).toBe('UterineMyoma');
+      expect(meta.standardReferences).toHaveLength(3);
+    });
+  });
+
+  // Registry-wide invariants. These apply to every category, so a future
+  // template inherits the same citation hygiene without a bespoke test.
+  describe('citation integrity across the whole registry', () => {
+    const categories = Object.keys(DISEASE_REGISTRY) as DiseaseCategory[];
+
+    it.each(categories)('%s: citation ids are unique', (category) => {
+      const ids = DISEASE_REGISTRY[category].standardReferences.map((r) => r.id);
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    it.each(categories)(
+      '%s: every reference carries title, year, scope and notice',
+      (category) => {
+        for (const ref of DISEASE_REGISTRY[category].standardReferences) {
+          expect(ref.fullTitle.length, `${ref.id} fullTitle`).toBeGreaterThan(0);
+          expect(ref.shortLabel.length, `${ref.id} shortLabel`).toBeGreaterThan(
+            0
+          );
+          expect(ref.year, `${ref.id} year`).toBeGreaterThan(1900);
+          expect(ref.scope.length, `${ref.id} scope`).toBeGreaterThan(0);
+          expect(ref.notice?.length ?? 0, `${ref.id} notice`).toBeGreaterThan(0);
+        }
+      }
+    );
+
+    // A citation URL is shown to the reader as the source of a clinical
+    // criterion, so a malformed or non-HTTPS one is worse than none at all.
+    it.each(categories)('%s: any citation URL is https', (category) => {
+      for (const ref of DISEASE_REGISTRY[category].standardReferences) {
+        if (ref.url === undefined) continue;
+        expect(ref.url, `${ref.id} url`).toMatch(/^https:\/\//);
+      }
     });
   });
 });

@@ -5,6 +5,7 @@
  * module that matches the requested DiseaseCategory. Currently dispatches to:
  *   - 'RCC'            → ./disease-templates/rcc.ts
  *   - 'ProstateCancer' → ./disease-templates/prostate.ts
+ *   - 'UterineMyoma'   → ./disease-templates/myoma.ts
  *
  * Unrecognised categories trigger the compile-time exhaustiveness check
  * (assertUnreachable) so the API layer can return a 400 response instead of
@@ -33,16 +34,24 @@ import {
   type ProstateModality,
   type ProstateReportLang,
 } from "./disease-templates/prostate";
+import {
+  buildMyomaReportSystemPrompt,
+  buildMyomaReportUserPrompt,
+  type MyomaModality,
+  type MyomaReportLang,
+} from "./disease-templates/myoma";
 
 /**
  * Output language for the structured-report body.
  *
- * RccReportLang and ProstateReportLang are both `"ko" | "en" | "mixed"`, so
- * either can be used as the alias source. The intersection (`& ProstateReportLang`)
- * is written explicitly so a future divergence in either template's language
- * enum is caught at compile time at this dispatch boundary.
+ * Every template's language enum is `"ko" | "en" | "mixed"`, so any one of
+ * them could serve as the alias source. The intersection is written out
+ * explicitly so a future divergence in any template's language enum is caught
+ * at compile time at this dispatch boundary.
  */
-export type StructuredReportLang = RccReportLang & ProstateReportLang;
+export type StructuredReportLang = RccReportLang &
+  ProstateReportLang &
+  MyomaReportLang;
 
 export interface StructuredReportConfig {
   /** Which disease category template to use. v0.1.0 accepts 'RCC' only. */
@@ -100,6 +109,26 @@ function toProstateModality(modality: string | undefined): ProstateModality {
 }
 
 /**
+ * Normalize a free-form modality string into the myoma template's enum.
+ *
+ * Uterine myoma reporting is MRI-first but ultrasound is a real modality for
+ * this disease, so both pass through; CT collapses to "Auto" because the
+ * template has no authored CT guidance.
+ */
+function toMyomaModality(modality: string | undefined): MyomaModality {
+  switch (modality) {
+    case "MRI":
+    case "US":
+    case "Auto":
+      return modality;
+    case "CT":
+      return "Auto";
+    default:
+      return "Auto";
+  }
+}
+
+/**
  * Compile-time exhaustiveness helper. If a new DiseaseCategory variant is
  * added to the union without a matching case, TypeScript will flag the
  * offending switch as returning `never` at this call.
@@ -107,7 +136,7 @@ function toProstateModality(modality: string | undefined): ProstateModality {
 function assertUnreachable(value: never): never {
   throw new Error(
     `Unsupported disease category: ${String(value)}. ` +
-      "Currently supported: 'RCC' and 'ProstateCancer'. " +
+      "Currently supported: 'RCC', 'ProstateCancer' and 'UterineMyoma'. " +
       "Add a new branch in structured-report-prompt.ts to extend."
   );
 }
@@ -130,6 +159,11 @@ export function buildReportSystemPrompt(
       return buildProstateReportSystemPrompt({
         lang,
         modality: toProstateModality(modality),
+      });
+    case "UterineMyoma":
+      return buildMyomaReportSystemPrompt({
+        lang,
+        modality: toMyomaModality(modality),
       });
     default:
       return assertUnreachable(diseaseCategory);
@@ -157,6 +191,12 @@ export function buildReportUserPrompt(
       return buildProstateReportUserPrompt({
         lang,
         modality: toProstateModality(modality),
+        findings,
+      });
+    case "UterineMyoma":
+      return buildMyomaReportUserPrompt({
+        lang,
+        modality: toMyomaModality(modality),
         findings,
       });
     default:

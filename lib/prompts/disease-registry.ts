@@ -15,11 +15,12 @@
  * Registered categories:
  *   - "RCC"            — Renal Cell Carcinoma (SPEC-DASHBOARD-001)
  *   - "ProstateCancer" — Prostate Cancer / PI-RADS v2.1 (SPEC-PROSTATE-001)
+ *   - "UterineMyoma"   — Uterine leiomyoma / FIGO subclassification
  *
  * Future extension example:
  *   type DiseaseCategory = "RCC" | "ProstateCancer" | "HCC" | "PulmonaryNodule";
  */
-export type DiseaseCategory = "RCC" | "ProstateCancer";
+export type DiseaseCategory = "RCC" | "ProstateCancer" | "UterineMyoma";
 
 /**
  * Imaging modalities supported per disease category.
@@ -215,6 +216,58 @@ export const DISEASE_REGISTRY: Record<DiseaseCategory, DiseaseCategoryMetadata> 
       },
     ] as const,
   },
+  UterineMyoma: {
+    id: "UterineMyoma",
+    displayName: "Uterine Myoma",
+    displayNameKo: "자궁근종",
+    description:
+      "Uterine leiomyoma structured reporting per the FIGO leiomyoma subclassification (types 0-8), with ESUR MR imaging guidance and Funaki typing for focused-ultrasound planning",
+    supportedModalities: ["MRI", "US"] as const,
+    standardReferences: [
+      {
+        id: "figo-palm-coein-2011",
+        shortLabel: "FIGO 2011",
+        fullTitle:
+          "FIGO classification system (PALM-COEIN) for causes of abnormal uterine bleeding in nongravid women of reproductive age",
+        authors:
+          "Munro MG, Critchley HOD, Broder MS, Fraser IS; FIGO Working Group on Menstrual Disorders",
+        venue: "International Journal of Gynecology & Obstetrics 113(1):3–13",
+        year: 2011,
+        url: "https://doi.org/10.1016/j.ijgo.2010.11.011",
+        scope:
+          "Leiomyoma subclassification — FIGO types 0–8 and the hybrid \"N-N\" notation for transmural lesions",
+        notice:
+          "Criteria paraphrased; FIGO type codes are public nomenclature.",
+      },
+      {
+        id: "esur-leiomyoma-2018",
+        shortLabel: "ESUR 2018",
+        fullTitle:
+          "European Society of Urogenital Radiology (ESUR) Guidelines: MR Imaging of Leiomyomas",
+        authors: "Kubik-Huch RA, Weston M, Nougaret S, et al.",
+        venue: "European Radiology 28(8):3125–3137",
+        year: 2018,
+        url: "https://doi.org/10.1007/s00330-017-5157-5",
+        scope:
+          "MR protocol, degeneration patterns, leiomyoma vs leiomyosarcoma differentiation, and structured reporting content",
+        notice:
+          "This template paraphrases the published recommendations; refer to the original publication for verbatim wording.",
+      },
+      {
+        id: "funaki-2007",
+        shortLabel: "Funaki",
+        fullTitle:
+          "Magnetic resonance-guided focused ultrasound surgery for uterine fibroids: relationship between the therapeutic effects and signal intensity of preexisting T2-weighted magnetic resonance images",
+        authors: "Funaki K, Fukunishi H, Funaki T, Sawada K, Kaji Y, Maruo T",
+        venue: "American Journal of Obstetrics and Gynecology 196(2):184.e1–6",
+        year: 2007,
+        url: "https://doi.org/10.1016/j.ajog.2006.08.030",
+        scope:
+          "Funaki types I–III — T2 signal intensity relative to skeletal muscle and myometrium, for HIFU/MRgFUS response prediction",
+        notice: "Type I–III designation is public nomenclature.",
+      },
+    ] as const,
+  },
 };
 
 /**
@@ -246,6 +299,7 @@ export function getDiseaseCategoryMetadata(
  * Examples:
  *   - "RCC"            → "rcc"
  *   - "ProstateCancer" → "prostate-cancer"
+ *   - "UterineMyoma"   → "uterine-myoma"
  *
  * Used for routing under `/structured-report/<slug>` (SPEC-DISEASE-SELECTOR-001).
  */

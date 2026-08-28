@@ -1,7 +1,13 @@
 // @vitest-environment happy-dom
 
 import * as React from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+} from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // ---------------------------------------------------------------------------
@@ -14,14 +20,48 @@ vi.mock("@/lib/storage/settings-store", () => ({
 }));
 
 // ---------------------------------------------------------------------------
+// Mock next/navigation — the App Router hooks require a mounted router, which
+// only exists inside a real Next.js render tree.
+// ---------------------------------------------------------------------------
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    refresh: vi.fn(),
+    prefetch: vi.fn(),
+  }),
+  usePathname: () => "/structured-report",
+  useSearchParams: () => new URLSearchParams(),
+}));
+
+// ---------------------------------------------------------------------------
 // Component under test
 // ---------------------------------------------------------------------------
 
 import { StructuredReportClient } from "@/app/structured-report/structured-report-client";
+import { ThemeProvider } from "@/components/theme-provider";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Render the client inside the ThemeProvider it relies on.
+ *
+ * In the app the provider comes from the root layout; rendering the client
+ * bare made useNotionPalette() throw, so this wrapper mirrors production
+ * rather than the component being at fault.
+ */
+function renderClient(disease: React.ComponentProps<typeof StructuredReportClient>["disease"]) {
+  return render(
+    <ThemeProvider>
+      <StructuredReportClient disease={disease} />
+    </ThemeProvider>
+  );
+}
 
 /** Build a minimal ReadableStream that closes immediately (empty stream). */
 function emptyStream(): ReadableStream<Uint8Array> {
@@ -59,6 +99,19 @@ describe("StructuredReportClient — structured input integration", () => {
       });
     });
 
+    // ThemeProvider resolves the system theme through matchMedia, which
+    // happy-dom does not implement.
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: false,
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      dispatchEvent: () => false,
+      onchange: null,
+    }));
+
     // Silence sessionStorage errors in happy-dom if any
     vi.stubGlobal("sessionStorage", {
       getItem: () => null,
@@ -68,11 +121,15 @@ describe("StructuredReportClient — structured input integration", () => {
   });
 
   afterEach(() => {
+    // vitest runs with globals: false, so @testing-library/react never
+    // registers its automatic cleanup. Without this, each render stacks up in
+    // the same document and screen queries match across tests.
+    cleanup();
     vi.unstubAllGlobals();
   });
 
   it("RCC Structured 입력의 직렬화 결과가 findings 필드로 전송된다", async () => {
-    render(<StructuredReportClient disease="RCC" />);
+    renderClient("RCC");
 
     // The RCC structured form is now always visible (no tab toggle). Fill in
     // the two minimum-required fields so `hasMinimumStructuredFields` passes
@@ -91,7 +148,7 @@ describe("StructuredReportClient — structured input integration", () => {
     // With both required fields filled, exactly one Generate button should be
     // rendered and enabled (the previous tab UI rendered two — one per panel).
     const generateButton = screen.getByRole("button", {
-      name: /Generate structured report/i,
+      name: /Generate report/i,
     });
     expect((generateButton as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(generateButton);
@@ -119,6 +176,59 @@ describe("StructuredReportClient — structured input integration", () => {
       // has been entered.
       expect(body.findings).not.toContain("Other findings:");
       expect(body.diseaseCategory).toBe("RCC");
+    });
+  });
+
+  // End-to-end myoma flow: click-driven geometry produces a derived FIGO type
+  // that ships in the serialized findings payload.
+  it("자궁근종 구조화 입력의 직렬화 결과가 findings 필드로 전송된다", async () => {
+    renderClient("UterineMyoma");
+
+    // Required fields are missing at first, so Generate must be disabled and
+    // the checklist visible.
+    const generateButton = screen.getByRole("button", {
+      name: /Generate report/i,
+    });
+    expect((generateButton as HTMLButtonElement).disabled).toBe(true);
+
+    // Reference-case index lesion: anterior subserosal pedunculated, 10 cm.
+    fireEvent.change(
+      screen.getByRole("combobox", { name: /Myoma #1 location/ }),
+      { target: { value: "Anterior" } }
+    );
+    fireEvent.click(screen.getByRole("radio", { name: "Subserosal" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Pedunculated/ }));
+    fireEvent.change(
+      screen.getByRole("spinbutton", { name: /Size \(largest\)/ }),
+      { target: { value: "10" } }
+    );
+
+    // The derived FIGO type is visible before generation.
+    expect(
+      screen.getByTestId("myoma-lesion-0-figo-value").textContent
+    ).toBe("7");
+
+    expect((generateButton as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(generateButton);
+
+    await waitFor(() => {
+      const generateCall = fetchCalls.find(
+        (c) => c.url === "/api/structured-report/generate"
+      );
+      expect(generateCall).toBeDefined();
+      const body = JSON.parse(generateCall!.options.body as string);
+      expect(body.diseaseCategory).toBe("UterineMyoma");
+      expect(body.findings).toContain("Myoma 1:");
+      expect(body.findings).toContain("- Location: Anterior");
+      expect(body.findings).toContain("- Layer: Subserosal");
+      expect(body.findings).toContain("- FIGO type: 7");
+      expect(body.findings).toContain("- Cavity distortion: No");
+      expect(body.findings).toContain("- Size: 10 cm");
+      expect(body.findings).toContain("- Pedunculated: Yes");
+      // Nothing atypical was entered, so the tally must say so.
+      expect(body.findings).toContain(
+        "Leiomyosarcoma red flags: None identified"
+      );
     });
   });
 });

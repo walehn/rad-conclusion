@@ -7,7 +7,18 @@ import {
   RCC_SECTION_ORDER,
   type RccReportSection,
 } from "@/lib/prompts/disease-templates/rcc";
+import type { MyomaReportSection } from "@/lib/prompts/disease-templates/myoma";
 import { cn } from "@/lib/utils";
+
+/**
+ * Any section header this component can route content into.
+ *
+ * The union spans every disease template rather than one of them, so a
+ * template that introduces a new section (uterine myoma replaces STAGING with
+ * CLASSIFICATION) fails to compile until SECTION_LABELS_KO gains a label for
+ * it, instead of rendering an untranslated box.
+ */
+export type StructuredReportSection = RccReportSection | MyomaReportSection;
 
 interface StructuredReportOutputProps {
   /** Full streaming content accumulated so far. */
@@ -22,24 +33,31 @@ interface StructuredReportOutputProps {
   onRetry?: () => void;
   /** Error message from the last generation attempt. */
   error?: string | null;
+  /**
+   * Section headers to parse and render, in report order. Comes from the
+   * active disease template (RCC_SECTION_ORDER, MYOMA_SECTION_ORDER, ...).
+   * Defaults to the RCC order, which the cancer templates share.
+   */
+  sectionOrder?: readonly StructuredReportSection[];
 }
 
 /**
- * Korean labels for each SAR/RCC report section.
+ * Korean labels for every report section across all disease templates.
  * The English uppercase header remains the authoritative anchor used by the
  * parser; the Korean label is only a secondary visual aid for readers.
  */
-const SECTION_LABELS_KO: Record<RccReportSection, string> = {
+const SECTION_LABELS_KO: Record<StructuredReportSection, string> = {
   "CLINICAL INFORMATION": "임상 정보",
   TECHNIQUE: "기법",
   COMPARISON: "비교",
   FINDINGS: "소견",
   STAGING: "병기",
+  CLASSIFICATION: "분류",
   IMPRESSION: "결론",
 };
 
 /**
- * Parse the streaming report into its six sections.
+ * Parse the streaming report into the sections the active template declares.
  *
  * Strategy:
  *   - Look for lines that match exactly one of the SAR section headers
@@ -53,24 +71,21 @@ const SECTION_LABELS_KO: Record<RccReportSection, string> = {
  *     header arrives, parsing switches to the normal header-based layout.
  */
 interface ParsedSections {
-  sections: Record<RccReportSection, string>;
+  sections: Partial<Record<StructuredReportSection, string>>;
   /** Which section is currently being written (last one seen in the stream). */
-  activeSection: RccReportSection | null;
+  activeSection: StructuredReportSection | null;
   /** True when at least one recognized header has been seen in the content. */
   headersDetected: boolean;
   /** Text that appeared before any recognized header (fallback buffer). */
   prelude: string;
 }
 
-function parseSections(content: string): ParsedSections {
-  const empty: Record<RccReportSection, string> = {
-    "CLINICAL INFORMATION": "",
-    TECHNIQUE: "",
-    COMPARISON: "",
-    FINDINGS: "",
-    STAGING: "",
-    IMPRESSION: "",
-  };
+function parseSections(
+  content: string,
+  sectionOrder: readonly StructuredReportSection[]
+): ParsedSections {
+  const empty: Partial<Record<StructuredReportSection, string>> = {};
+  for (const section of sectionOrder) empty[section] = "";
 
   if (!content) {
     return {
@@ -83,7 +98,7 @@ function parseSections(content: string): ParsedSections {
 
   // Escape any potentially-regex-sensitive characters in section names.
   // (All current names are [A-Z ]+ but this future-proofs the pattern.)
-  const headerAlternation = RCC_SECTION_ORDER.map((s) =>
+  const headerAlternation = sectionOrder.map((s) =>
     s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
   ).join("|");
 
@@ -95,12 +110,15 @@ function parseSections(content: string): ParsedSections {
     "gm"
   );
 
-  const matches: Array<{ name: RccReportSection; start: number; end: number }> =
-    [];
+  const matches: Array<{
+    name: StructuredReportSection;
+    start: number;
+    end: number;
+  }> = [];
   let m: RegExpExecArray | null;
   while ((m = headerRegex.exec(content)) !== null) {
     matches.push({
-      name: m[1] as RccReportSection,
+      name: m[1] as StructuredReportSection,
       start: m.index,
       end: m.index + m[0].length,
     });
@@ -164,7 +182,7 @@ function LiveElapsed({ startedAt }: { startedAt: number }) {
 /**
  * Structured Report streaming output.
  *
- * Renders six section boxes in the fixed RCC_SECTION_ORDER. As the stream
+ * Renders one box per section in the template's fixed order. As the stream
  * arrives, header-delimited content is routed into its matching box; empty
  * sections display a muted placeholder. Once streaming finishes the user can
  * copy the complete report or retry on error.
@@ -176,10 +194,14 @@ export function StructuredReportOutput({
   streamStartedAt,
   onRetry,
   error,
+  sectionOrder = RCC_SECTION_ORDER,
 }: StructuredReportOutputProps) {
   const [copied, setCopied] = React.useState(false);
 
-  const parsed = React.useMemo(() => parseSections(content), [content]);
+  const parsed = React.useMemo(
+    () => parseSections(content, sectionOrder),
+    [content, sectionOrder]
+  );
 
   const handleCopy = async () => {
     if (!content) return;
@@ -311,8 +333,8 @@ export function StructuredReportOutput({
       {/* Section boxes (always rendered in canonical order) */}
       {(hasAnyContent || isStreaming) && (
         <div className="space-y-3">
-          {RCC_SECTION_ORDER.map((section) => {
-            const body = parsed.sections[section];
+          {sectionOrder.map((section) => {
+            const body = parsed.sections[section] ?? "";
             const isActive =
               isStreaming && parsed.activeSection === section;
             const isEmpty = body.length === 0;

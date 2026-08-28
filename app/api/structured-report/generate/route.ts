@@ -2,9 +2,9 @@
  * POST /api/structured-report/generate
  *
  * SSE streaming endpoint for the Structured Report Generator
- * (SPEC-DASHBOARD-001). v0.1.0 supports the Renal Cell Carcinoma (RCC)
- * disease category only; requests for any other category are rejected
- * with HTTP 400.
+ * (SPEC-DASHBOARD-001). Supports the disease categories registered in
+ * lib/prompts/disease-registry.ts; requests for any other category are
+ * rejected with HTTP 400 at the zod layer.
  *
  * Security layers (mirrors /api/generate):
  *   1. requireApiSession()      — iron-session cookie gate (401 on miss)
@@ -37,10 +37,12 @@ export const dynamic = "force-dynamic";
  * Request body schema.
  *
  * - findings: non-empty; hard-capped at 20_000 chars to keep prompts bounded.
- * - diseaseCategory: 'RCC' or 'ProstateCancer' (extended by SPEC-PROSTATE-001).
- *   Any other value is rejected at the zod layer, producing a 400 response
- *   without reaching the prompt dispatcher.
- * - modality: optional hint routed to the RCC template (defaults to 'Auto').
+ * - diseaseCategory: one of the registered DiseaseCategory literals. Any other
+ *   value is rejected at the zod layer, producing a 400 response without
+ *   reaching the prompt dispatcher. The literals are listed explicitly rather
+ *   than derived so that adding a category is a deliberate API change.
+ * - modality: optional hint routed to the chosen template, which normalizes
+ *   values it has no authored guidance for (defaults to 'Auto').
  * - lang: output language for the report body.
  * - provider/model: same provider surface as /api/generate.
  */
@@ -49,7 +51,11 @@ const requestSchema = z.object({
     .string()
     .min(1, "Findings text is required")
     .max(20_000, "Findings text exceeds maximum length (20000 characters)"),
-  diseaseCategory: z.union([z.literal("RCC"), z.literal("ProstateCancer")]),
+  diseaseCategory: z.union([
+    z.literal("RCC"),
+    z.literal("ProstateCancer"),
+    z.literal("UterineMyoma"),
+  ]),
   modality: z.enum(["CT", "MRI", "US", "Auto"]).optional(),
   lang: z.enum(["ko", "en", "mixed"]),
   provider: z.enum(["local", "openai", "anthropic", "google"]),
@@ -108,7 +114,7 @@ export async function POST(req: Request) {
     });
 
     // Perf instrumentation: t at LLM-call boundary so TTFT excludes auth/parse.
-    // disease (RCC/ProstateCancer) lets us group by disease in `jq` analysis.
+    // `disease` lets us group perf records by disease category in `jq` analysis.
     const tLLMStart = performance.now();
     const modelId = resolvedModelId(provider as ProviderName, model);
     const maxTokensConfig = 2048;

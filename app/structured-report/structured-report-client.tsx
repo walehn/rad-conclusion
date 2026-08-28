@@ -44,7 +44,12 @@ import {
 import { ModelSelector } from "@/components/model-selector";
 import { DiseaseCategoryIndicator } from "@/components/disease-category-indicator";
 import { ReferencesDialog } from "@/components/references-dialog";
-import { StructuredReportOutput } from "@/components/structured-report-output";
+import {
+  StructuredReportOutput,
+  type StructuredReportSection,
+} from "@/components/structured-report-output";
+import { RCC_SECTION_ORDER } from "@/lib/prompts/disease-templates/rcc";
+import { MYOMA_SECTION_ORDER } from "@/lib/prompts/disease-templates/myoma";
 import {
   DISEASE_REGISTRY,
   getDiseaseCategoryMetadata,
@@ -61,6 +66,14 @@ import {
   serializeProstateStructuredInput,
 } from "@/lib/prompts/disease-templates/prostate-serializer";
 import type { ProstateStructuredInput } from "@/lib/prompts/disease-templates/prostate-serializer";
+import {
+  createEmptyMyomaInput,
+  getMissingMyomaFields,
+  hasMinimumMyomaFields,
+  serializeMyomaStructuredInput,
+} from "@/lib/prompts/disease-templates/myoma-serializer";
+import type { MyomaStructuredInput } from "@/lib/prompts/disease-templates/myoma-serializer";
+import { MyomaStructuredForm } from "@/components/myoma-structured-form";
 import { loadProviderSettings } from "@/lib/storage/settings-store";
 import { genClientId } from "@/lib/utils";
 import type { DiseaseCategory } from "@/lib/prompts/disease-registry";
@@ -140,7 +153,8 @@ function appendStreamChunk(accumulated: string, rawLine: string): string {
  */
 type StructuredFormState =
   | { kind: "RCC"; input: RccStructuredInput }
-  | { kind: "ProstateCancer"; input: ProstateStructuredInput };
+  | { kind: "ProstateCancer"; input: ProstateStructuredInput }
+  | { kind: "UterineMyoma"; input: MyomaStructuredInput };
 
 function createInitialFormState(disease: DiseaseCategory): StructuredFormState {
   switch (disease) {
@@ -148,6 +162,8 @@ function createInitialFormState(disease: DiseaseCategory): StructuredFormState {
       return { kind: "RCC", input: { masses: [{ id: genClientId() }] } };
     case "ProstateCancer":
       return { kind: "ProstateCancer", input: createEmptyProstateInput() };
+    case "UterineMyoma":
+      return { kind: "UterineMyoma", input: createEmptyMyomaInput() };
   }
 }
 
@@ -157,6 +173,8 @@ function hasMinimumFormFields(state: StructuredFormState): boolean {
       return hasMinimumStructuredFields(state.input);
     case "ProstateCancer":
       return hasMinimumProstateFields(state.input);
+    case "UterineMyoma":
+      return hasMinimumMyomaFields(state.input);
   }
 }
 
@@ -172,6 +190,8 @@ function getMissingFormFields(state: StructuredFormState): string[] {
       return getMissingRccFields(state.input);
     case "ProstateCancer":
       return getMissingProstateFields(state.input);
+    case "UterineMyoma":
+      return getMissingMyomaFields(state.input);
   }
 }
 
@@ -181,6 +201,27 @@ function serializeFormFindings(state: StructuredFormState): string {
       return serializeRccStructuredInput(state.input);
     case "ProstateCancer":
       return serializeProstateStructuredInput(state.input);
+    case "UterineMyoma":
+      return serializeMyomaStructuredInput(state.input);
+  }
+}
+
+/**
+ * Section headers the output panel should parse and render for this disease.
+ *
+ * The cancer templates share the RCC order; uterine myoma is benign and
+ * carries CLASSIFICATION (FIGO / Funaki / sarcoma risk) where they carry
+ * STAGING, so the panel cannot assume one fixed list.
+ */
+function getSectionOrder(
+  disease: DiseaseCategory
+): readonly StructuredReportSection[] {
+  switch (disease) {
+    case "RCC":
+    case "ProstateCancer":
+      return RCC_SECTION_ORDER;
+    case "UterineMyoma":
+      return MYOMA_SECTION_ORDER;
   }
 }
 
@@ -190,6 +231,8 @@ function getMinimumFieldsErrorMessage(disease: DiseaseCategory): string {
       return "Please complete the structured input (Side and Mass size are required for each mass).";
     case "ProstateCancer":
       return "Please complete the structured input (PSA, prostate volume, PI-QUAL overall, and at least one lesion with T2W/DWI scores and a sector are required).";
+    case "UterineMyoma":
+      return "Please complete the structured input (location, layer, FIGO type and size are required for each myoma).";
   }
 }
 
@@ -825,7 +868,7 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
                   note="Fill the structured fields below. Required cells are marked; the report won't generate until they are complete."
                 >
                   <div className="flex flex-col gap-4">
-                    {formState.kind === "RCC" ? (
+                    {formState.kind === "RCC" && (
                       <RccStructuredForm
                         value={formState.input}
                         onChange={(next) => {
@@ -834,12 +877,26 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
                         }}
                         error={inputError}
                       />
-                    ) : (
+                    )}
+                    {formState.kind === "ProstateCancer" && (
                       <ProstateStructuredForm
                         value={formState.input}
                         onChange={(next) => {
                           setFormState({
                             kind: "ProstateCancer",
+                            input: next,
+                          });
+                          if (inputError) setInputError("");
+                        }}
+                        error={inputError}
+                      />
+                    )}
+                    {formState.kind === "UterineMyoma" && (
+                      <MyomaStructuredForm
+                        value={formState.input}
+                        onChange={(next) => {
+                          setFormState({
+                            kind: "UterineMyoma",
                             input: next,
                           });
                           if (inputError) setInputError("");
@@ -961,6 +1018,7 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
                   }
                 >
                   <StructuredReportOutput
+                    sectionOrder={getSectionOrder(disease)}
                     content={content}
                     isStreaming={isStreaming}
                     elapsedMs={elapsedMs}

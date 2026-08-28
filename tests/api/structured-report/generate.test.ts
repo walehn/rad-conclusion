@@ -106,7 +106,7 @@ describe('POST /api/structured-report/generate', () => {
     expect(body.error).toBeDefined();
   });
 
-  it('returns 400 when diseaseCategory is not the supported RCC literal', async () => {
+  it('returns 400 for a diseaseCategory that is not registered', async () => {
     await authenticate();
     setCsrfCookie();
     const res = await POST(
