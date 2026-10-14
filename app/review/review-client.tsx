@@ -21,12 +21,6 @@ import {
   findPromptRevision,
 } from "@/lib/prompts/revisions";
 
-interface EvaluationSummary {
-  scores: Record<string, number | undefined>;
-  issues: string[];
-  overallScore: number | null;
-}
-
 interface GenerationItem {
   id: number;
   promptVersion: "v1" | "v2";
@@ -45,7 +39,6 @@ interface GenerationItem {
   totalMs: number | null;
   createdAt: string;
   isMine: boolean;
-  evaluation: EvaluationSummary | null;
 }
 
 interface GenerationBatch {
@@ -56,15 +49,6 @@ interface GenerationBatch {
 }
 
 const PAGE_SIZE = 20;
-
-const SCORE_LABELS: Record<string, string> = {
-  conciseness: "간결성",
-  intervalChange: "경과 변화",
-  dxAppropriateness: "진단 적절성",
-  redundancy: "중복 없음",
-  hedgingAccuracy: "확신 표현",
-  clinicalPriority: "임상 우선순위",
-};
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
@@ -526,43 +510,6 @@ export function ReviewClient(): React.ReactElement {
                               </div>
                             </dl>
 
-                            {item.evaluation && (
-                              <div className="mt-3 border-t border-border pt-2">
-                                <div className="mb-1.5 flex items-center justify-between">
-                                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                    LLM 평가
-                                  </h3>
-                                  {item.evaluation.overallScore !== null && (
-                                    <span className="text-xs font-semibold text-foreground">
-                                      {item.evaluation.overallScore.toFixed(1)} / 5
-                                    </span>
-                                  )}
-                                </div>
-                                <ul className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                                  {Object.entries(item.evaluation.scores).map(
-                                    ([k, v]) =>
-                                      typeof v === "number" ? (
-                                        <li
-                                          key={k}
-                                          className="flex justify-between gap-2"
-                                        >
-                                          <span>{SCORE_LABELS[k] ?? k}</span>
-                                          <span className="text-foreground">
-                                            {v}
-                                          </span>
-                                        </li>
-                                      ) : null
-                                  )}
-                                </ul>
-                                {item.evaluation.issues.length > 0 && (
-                                  <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-muted-foreground">
-                                    {item.evaluation.issues.map((issue, i) => (
-                                      <li key={i}>{issue}</li>
-                                    ))}
-                                  </ul>
-                                )}
-                              </div>
-                            )}
                           </section>
                         ))}
                       </div>

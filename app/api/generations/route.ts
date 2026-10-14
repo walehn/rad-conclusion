@@ -3,10 +3,6 @@ import { and, desc, eq, inArray, like, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { generations } from "@/lib/db/schema";
 import { requireApiSession } from "@/lib/auth/guard";
-import {
-  findEvaluation,
-  loadEvaluationIndex,
-} from "@/lib/generations/evaluations";
 
 // Reads the live SQLite file; never serve a cached snapshot.
 export const dynamic = "force-dynamic";
@@ -108,8 +104,6 @@ export async function GET(request: NextRequest) {
           .all()
       : [];
 
-    const evalIndex = loadEvaluationIndex();
-
     const byBatch = new Map<
       string,
       {
@@ -149,7 +143,6 @@ export async function GET(request: NextRequest) {
         totalMs: row.totalMs,
         createdAt: row.createdAt.toISOString(),
         isMine: row.userId === session.userId,
-        evaluation: findEvaluation(evalIndex, row.findings, row.conclusion),
       });
     }
 

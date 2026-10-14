@@ -170,24 +170,9 @@ export function ConclusionClient() {
         return batchIdRef.current;
       },
     },
-    onFinish: (message) => {
+    onFinish: () => {
       if (startTimeRef.current) {
         setElapsedTime((performance.now() - startTimeRef.current) / 1000);
-      }
-      // Fire-and-forget evaluation
-      if (message.content) {
-        fetch("/api/evaluate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-csrf-token": getCsrfToken() },
-          body: JSON.stringify({
-            findings: findings.trim(),
-            conclusion: message.content,
-            promptVersion: "v1",
-            style,
-            lang,
-            model,
-          }),
-        }).catch(() => {}); // Silent fail
       }
     },
     onError: (err) => {
@@ -213,24 +198,9 @@ export function ConclusionClient() {
         return batchIdRef.current;
       },
     },
-    onFinish: (message) => {
+    onFinish: () => {
       if (startTimeV1Ref.current) {
         setElapsedTimeV1((performance.now() - startTimeV1Ref.current) / 1000);
-      }
-      // Fire-and-forget evaluation
-      if (message.content) {
-        fetch("/api/evaluate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-csrf-token": getCsrfToken() },
-          body: JSON.stringify({
-            findings: findings.trim(),
-            conclusion: message.content,
-            promptVersion: "v1",
-            style,
-            lang,
-            model,
-          }),
-        }).catch(() => {}); // Silent fail
       }
     },
     onError: (err) => {
@@ -255,24 +225,9 @@ export function ConclusionClient() {
         return batchIdRef.current;
       },
     },
-    onFinish: (message) => {
+    onFinish: () => {
       if (startTimeV2Ref.current) {
         setElapsedTimeV2((performance.now() - startTimeV2Ref.current) / 1000);
-      }
-      // Fire-and-forget evaluation
-      if (message.content) {
-        fetch("/api/evaluate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-csrf-token": getCsrfToken() },
-          body: JSON.stringify({
-            findings: findings.trim(),
-            conclusion: message.content,
-            promptVersion: "v2",
-            style,
-            lang,
-            model,
-          }),
-        }).catch(() => {}); // Silent fail
       }
     },
     onError: (err) => {
@@ -881,4 +836,3 @@ export function ConclusionClient() {
     </div>
   );
 }
-

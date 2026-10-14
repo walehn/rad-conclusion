@@ -50,9 +50,7 @@ export type NewUserApiKey = typeof userApiKeys.$inferInsert;
  *
  * Written server-side from /api/generate once a stream finishes, so a record
  * exists even if the browser navigates away or a follow-up request fails.
- * This is the source of truth for the review screen; the evaluation JSONL
- * queue (data/pending-evaluations.jsonl) remains a separate, best-effort
- * feed for the LLM-judge worker.
+ * This is the source of truth for the review screen.
  *
  * A/B compare fires v1 and v2 for the same findings; both rows share a
  * `batchId` so the review screen can put them side by side.
