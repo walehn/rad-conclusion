@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "prompt:revision": "tsx scripts/prompt-revision.ts"
+    "prompt:revision": "tsx scripts/prompt-revision.ts",
+    "eval": "tsx lib/eval/cli.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.2.0",
