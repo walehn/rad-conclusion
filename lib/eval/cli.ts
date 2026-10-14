@@ -356,15 +356,19 @@ async function cmdFindingsReview(flags: Record<string, string | true>) {
   const sheetPath = str(flags, "tally");
   if (sheetPath) {
     const tally = tallyVerdicts(readFileSync(sheetPath, "utf8"));
-    console.log("type           real  false alarm  unsure  unmarked  precision (real / decided)");
-    for (const [type, t] of Object.entries(tally)) {
+    const row = (name: string, t: { real: number; false_alarm: number; unsure: number; unmarked: number }) => {
       const decided = t.real + t.false_alarm;
       const precision = decided ? `${((t.real / decided) * 100).toFixed(0)}%` : "-";
-      console.log(
-        `${type.padEnd(13)}  ${String(t.real).padStart(4)}  ${String(t.false_alarm).padStart(11)}  ` +
-          `${String(t.unsure).padStart(6)}  ${String(t.unmarked).padStart(8)}  ${precision}`
+      return (
+        `${name.padEnd(22)}  ${String(t.real).padStart(4)}  ${String(t.false_alarm).padStart(11)}  ` +
+        `${String(t.unsure).padStart(6)}  ${String(t.unmarked).padStart(8)}  ${precision}`
       );
-    }
+    };
+    const head = `${"".padEnd(22)}  real  false alarm  unsure  unmarked  precision (real / decided)`;
+    console.log(head);
+    for (const [type, t] of Object.entries(tally.byType)) console.log(row(type, t));
+    console.log(`\n${head}`);
+    for (const [variant, t] of Object.entries(tally.byVariant)) console.log(row(variant, t));
     return;
   }
 
@@ -420,12 +424,14 @@ async function cmdFindingsReview(flags: Record<string, string | true>) {
 
   const byKey = new Map(finals.map((f) => [f.study_key, f]));
   if (flags.sheet) {
-    for (const [i, v] of variants.entries()) {
-      const path = `data/findings-review-${v.id}-${keys[i].promptHash}.md`;
-      writeFileSync(path, renderReviewSheet(v.id, keys[i].promptHash, byKey, results[i].reviews));
-      chmodSync(path, 0o600);
-      console.log(`review sheet: ${path}`);
-    }
+    const path = `data/findings-review-${keys.map((k) => k.promptHash).join("-")}.md`;
+    const sheet = renderReviewSheet(
+      variants.map((v, i) => ({ id: v.id, promptHash: keys[i].promptHash, reviews: results[i].reviews })),
+      byKey
+    );
+    writeFileSync(path, sheet);
+    chmodSync(path, 0o600);
+    console.log(`review sheet: ${path}`);
   }
 
   const examples = parseInt(str(flags, "examples") ?? "0", 10);

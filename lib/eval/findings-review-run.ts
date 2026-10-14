@@ -15,6 +15,7 @@ import {
   FINDINGS_REVIEW_TYPES,
   buildFindingsReviewPrompt,
   parseFindingsReview,
+  type FindingsIssue,
   type FindingsReview,
   type FindingsReviewType,
 } from "@/lib/findings-review";
@@ -159,51 +160,105 @@ function highlight(findings: string, quotes: string[]): string {
   return out;
 }
 
-export function renderReviewSheet(
-  variant: string,
-  promptHash: string,
-  finals: Map<string, FinalReport>,
-  reviews: Map<string, FindingsReview>
-): string {
-  const flagged = [...reviews].filter(([, r]) => r.issues.length > 0);
+export interface SheetVariant {
+  id: string;
+  promptHash: string;
+  reviews: Map<string, FindingsReview>;
+}
+
+interface SheetIssue extends FindingsIssue {
+  variants: string[];
+}
+
+const quoteKey = (q: string) => q.toLowerCase().replace(/\s+/g, " ").trim();
+
+/** Two variants reporting the same conflict quote the same text, or one quote inside the other. */
+function sameIssue(a: FindingsIssue, b: FindingsIssue): boolean {
+  const qa = [a.quote, a.otherQuote ?? ""].filter(Boolean).map(quoteKey);
+  const qb = [b.quote, b.otherQuote ?? ""].filter(Boolean).map(quoteKey);
+  return qa.some((x) => qb.some((y) => x.includes(y) || y.includes(x)));
+}
+
+/**
+ * One sheet for every variant, so a case flagged by several is judged once.
+ * Each issue heading lists the variants that reported it; --tally scores each
+ * variant on the issues it reported.
+ */
+export function renderReviewSheet(variants: SheetVariant[], finals: Map<string, FinalReport>): string {
+  const byCase = new Map<string, SheetIssue[]>();
+  for (const v of variants) {
+    for (const [id, r] of v.reviews) {
+      const merged = byCase.get(id) ?? [];
+      for (const issue of r.issues) {
+        const same = merged.find((m) => !m.variants.includes(v.id) && sameIssue(m, issue));
+        if (same) same.variants.push(v.id);
+        else merged.push({ ...issue, variants: [v.id] });
+      }
+      if (merged.length) byCase.set(id, merged);
+    }
+  }
+  const flagged = [...byCase].sort(([a], [b]) =>
+    (finals.get(a)?.study_date ?? "").localeCompare(finals.get(b)?.study_date ?? "") || a.localeCompare(b)
+  );
+  const reviewed = Math.max(...variants.map((v) => v.reviews.size));
   const parts = [
-    `# 소견 모순 검사 검토표 (${variant}, ${promptHash})`,
+    `# 소견 모순 검사 검토표 (${variants.map((v) => `${v.id} ${v.promptHash}`).join(", ")})`,
     "",
-    `서명 판독문 ${reviews.size}건 중 ${flagged.length}건에 경고가 나왔습니다. 경고마다 판정 칸 하나에 x를 넣어 주세요.`,
-    "다 표시한 뒤 `npm run eval -- findings-review --tally <이 파일>`로 집계합니다.",
+    `서명 판독문 ${reviewed}건 중 ${flagged.length}건에 경고가 나왔습니다. 경고마다 판정 칸 하나에 x를 넣어 주세요.`,
+    "제목 끝은 그 경고를 낸 검사 방식입니다. 다 표시한 뒤 `npm run eval -- findings-review --tally <이 파일>`로 집계합니다.",
     "",
   ];
-  flagged.forEach(([id, r], n) => {
+  flagged.forEach(([id, issues], n) => {
     const f = finals.get(id);
     parts.push(
       `## ${n + 1}. ${f?.accession_num || id}  ${f?.study_date.slice(0, 10) ?? ""}  ${f?.modality ?? ""} ${f?.description ?? ""}`.trimEnd(),
       ""
     );
-    r.issues.forEach((i, k) => {
-      parts.push(`### ${n + 1}-${k + 1} ${i.type}`, "", `- 근거: "${i.quote}"${i.otherQuote ? ` ↔ "${i.otherQuote}"` : ""}`);
-      parts.push(`- 설명: ${i.explanation}`, `- ${VERDICT_LINE}`, "");
+    issues.forEach((i, k) => {
+      parts.push(
+        `### ${n + 1}-${k + 1} ${i.type} · ${i.variants.join(", ")}`,
+        "",
+        `- 근거: "${i.quote}"${i.otherQuote ? ` ↔ "${i.otherQuote}"` : ""}`,
+        `- 설명: ${i.explanation}`,
+        `- ${VERDICT_LINE}`,
+        ""
+      );
     });
-    const quotes = r.issues.flatMap((i) => [i.quote, ...(i.otherQuote ? [i.otherQuote] : [])]);
+    const quotes = issues.flatMap((i) => [i.quote, ...(i.otherQuote ? [i.otherQuote] : [])]);
     parts.push("<details><summary>소견 전문</summary>", "", highlight(f?.findings ?? "", quotes), "", "</details>", "");
   });
   return parts.join("\n");
 }
 
 export type Verdict = "real" | "false_alarm" | "unsure" | "unmarked";
+type VerdictCounts = Record<Verdict, number>;
 
-/** Reads a marked review sheet back: one verdict per "### n-k <type>" heading. */
-export function tallyVerdicts(sheet: string): Record<FindingsReviewType, Record<Verdict, number>> {
-  const out = Object.fromEntries(
-    FINDINGS_REVIEW_TYPES.map((t) => [t, { real: 0, false_alarm: 0, unsure: 0, unmarked: 0 }])
-  ) as Record<FindingsReviewType, Record<Verdict, number>>;
-  let type: FindingsReviewType | null = null;
+const emptyCounts = (): VerdictCounts => ({ real: 0, false_alarm: 0, unsure: 0, unmarked: 0 });
+
+export interface VerdictTally {
+  byType: Record<FindingsReviewType, VerdictCounts>;
+  /** Each variant scored on the issues it reported. */
+  byVariant: Record<string, VerdictCounts>;
+}
+
+/** Reads a marked review sheet back: one verdict per "### n-k <type> · <variants>" heading. */
+export function tallyVerdicts(sheet: string): VerdictTally {
+  const byType = Object.fromEntries(FINDINGS_REVIEW_TYPES.map((t) => [t, emptyCounts()])) as Record<
+    FindingsReviewType,
+    VerdictCounts
+  >;
+  const byVariant: Record<string, VerdictCounts> = {};
+  let current: { type: FindingsReviewType; variants: string[] } | null = null;
   for (const line of sheet.split("\n")) {
-    const h = line.match(/^###\s+\d+-\d+\s+(\w+)/);
+    const h = line.match(/^###\s+\d+-\d+\s+(\w+)(?:\s+·\s+(.+))?$/);
     if (h) {
-      type = (FINDINGS_REVIEW_TYPES as readonly string[]).includes(h[1]) ? (h[1] as FindingsReviewType) : null;
+      const known = (FINDINGS_REVIEW_TYPES as readonly string[]).includes(h[1]);
+      current = known
+        ? { type: h[1] as FindingsReviewType, variants: (h[2] ?? "").split(",").map((v) => v.trim()).filter(Boolean) }
+        : null;
       continue;
     }
-    if (!type || !line.includes("판정:")) continue;
+    if (!current || !line.includes("판정:")) continue;
     const marks = [...line.matchAll(/\[([^\]]?)\]\s*([^[]+)/g)].filter((m) => m[1].trim() !== "");
     const label = marks.length === 1 ? marks[0][2].trim() : "";
     const verdict: Verdict = label.startsWith("오류")
@@ -213,8 +268,9 @@ export function tallyVerdicts(sheet: string): Record<FindingsReviewType, Record<
         : label.startsWith("애매")
           ? "unsure"
           : "unmarked";
-    out[type][verdict]++;
-    type = null;
+    byType[current.type][verdict]++;
+    for (const v of current.variants) (byVariant[v] ??= emptyCounts())[verdict]++;
+    current = null;
   }
-  return out;
+  return { byType, byVariant };
 }

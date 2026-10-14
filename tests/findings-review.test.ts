@@ -79,7 +79,10 @@ describe('lib/eval/findings-review-run review sheet', () => {
       }),
       FINDINGS
     );
-    const sheet = renderReviewSheet('findings-review', 'abc', new Map([['S1', final]]), new Map([['S1', review]]));
+    const sheet = renderReviewSheet(
+      [{ id: 'findings-review', promptHash: 'abc', reviews: new Map([['S1', review]]) }],
+      new Map([['S1', final]])
+    );
     expect(sheet).toContain('**segment 6 of the left lobe**');
     expect(sheet).toContain('ACC1');
 
@@ -89,12 +92,42 @@ describe('lib/eval/findings-review-run review sheet', () => {
       .replace(verdictLines[0], verdictLines[0].replace('[ ] 오류', '[x] 오류'))
       .replace(verdictLines[1], verdictLines[1].replace('[ ] 거짓', '[x] 거짓'));
     const tally = tallyVerdicts(marked);
-    expect(tally.location).toEqual({ real: 1, false_alarm: 0, unsure: 0, unmarked: 0 });
-    expect(tally.history).toEqual({ real: 0, false_alarm: 1, unsure: 0, unmarked: 0 });
+    expect(tally.byType.location).toEqual({ real: 1, false_alarm: 0, unsure: 0, unmarked: 0 });
+    expect(tally.byType.history).toEqual({ real: 0, false_alarm: 1, unsure: 0, unmarked: 0 });
+    expect(tally.byVariant['findings-review']).toEqual({ real: 1, false_alarm: 1, unsure: 0, unmarked: 0 });
   });
 
   it('counts an unmarked or doubly marked verdict as unmarked', () => {
     const sheet = '### 1-1 laterality\n- 판정: [ ] 오류 맞음  [ ] 거짓 경보  [ ] 애매\n### 2-1 laterality\n- 판정: [x] 오류 맞음  [x] 거짓 경보  [ ] 애매\n';
-    expect(tallyVerdicts(sheet).laterality.unmarked).toBe(2);
+    expect(tallyVerdicts(sheet).byType.laterality.unmarked).toBe(2);
+  });
+
+  it('merges an issue two variants both reported and scores each variant on its own issues', () => {
+    const both = parseFindingsReview(
+      issue({ type: 'location', quote: 'segment 6 of the left lobe', other_quote: '', explanation: 'a' }),
+      FINDINGS
+    );
+    const thinkOnly = parseFindingsReview(
+      JSON.stringify({
+        issues: [
+          { type: 'location', quote: 'segment 6', other_quote: '', explanation: 'b' },
+          { type: 'contradiction', quote: 'No ascites', other_quote: '', explanation: 'c' },
+        ],
+      }),
+      FINDINGS
+    );
+    const sheet = renderReviewSheet(
+      [
+        { id: 'plain', promptHash: 'h1', reviews: new Map([['S1', both]]) },
+        { id: 'think', promptHash: 'h2', reviews: new Map([['S1', thinkOnly]]) },
+      ],
+      new Map([['S1', final]])
+    );
+    expect(sheet).toContain('### 1-1 location · plain, think');
+    expect(sheet).toContain('### 1-2 contradiction · think');
+    const marked = sheet.replace(/판정: \[ \] 오류/g, '판정: [x] 오류');
+    const tally = tallyVerdicts(marked);
+    expect(tally.byVariant.plain.real).toBe(1);
+    expect(tally.byVariant.think.real).toBe(2);
   });
 });
