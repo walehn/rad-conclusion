@@ -21,6 +21,7 @@ import {
   type FinalReport,
 } from "./finals";
 import { RULE_SEVERITY, type RuleFlagKind, type RuleResult } from "./rules";
+import type { CandidateScore, PairedComparison } from "./replay";
 import type { SourceGeneration } from "./store";
 
 export type GroupBy = "all" | "version" | "revision" | "model" | "month";
@@ -418,4 +419,33 @@ export function renderFinalSummaries(rows: FinalSummary[], adoption: AdoptionSum
     adoption.map((a) => [a.group, String(a.batches), pct(a.v1), pct(a.v2), pct(a.tie), pct(a.neither)])
   );
   return `${sim}\n\n${adopt}`;
+}
+
+export function renderReplayScores(
+  scores: CandidateScore[],
+  referenceMarkers: Record<string, number>,
+  paired: PairedComparison[]
+): string {
+  const main = table(
+    ["candidate", "n", "similarity", "overlap", "verbatim", "suspect", "violation", "items", "latency"],
+    scores.map((s) => [
+      s.candidate, String(s.n), num(s.meanSimilarity), num(s.meanOverlap), pct(s.verbatimRate), pct(s.suspectRate),
+      pct(s.violationRate), num(s.meanItems, 1), `${(s.meanLatencyMs / 1000).toFixed(1)}s`,
+    ])
+  );
+  const markerNames = Object.keys(referenceMarkers);
+  const markers = table(
+    ["style marker", "signed", ...scores.map((s) => s.candidate)],
+    markerNames.map((m) => [m, pct(referenceMarkers[m]), ...scores.map((s) => pct(s.markers[m]))])
+  );
+  const deltas = paired.length
+    ? table(
+        ["vs baseline", "n", "similarity delta", "95% CI", "better", "same", "worse"],
+        paired.map((p) => [
+          `${p.candidate} - ${p.baseline}`, String(p.n), num(p.meanDelta, 3),
+          `[${num(p.ci95[0], 3)}, ${num(p.ci95[1], 3)}]`, String(p.wins), String(p.ties), String(p.losses),
+        ])
+      )
+    : "";
+  return [main, markers, deltas].filter(Boolean).join("\n\n");
 }

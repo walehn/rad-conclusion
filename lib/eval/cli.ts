@@ -10,6 +10,10 @@
  *   npm run eval -- import-finals <reports.jsonl>
  *                                               import signed PACS reports (pft report-export)
  *                                               and re-match every batch to them
+ *   npm run eval -- replay --candidates v2,r2 --set matched|pacs [--split dev|test|all]
+ *                                               regenerate past inputs with candidate prompts
+ *                                               (lib/prompts/candidates.ts) and score them
+ *                                               against the signed conclusions
  *
  * Common options:
  *   --since YYYY-MM-DD   only generations created on/after this date
@@ -19,6 +23,13 @@
  *   --concurrency N      parallel requests (default 4)
  *   --dry-run            print the first prompt and exit
  *
+ * replay options:
+ *   --split dev|test|all cases before / from 2026-10-01 (default dev)
+ *   --limit N            evenly spaced subset of the split
+ *   --concurrency N      parallel requests (default 4)
+ *   --report-only        score stored outputs without generating
+ *   --examples N         print N de-identified cases side by side
+ *
  * Every command is incremental: rows already evaluated with the current
  * RULES_VERSION / RUBRIC_VERSION and judge are skipped; failed judgments are
  * retried. Results are stored in
@@ -26,7 +37,22 @@
  */
 
 import { readFileSync } from "node:fs";
-import { MATCHER_VERSION, matchBatches, parseFinalReportsJsonl } from "./finals";
+import { PROMPT_CANDIDATES } from "@/lib/prompts/candidates";
+import { deidentify } from "./deidentify";
+import { MATCHER_VERSION, editSimilarity, matchBatches, parseFinalReportsJsonl } from "./finals";
+import {
+  REPLAY_MODEL,
+  candidateHash,
+  comparePaired,
+  generateForCase,
+  markerShares,
+  matchedCases,
+  pacsCases,
+  scoreCandidate,
+  selectCases,
+  type CaseSet,
+  type Split,
+} from "./replay";
 import { RULES_VERSION, runRules } from "./rules";
 import { RUBRIC_HASH, RUBRIC_VERSION, type Judgment } from "./judge-prompt";
 import { JUDGES, JudgeParseError, judgeInput, runJudge } from "./judges";
@@ -36,6 +62,7 @@ import {
   loadFinalReports,
   loadGenerations,
   loadJudgments,
+  loadReplays,
   loadRuleResults,
   openEvalDb,
   openSourceDb,
@@ -43,6 +70,7 @@ import {
   ruledIds,
   saveFinalReports,
   saveJudgment,
+  saveReplay,
   saveRuleResult,
   type LoadFilter,
 } from "./store";
@@ -51,6 +79,7 @@ import {
   renderAgreement,
   renderFinalSummaries,
   renderJudgeSummaries,
+  renderReplayScores,
   renderRuleSummaries,
   summarizeAdoption,
   summarizeFinals,
@@ -239,6 +268,70 @@ function cmdImportFinals(file: string) {
   );
 }
 
+async function cmdReplay(flags: Record<string, string | true>) {
+  const names = (str(flags, "candidates") ?? "v2,r2").split(",").map((s) => s.trim());
+  const candidates = names.map((n) => {
+    const c = PROMPT_CANDIDATES[n];
+    if (!c) throw new Error(`unknown candidate "${n}" (choose: ${Object.keys(PROMPT_CANDIDATES).join(", ")})`);
+    return c;
+  });
+  const set = (str(flags, "set") ?? "matched") as CaseSet;
+  if (set !== "matched" && set !== "pacs") throw new Error(`--set must be matched or pacs`);
+  const split = (str(flags, "split") ?? "dev") as Split;
+  const limit = str(flags, "limit") ? parseInt(str(flags, "limit")!, 10) : undefined;
+  const concurrency = parseInt(str(flags, "concurrency") ?? "4", 10);
+
+  const db = openEvalDb();
+  const finals = loadFinalReports(db);
+  const matches = loadFinalMatches(db, MATCHER_VERSION);
+  const all =
+    set === "matched" ? matchedCases(loadGenerations(openSourceDb()), finals, matches) : pacsCases(finals, matches);
+  const cases = selectCases(all, split, limit);
+  console.log(`replay set ${set}, split ${split}: ${cases.length} cases (of ${all.length}), model ${REPLAY_MODEL}`);
+
+  const keys = candidates.map((c) => ({ candidate: c.id, promptHash: candidateHash(c), model: REPLAY_MODEL, caseSet: set }));
+  if (!flags["report-only"]) {
+    for (const [i, c] of candidates.entries()) {
+      const have = loadReplays(db, keys[i]);
+      const todo = cases.filter((x) => !have.has(x.id));
+      console.log(`  ${c.id} (${keys[i].promptHash}): ${todo.length} to generate`);
+      let n = 0;
+      let failed = 0;
+      const t0 = Date.now();
+      await pool(todo, concurrency, async (x) => {
+        try {
+          saveReplay(db, keys[i], x.id, await generateForCase(c, x.findings));
+        } catch (error) {
+          failed++;
+          saveReplay(db, keys[i], x.id, { error: error instanceof Error ? error.message : String(error) });
+        }
+        if (++n % 20 === 0 || n === todo.length) {
+          console.log(`    ${n}/${todo.length}  failed ${failed}  ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+        }
+      });
+    }
+  }
+
+  const outputs = keys.map((k) => loadReplays(db, k));
+  // Score every candidate on the cases all of them have, so the rows compare.
+  const common = cases.filter((x) => outputs.every((o) => o.has(x.id)));
+  console.log(renderReplayScores(
+    candidates.map((c, i) => scoreCandidate(c.id, common, outputs[i])),
+    markerShares(common.map((x) => x.reference)),
+    candidates.slice(1).map((c, i) => comparePaired(c.id, candidates[0].id, common, outputs[i + 1], outputs[0]))
+  ));
+
+  const examples = parseInt(str(flags, "examples") ?? "0", 10);
+  for (const x of selectCases(common, "all", examples).slice(0, examples)) {
+    const texts = [x.findings, x.reference, ...outputs.map((o) => o.get(x.id)!.output)];
+    const { texts: d } = deidentify(texts);
+    console.log(`\n=== ${x.id} (${x.split})\n--- findings\n${d[0]}\n--- signed\n${d[1]}`);
+    candidates.forEach((c, i) => {
+      console.log(`--- ${c.id}  (similarity ${editSimilarity(texts[i + 2], x.reference).toFixed(2)})\n${d[i + 2]}`);
+    });
+  }
+}
+
 function cmdShow(id: number) {
   const src = openSourceDb();
   const db = openEvalDb();
@@ -300,9 +393,11 @@ async function main() {
       return cmdDeid(flags, filter);
     case "import-finals":
       return cmdImportFinals(arg);
+    case "replay":
+      return cmdReplay(flags);
     default:
       console.log(
-        "usage: npm run eval -- <rules|judge|report|show|deid|import-finals> [options] (see lib/eval/cli.ts)"
+        "usage: npm run eval -- <rules|judge|report|show|deid|import-finals|replay> [options] (see lib/eval/cli.ts)"
       );
       process.exit(command ? 1 : 0);
   }

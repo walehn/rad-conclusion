@@ -46,6 +46,20 @@ export const PROMPT_REVISIONS: readonly PromptRevision[] = [
     changes: [],
     fingerprint: "54ffaf17bb8c",
   },
+  {
+    id: "r2",
+    date: "2026-10-14",
+    summary: "v1을 서명 판독문 문체(house style) 프롬프트로 교체 — v2와 A/B 비교",
+    changes: [
+      "v1 'Basic' 프롬프트를 house style로 교체 (A/B에서 v1 채택률 5%)",
+      "임상 질문에 먼저 답하고 배경 소견은 생략, 음성 소견은 주 항목에 붙임, 1~3개 항목",
+      "little change / probably / suspicion of 사용, 권고 최소화, 세미콜론·대시 사용 안 함",
+      "비교 근거 없는 변화 표현 금지를 맨 앞 NEVER 섹션으로",
+      "재현 시험(앱 없이 쓴 서명 판독 220건): 유사도 +0.045 (95% CI 0.033–0.058), 근거 없는 변화 표현 0.9% vs 4.5%",
+      "v2는 변경 없음",
+    ],
+    fingerprint: "c58badde21ff",
+  },
 ];
 
 /** The revision the code currently renders, assuming no uncommitted drift. */

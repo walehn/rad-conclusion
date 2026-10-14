@@ -10,6 +10,7 @@ import Database from "better-sqlite3";
 import { postProcess } from "@/lib/post-process";
 import type { FinalMatch, FinalReport } from "./finals";
 import type { Judgment } from "./judge-prompt";
+import type { ReplayOutput } from "./replay";
 import type { RuleResult } from "./rules";
 
 export interface SourceGeneration {
@@ -137,6 +138,20 @@ CREATE TABLE IF NOT EXISTS final_matches (
   runner_up REAL NOT NULL,
   created_at INTEGER NOT NULL,
   PRIMARY KEY (batch_id, matcher_version)
+);
+-- Offline replays of past inputs with candidate prompts (lib/eval/replay.ts).
+CREATE TABLE IF NOT EXISTS replays (
+  candidate TEXT NOT NULL,
+  prompt_hash TEXT NOT NULL,
+  model TEXT NOT NULL,
+  case_set TEXT NOT NULL,
+  case_id TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('ok', 'error')),
+  output TEXT,
+  error TEXT,
+  latency_ms INTEGER,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (candidate, prompt_hash, model, case_set, case_id)
 );
 `;
 
@@ -332,4 +347,40 @@ export function loadFinalMatches(db: Database.Database, matcherVersion: string):
       { batchId: r.batch_id, studyKey: r.study_key, score: r.score, runnerUp: r.runner_up },
     ])
   );
+}
+
+export interface ReplayKey {
+  candidate: string;
+  promptHash: string;
+  model: string;
+  caseSet: string;
+}
+
+export function saveReplay(
+  db: Database.Database,
+  key: ReplayKey,
+  caseId: string,
+  result: { output: string; latencyMs: number } | { error: string }
+): void {
+  const ok = "output" in result;
+  db.prepare(
+    `INSERT OR REPLACE INTO replays
+       (candidate, prompt_hash, model, case_set, case_id, status, output, error, latency_ms, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    key.candidate, key.promptHash, key.model, key.caseSet, caseId,
+    ok ? "ok" : "error", ok ? result.output : null, ok ? null : result.error,
+    ok ? result.latencyMs : null, now()
+  );
+}
+
+/** Successful outputs for this exact prompt text, by case id. */
+export function loadReplays(db: Database.Database, key: ReplayKey): Map<string, ReplayOutput> {
+  const rows = db
+    .prepare(
+      `SELECT case_id, output, latency_ms FROM replays
+        WHERE candidate = ? AND prompt_hash = ? AND model = ? AND case_set = ? AND status = 'ok'`
+    )
+    .all(key.candidate, key.promptHash, key.model, key.caseSet) as { case_id: string; output: string; latency_ms: number }[];
+  return new Map(rows.map((r) => [r.case_id, { output: r.output, latencyMs: r.latency_ms }]));
 }

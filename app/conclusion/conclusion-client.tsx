@@ -688,9 +688,9 @@ export function ConclusionClient() {
                   <div className="flex flex-col gap-6">
                     <OutputBlock
                       label="Variant V1"
-                      title="Basic"
+                      title="House style"
                       pill={{
-                        text: "baseline",
+                        text: "challenger",
                         bg: c.surface,
                         color: c.slate,
                       }}
@@ -746,7 +746,7 @@ export function ConclusionClient() {
                                   }}
                                 >
                                   {voted === "v1"
-                                    ? "V1 Basic"
+                                    ? "V1 House style"
                                     : voted === "v2"
                                     ? "V2 Advanced"
                                     : "Tie"}

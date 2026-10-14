@@ -57,7 +57,7 @@ export function OptionsPanel({
           className="h-4 w-4 rounded border-border text-primary focus:ring-primary/50"
         />
         <span className="text-sm font-medium text-foreground">A/B Compare</span>
-        <span className="text-xs text-muted-foreground">(V1 Basic vs V2 Advanced)</span>
+        <span className="text-xs text-muted-foreground">(V1 House style vs V2 Advanced)</span>
       </label>
     </div>
   );

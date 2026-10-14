@@ -24,7 +24,7 @@ A browser-based radiology AI assistant with two tools: a **Conclusion Generator*
 ## Key Features
 
 - **Real-time streaming** — Token-by-token streaming output from LLM
-- **Conclusion Generator** — A/B Compare mode with V1 (Basic) vs V2 (Advanced Dx/DDx) prompt comparison and voting
+- **Conclusion Generator** — A/B Compare mode with V1 (house style, fitted to signed reports) vs V2 (Advanced Dx/DDx) prompt comparison and voting
 - **Structured Report Generator** — Disease selection landing page at `/structured-report` listing registered diseases as cards; per-disease form at `/structured-report/<slug>` (currently `/structured-report/rcc`).
 - **RCC Structured Form** — 14-field controlled input following SAR §3.3 with Bosniak v2019 + Neves-Mayo + AJCC 8th classification; auto-numbered Mass cards with prior-study comparison toggle and free-text Other findings section.
 - **Disease dashboard** — Feature-selection card layout at root (`/`); original conclusion generator at `/conclusion`
