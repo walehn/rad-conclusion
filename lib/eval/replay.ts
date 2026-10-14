@@ -96,7 +96,7 @@ export interface ReplayOutput {
 }
 
 /** The local replay model with thinking forced on through the chat template. */
-function thinkingModel(): LanguageModelV1 {
+export function thinkingModel(): LanguageModelV1 {
   const entry = LOCAL_MODELS.find((m) => m.id === REPLAY_MODEL);
   if (!entry) throw new Error(`${REPLAY_MODEL} is not in LOCAL_MODELS`);
   const host = process.env[entry.hostEnvVar] || entry.host;

@@ -14,6 +14,11 @@
  *                                               regenerate past inputs with candidate prompts
  *                                               (lib/prompts/candidates.ts) and score them
  *                                               against the signed conclusions
+ *   npm run eval -- findings-review [--variants findings-review,findings-review-think]
+ *                                               consistency review of signed Findings
+ *                                               (lib/findings-review.ts); --sheet writes a
+ *                                               review sheet to data/, --tally <sheet> counts
+ *                                               the verdicts marked in it
  *
  * Common options:
  *   --since YYYY-MM-DD   only generations created on/after this date
@@ -30,13 +35,16 @@
  *   --report-only        score stored outputs without generating
  *   --examples N         print N de-identified cases side by side
  *
+ * findings-review options: --split (default all), --limit, --concurrency,
+ * --report-only as for replay; --sheet; --examples N (de-identified issues only)
+ *
  * Every command is incremental: rows already evaluated with the current
  * RULES_VERSION / RUBRIC_VERSION and judge are skipped; failed judgments are
  * retried. Results are stored in
  * data/eval.sqlite; data/auth.sqlite is opened read-only.
  */
 
-import { readFileSync } from "node:fs";
+import { chmodSync, readFileSync, writeFileSync } from "node:fs";
 import { PROMPT_CANDIDATES } from "@/lib/prompts/candidates";
 import { deidentify } from "./deidentify";
 import { MATCHER_VERSION, editSimilarity, matchBatches, parseFinalReportsJsonl } from "./finals";
@@ -53,6 +61,18 @@ import {
   type CaseSet,
   type Split,
 } from "./replay";
+import {
+  REVIEW_CASE_SET,
+  REVIEW_VARIANTS,
+  renderReviewSheet,
+  renderReviewSummaries,
+  reviewAgreement,
+  reviewForCase,
+  reviewHash,
+  signedCases,
+  summarizeReviews,
+  tallyVerdicts,
+} from "./findings-review-run";
 import { RULES_VERSION, runRules } from "./rules";
 import { RUBRIC_HASH, RUBRIC_VERSION, type Judgment } from "./judge-prompt";
 import { JUDGES, JudgeParseError, judgeInput, runJudge } from "./judges";
@@ -332,6 +352,96 @@ async function cmdReplay(flags: Record<string, string | true>) {
   }
 }
 
+async function cmdFindingsReview(flags: Record<string, string | true>) {
+  const sheetPath = str(flags, "tally");
+  if (sheetPath) {
+    const tally = tallyVerdicts(readFileSync(sheetPath, "utf8"));
+    console.log("type           real  false alarm  unsure  unmarked  precision (real / decided)");
+    for (const [type, t] of Object.entries(tally)) {
+      const decided = t.real + t.false_alarm;
+      const precision = decided ? `${((t.real / decided) * 100).toFixed(0)}%` : "-";
+      console.log(
+        `${type.padEnd(13)}  ${String(t.real).padStart(4)}  ${String(t.false_alarm).padStart(11)}  ` +
+          `${String(t.unsure).padStart(6)}  ${String(t.unmarked).padStart(8)}  ${precision}`
+      );
+    }
+    return;
+  }
+
+  const names = (str(flags, "variants") ?? "findings-review").split(",").map((s) => s.trim());
+  const variants = names.map((n) => {
+    const v = REVIEW_VARIANTS[n];
+    if (!v) throw new Error(`unknown variant "${n}" (choose: ${Object.keys(REVIEW_VARIANTS).join(", ")})`);
+    return v;
+  });
+  const split = (str(flags, "split") ?? "all") as Split;
+  const limit = str(flags, "limit") ? parseInt(str(flags, "limit")!, 10) : undefined;
+  const concurrency = parseInt(str(flags, "concurrency") ?? "4", 10);
+
+  const db = openEvalDb();
+  const finals = loadFinalReports(db);
+  const all = signedCases(finals);
+  const cases = selectCases(all, split, limit);
+  console.log(`findings-review split ${split}: ${cases.length} cases (of ${all.length}), model ${REPLAY_MODEL}`);
+
+  const keys = variants.map((v) => ({ candidate: v.id, promptHash: reviewHash(v), model: REPLAY_MODEL, caseSet: REVIEW_CASE_SET }));
+  if (!flags["report-only"]) {
+    for (const [i, v] of variants.entries()) {
+      const have = loadReplays(db, keys[i]);
+      const todo = cases.filter((x) => !have.has(x.id));
+      console.log(`  ${v.id} (${keys[i].promptHash}): ${todo.length} to review`);
+      let n = 0;
+      let failed = 0;
+      const t0 = Date.now();
+      await pool(todo, concurrency, async (x) => {
+        try {
+          saveReplay(db, keys[i], x.id, await reviewForCase(v, x.findings));
+        } catch (error) {
+          failed++;
+          saveReplay(db, keys[i], x.id, { error: error instanceof Error ? error.message : String(error) });
+        }
+        if (++n % 20 === 0 || n === todo.length) {
+          console.log(`    ${n}/${todo.length}  failed ${failed}  ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+        }
+      });
+    }
+  }
+
+  const outputs = keys.map((k) => loadReplays(db, k));
+  const common = cases.filter((x) => outputs.every((o) => o.has(x.id)));
+  const results = variants.map((v, i) => summarizeReviews(v.id, common, outputs[i]));
+  console.log(renderReviewSummaries(results.map((r) => r.summary)));
+  if (results.length === 2) {
+    const a = reviewAgreement(results[0].reviews, results[1].reviews);
+    console.log(
+      `flagged by both ${a.both}, only ${variants[0].id} ${a.onlyA}, only ${variants[1].id} ${a.onlyB}, neither ${a.neither}`
+    );
+  }
+
+  const byKey = new Map(finals.map((f) => [f.study_key, f]));
+  if (flags.sheet) {
+    for (const [i, v] of variants.entries()) {
+      const path = `data/findings-review-${v.id}-${keys[i].promptHash}.md`;
+      writeFileSync(path, renderReviewSheet(v.id, keys[i].promptHash, byKey, results[i].reviews));
+      chmodSync(path, 0o600);
+      console.log(`review sheet: ${path}`);
+    }
+  }
+
+  const examples = parseInt(str(flags, "examples") ?? "0", 10);
+  for (const [i, v] of variants.entries()) {
+    const flagged = [...results[i].reviews].filter(([, r]) => r.issues.length).slice(0, examples);
+    for (const [id, r] of flagged) {
+      const texts = r.issues.flatMap((x) => [x.quote, x.otherQuote ?? "", x.explanation]);
+      const { texts: d } = deidentify(texts);
+      console.log(`\n=== ${v.id} ${id}`);
+      r.issues.forEach((x, k) => {
+        console.log(`  [${x.type}] "${d[k * 3]}"${x.otherQuote ? ` <-> "${d[k * 3 + 1]}"` : ""}\n    ${d[k * 3 + 2]}`);
+      });
+    }
+  }
+}
+
 function cmdShow(id: number) {
   const src = openSourceDb();
   const db = openEvalDb();
@@ -395,9 +505,11 @@ async function main() {
       return cmdImportFinals(arg);
     case "replay":
       return cmdReplay(flags);
+    case "findings-review":
+      return cmdFindingsReview(flags);
     default:
       console.log(
-        "usage: npm run eval -- <rules|judge|report|show|deid|import-finals|replay> [options] (see lib/eval/cli.ts)"
+        "usage: npm run eval -- <rules|judge|report|show|deid|import-finals|replay|findings-review> [options] (see lib/eval/cli.ts)"
       );
       process.exit(command ? 1 : 0);
   }
