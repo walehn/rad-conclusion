@@ -42,6 +42,7 @@ import { loadProviderSettings } from "@/lib/storage/settings-store";
 import type { ConclusionStyle, ConclusionLang } from "@/lib/prompts/system-prompt";
 import type { ProviderInfo, ProviderName, ProviderSettings } from "@/lib/providers/types";
 import { LOCAL_PROVIDER_DEFAULTS } from "@/lib/providers/local-config";
+import { findingsProblem } from "@/lib/findings-check";
 
 function getCsrfToken(): string {
   if (typeof document === "undefined") return "";
@@ -259,8 +260,9 @@ export function ConclusionClient() {
 
   const handleGenerate = () => {
     const trimmed = findings.trim();
-    if (!trimmed) {
-      setInputError("Please enter the Findings text.");
+    const problem = findingsProblem(trimmed);
+    if (problem) {
+      setInputError(problem);
       return;
     }
     setInputError("");

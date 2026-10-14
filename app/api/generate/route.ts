@@ -15,9 +15,13 @@ import { validateCsrfOrFail } from "@/lib/auth/csrf";
 import { resolveApiKey } from "@/lib/api-keys/resolve";
 import { perfLog } from "@/lib/perf-log";
 import { recordGeneration } from "@/lib/generations/record";
+import { findingsProblem } from "@/lib/findings-check";
 
 const requestSchema = z.object({
-  findings: z.string().min(1, "Findings text is required"),
+  findings: z
+    .string()
+    .min(1, "Findings text is required")
+    .refine((f) => findingsProblem(f) === null, (f) => ({ message: findingsProblem(f) ?? "" })),
   style: z.enum(["numbered", "short", "urgent-first"]).default("numbered"),
   lang: z.enum(["ko", "en", "mixed"]).default("en"),
   title: z.string().default("Conclusion"),

@@ -10,6 +10,7 @@
 // that say "two lesions" is flagged. The LLM judge decides clinical
 // correctness; these flags tell you where to look and let you track drift.
 
+import { findingsWordCount } from "@/lib/findings-check";
 import { DATE_PATTERNS } from "./deidentify";
 
 /** Bump when a check changes, so stored results stay comparable. */
@@ -237,8 +238,8 @@ export function runRules(input: RuleInput): RuleResult {
 
   // A pasted registration number or a stray keystroke still yields a fluent,
   // entirely invented conclusion; any conclusion for such input is an error.
-  const words = findings.match(/[A-Za-z가-힣]{2,}/g) ?? [];
-  if (words.length < 2) add("input_without_findings", `${findings.trim().length} chars, ${words.length} words`);
+  const words = findingsWordCount(findings);
+  if (words < 2) add("input_without_findings", `${findings.trim().length} chars, ${words} words`);
 
   if (style === "numbered") {
     const problem = checkNumbered(conclusion);
