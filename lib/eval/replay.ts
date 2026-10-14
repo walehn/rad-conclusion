@@ -14,8 +14,10 @@
 // test once per draft, or the drafts end up fitted to it.
 
 import { createHash } from "node:crypto";
-import { generateText } from "ai";
+import { createOpenAI } from "@ai-sdk/openai";
+import { generateText, type LanguageModelV1 } from "ai";
 import { postProcess } from "@/lib/post-process";
+import { LOCAL_MODELS } from "@/lib/providers/local-config";
 import { getModel, supportsReasoningEffort } from "@/lib/providers/registry";
 import type { PromptCandidate } from "@/lib/prompts/candidates";
 import { VERBATIM_THRESHOLD, editSimilarity, matchKey, normalizeConclusion, type FinalMatch, type FinalReport } from "./finals";
@@ -83,6 +85,7 @@ export function candidateHash(c: PromptCandidate): string {
     .update(c.buildSystem({ style: STYLE, lang: LANG, title: TITLE }))
     .update("\n<<<>>>\n")
     .update(c.buildUser("SAMPLE FINDINGS", TITLE))
+    .update(c.thinking ? "\n<<<thinking>>>" : "")
     .digest("hex")
     .slice(0, 12);
 }
@@ -92,12 +95,30 @@ export interface ReplayOutput {
   latencyMs: number;
 }
 
+/** The local replay model with thinking forced on through the chat template. */
+function thinkingModel(): LanguageModelV1 {
+  const entry = LOCAL_MODELS.find((m) => m.id === REPLAY_MODEL);
+  if (!entry) throw new Error(`${REPLAY_MODEL} is not in LOCAL_MODELS`);
+  const host = process.env[entry.hostEnvVar] || entry.host;
+  const withThinking: typeof fetch = (input, init) => {
+    if (init?.body && typeof init.body === "string") {
+      const body = JSON.parse(init.body);
+      body.chat_template_kwargs = { ...(body.chat_template_kwargs ?? {}), thinking: true };
+      init = { ...init, body: JSON.stringify(body) };
+    }
+    return fetch(input, init);
+  };
+  return createOpenAI({ baseURL: host + "/v1", apiKey: "not-needed", compatibility: "compatible", fetch: withThinking })(
+    entry.id
+  );
+}
+
 /** One generation, with the parameters /api/generate uses for a local model. */
 export async function generateForCase(c: PromptCandidate, findings: string, timeoutMs = 180_000): Promise<ReplayOutput> {
   const t0 = performance.now();
   const reasoningEffort = c.deepReasoning ? "medium" : "low";
   const res = await generateText({
-    model: getModel("local", REPLAY_MODEL, { deepReasoning: c.deepReasoning }),
+    model: c.thinking ? thinkingModel() : getModel("local", REPLAY_MODEL, { deepReasoning: c.deepReasoning }),
     system: c.buildSystem({ style: STYLE, lang: LANG, title: TITLE }),
     prompt: c.buildUser(findings, TITLE),
     temperature: 0.3,

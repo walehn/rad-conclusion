@@ -29,6 +29,11 @@ export interface PromptCandidate {
   description: string;
   /** Same switch /api/generate derives from the prompt version. */
   deepReasoning: boolean;
+  /**
+   * Replay only: turn the local model's thinking on through the chat
+   * template. /api/generate keeps it off for latency (commit 120000b).
+   */
+  thinking?: boolean;
   buildSystem(options: CandidateOptions): string;
   buildUser(findings: string, title: string): string;
 }
@@ -107,6 +112,23 @@ export const PROMPT_CANDIDATES: Record<string, PromptCandidate> = {
     description: "v2 rewritten to the measured house style (2026-10-14 draft)",
     deepReasoning: true,
     buildSystem: buildR2Prompt,
+    buildUser: user,
+  },
+  // Thinking on, same prompt text: does reasoning buy accuracy worth its latency?
+  "v1-think": {
+    id: "v1-think",
+    description: "live v1 (house style) with thinking on",
+    deepReasoning: false,
+    thinking: true,
+    buildSystem: (o) => buildSystemPrompt({ ...o, version: "v1" }),
+    buildUser: user,
+  },
+  "v2-think": {
+    id: "v2-think",
+    description: "live v2 with thinking on",
+    deepReasoning: true,
+    thinking: true,
+    buildSystem: (o) => buildSystemPrompt({ ...o, version: "v2" }),
     buildUser: user,
   },
   // Promoted to the live v1 slot in prompt revision r2 (2026-10-14); kept so
