@@ -43,6 +43,7 @@ import type { ConclusionStyle, ConclusionLang } from "@/lib/prompts/system-promp
 import type { ProviderInfo, ProviderName, ProviderSettings } from "@/lib/providers/types";
 import { LOCAL_PROVIDER_DEFAULTS } from "@/lib/providers/local-config";
 import { findingsProblem } from "@/lib/findings-check";
+import { ConclusionChecks } from "@/components/conclusion-checks";
 
 function getCsrfToken(): string {
   if (typeof document === "undefined") return "";
@@ -63,6 +64,13 @@ export function ConclusionClient() {
   const [providers, setProviders] = React.useState<ProviderInfo[]>([]);
   const [clientSettings, setClientSettings] = React.useState<ProviderSettings[]>([]);
   const [inputError, setInputError] = React.useState("");
+  // Input of the last generation: the checks run against it, and editing the
+  // Findings afterwards marks the shown conclusion as stale.
+  const [lastRun, setLastRun] = React.useState<{
+    findings: string;
+    style: string;
+    lang: string;
+  } | null>(null);
   const [elapsedTime, setElapsedTime] = React.useState<number | null>(null);
   const [compareMode, setCompareMode] = React.useState(true);
   const [apiError, setApiError] = React.useState("");
@@ -267,6 +275,7 @@ export function ConclusionClient() {
     }
     setInputError("");
     setApiError("");
+    setLastRun({ findings: trimmed, style, lang });
     // One id per click: in A/B mode both requests carry it, so the review
     // screen can show v1 and v2 for the same findings side by side.
     batchIdRef.current = genClientId();
@@ -313,6 +322,9 @@ export function ConclusionClient() {
   const isAnyLoading = compareMode
     ? chatV1.isLoading || chatV2.isLoading
     : isLoading;
+
+  const findingsChanged =
+    lastRun !== null && !isAnyLoading && findings.trim() !== lastRun.findings;
 
   // Local style helpers for this page only (palette comes from notion-tone).
   const headingStyle: React.CSSProperties = {
@@ -640,15 +652,19 @@ export function ConclusionClient() {
                   <div className="min-w-0">
                     <div
                       className="text-[14px] font-medium"
-                      style={{ color: c.charcoal }}
+                      style={{ color: findingsChanged ? c.warningText : c.charcoal }}
                     >
-                      Ready to generate?
+                      {findingsChanged
+                        ? "Findings changed since the last conclusion"
+                        : "Ready to generate?"}
                     </div>
                     <div
                       className="text-[13px]"
                       style={{ color: c.slate, marginTop: 2 }}
                     >
-                      {compareMode
+                      {findingsChanged
+                        ? "Generate again so the conclusion covers the final Findings."
+                        : compareMode
                         ? "V1 and V2 will run in parallel for comparison."
                         : "A single conclusion will be drafted."}
                     </div>
@@ -671,7 +687,7 @@ export function ConclusionClient() {
                     ) : (
                       <>
                         <Send className="mr-2 h-4 w-4" />
-                        Generate
+                        {findingsChanged ? "Regenerate" : "Generate"}
                         <ArrowRight className="ml-1 h-4 w-4" />
                       </>
                     )}
@@ -701,6 +717,14 @@ export function ConclusionClient() {
                         elapsedTime={elapsedTimeV1}
                         error={apiErrorV1}
                       />
+                      {!chatV1.isLoading && lastRun && (
+                        <ConclusionChecks
+                          findings={lastRun.findings}
+                          conclusion={processedV1}
+                          style={lastRun.style}
+                          lang={lastRun.lang}
+                        />
+                      )}
                     </OutputBlock>
 
                     <OutputBlock
@@ -719,6 +743,14 @@ export function ConclusionClient() {
                         elapsedTime={elapsedTimeV2}
                         error={apiErrorV2}
                       />
+                      {!chatV2.isLoading && lastRun && (
+                        <ConclusionChecks
+                          findings={lastRun.findings}
+                          conclusion={processedV2}
+                          style={lastRun.style}
+                          lang={lastRun.lang}
+                        />
+                      )}
                     </OutputBlock>
 
                     {!chatV1.isLoading &&
@@ -804,6 +836,14 @@ export function ConclusionClient() {
                       elapsedTime={elapsedTime}
                       error={apiError}
                     />
+                    {!isLoading && lastRun && (
+                      <ConclusionChecks
+                        findings={lastRun.findings}
+                        conclusion={processedContent}
+                        style={lastRun.style}
+                        lang={lastRun.lang}
+                      />
+                    )}
                   </OutputBlock>
                 )}
               </div>
