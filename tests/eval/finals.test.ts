@@ -4,6 +4,7 @@ import {
   editSimilarity,
   matchBatches,
   parseFinalReportsJsonl,
+  repairMojibake,
   type FinalReport,
 } from '@/lib/eval/finals';
 import { summarizeAdoption, summarizeFinals } from '@/lib/eval/report';
@@ -138,5 +139,40 @@ describe('lib/eval/report against signed reports', () => {
     expect(all.batches).toBe(2);
     expect(all.v2).toBe(0.5);
     expect(all.neither).toBe(0.5);
+  });
+});
+
+describe('repairMojibake', () => {
+  it('restores Korean whose UTF-8 bytes were read as PT154', () => {
+    expect(repairMojibake('Pancreas tailм—җ м—¬лҹ¬ к°ңмқҳ cyst')).toBe('Pancreas tail에 여러 개의 cyst');
+  });
+
+  it('keeps punctuation PT154 shares with normal text', () => {
+    expect(repairMojibake('Liver — 2 cm, 30° “м—җ”')).toBe('Liver — 2 cm, 30° “에”');
+  });
+
+  it('leaves text without Cyrillic untouched', () => {
+    const text = 'Rt kidney에 1.2 cm cyst — little change “stable”';
+    expect(repairMojibake(text)).toBe(text);
+  });
+
+  it('is applied to every text field on import', () => {
+    const line = JSON.stringify({
+      study_key: 'K1',
+      report_dttm: '2026-10-01T09:00:00',
+      description: 'CT м—җ',
+      findings: 'tailм—җ',
+      conclusion: 'к°ңмқҳ',
+      recommend: 'м—¬лҹ¬',
+    });
+    const [r] = parseFinalReportsJsonl(line).reports;
+    expect([r.description, r.findings, r.conclusion, r.recommend]).toEqual(['CT 에', 'tail에', '개의', '여러']);
+  });
+});
+
+describe('repairMojibake, Mac Cyrillic', () => {
+  it('restores Korean read as Mac Cyrillic', () => {
+    // "에" is EC 97 90, which Mac Cyrillic reads as "мЧР"
+    expect(repairMojibake('Liver S6мЧР 2 cm')).toBe('Liver S6에 2 cm');
   });
 });

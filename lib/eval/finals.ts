@@ -33,13 +33,80 @@ export const FinalReportSchema = z.object({
 
 export type FinalReport = z.infer<typeof FinalReportSchema>;
 
+// Characters for bytes 0x80-0xFF in the two code pages seen in PACS reports.
+// About 4% of signed reports arrive with their UTF-8 bytes read as one of
+// these ("에" -> "м—җ" in PT154); mapping each character back to its byte and
+// decoding UTF-8 restores the text.
+const MOJIBAKE_TABLES = [
+  // PT154 (40 of 43 garbled reports, 2026-10)
+  "ҖҒӮғ„…ҶҮҲүҠӢҢҚҺҸҗ‘’“”•–—ҳҷҡӣңқһҹ\u00a0ЎўЈӨҘҰ§Ё©Ә«¬ӯ®Ҝ°ұІіҙө¶·ё№ә»јҪҫҝ" +
+    "АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдежзийклмнопрстуфхцчшщъыьэюя",
+  // Mac Cyrillic (the other 3)
+  "АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ†°Ґ£§•¶І®©™Ђђ≠Ѓѓ∞±≤≥іµґЈЄєЇїЉљЊњјЅ¬√ƒ≈∆«»…\u00a0" +
+    "ЋћЌќѕ–—“”‘’÷„ЎўЏџ№Ёёяабвгдежзийклмнопрстуфхцчшщъыьэю€",
+].map((table) => new Map([...table].map((ch, i) => [ch, 0x80 + i])));
+const UTF8 = new TextDecoder("utf-8", { fatal: true });
+const CYRILLIC = /[\u0400-\u04ff]/g;
+
+function utf8Length(lead: number): number {
+  if (lead >= 0xc2 && lead <= 0xdf) return 2;
+  if (lead >= 0xe0 && lead <= 0xef) return 3;
+  if (lead >= 0xf0 && lead <= 0xf4) return 4;
+  return 0;
+}
+
+/** Decodes every complete UTF-8 sequence spelled in `table`'s characters; keeps the rest. */
+function decodeWith(table: Map<string, number>, text: string): string {
+  const chars = [...text];
+  let out = "";
+  for (let i = 0; i < chars.length; ) {
+    const lead = table.get(chars[i]);
+    const len = lead === undefined ? 0 : utf8Length(lead);
+    const bytes = len ? chars.slice(i, i + len).map((c) => table.get(c)) : [];
+    if (len && bytes.length === len && bytes.slice(1).every((b) => b !== undefined && b >= 0x80 && b <= 0xbf)) {
+      try {
+        out += UTF8.decode(Uint8Array.from(bytes as number[]));
+        i += len;
+        continue;
+      } catch {
+        // Not valid UTF-8 (overlong, surrogate): keep the character as it was.
+      }
+    }
+    out += chars[i];
+    i++;
+  }
+  return out;
+}
+
+/**
+ * Restores text whose UTF-8 bytes were read as PT154 or Mac Cyrillic, using
+ * whichever leaves the least Cyrillic. Only complete UTF-8 sequences are
+ * decoded, so punctuation the code pages share with normal text ("—", "°",
+ * curly quotes) is left alone. Text without Cyrillic is returned unchanged:
+ * these reports contain none of their own.
+ */
+export function repairMojibake(text: string): string {
+  if (!/[\u0400-\u04ff]/.test(text)) return text;
+  const cyrillic = (t: string) => t.match(CYRILLIC)?.length ?? 0;
+  return MOJIBAKE_TABLES.map((table) => decodeWith(table, text)).reduce((best, t) =>
+    cyrillic(t) < cyrillic(best) ? t : best
+  );
+}
+
 export function parseFinalReportsJsonl(text: string): { reports: FinalReport[]; invalid: number } {
   const reports: FinalReport[] = [];
   let invalid = 0;
   for (const line of text.split("\n")) {
     if (!line.trim()) continue;
     try {
-      reports.push(FinalReportSchema.parse(JSON.parse(line)));
+      const r = FinalReportSchema.parse(JSON.parse(line));
+      reports.push({
+        ...r,
+        description: repairMojibake(r.description),
+        findings: repairMojibake(r.findings),
+        conclusion: repairMojibake(r.conclusion),
+        recommend: repairMojibake(r.recommend),
+      });
     } catch {
       invalid++;
     }
