@@ -424,14 +424,13 @@ async function cmdFindingsReview(flags: Record<string, string | true>) {
 
   const byKey = new Map(finals.map((f) => [f.study_key, f]));
   if (flags.sheet) {
-    const path = `data/findings-review-${keys.map((k) => k.promptHash).join("-")}.md`;
-    const sheet = renderReviewSheet(
-      variants.map((v, i) => ({ id: v.id, promptHash: keys[i].promptHash, reviews: results[i].reviews })),
-      byKey
-    );
-    writeFileSync(path, sheet);
-    chmodSync(path, 0o600);
-    console.log(`review sheet: ${path}`);
+    const base = `data/findings-review-${keys.map((k) => k.promptHash).join("-")}`;
+    const sheetVariants = variants.map((v, i) => ({ id: v.id, promptHash: keys[i].promptHash, reviews: results[i].reviews }));
+    for (const [path, deidentified] of [[`${base}.md`, false], [`${base}-deid.md`, true]] as const) {
+      writeFileSync(path, renderReviewSheet(sheetVariants, byKey, { deidentified }));
+      chmodSync(path, 0o600);
+      console.log(`review sheet: ${path}${deidentified ? " (de-identified)" : ""}`);
+    }
   }
 
   const examples = parseInt(str(flags, "examples") ?? "0", 10);

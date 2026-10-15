@@ -131,3 +131,34 @@ describe('lib/eval/findings-review-run review sheet', () => {
     expect(tally.byVariant.think.real).toBe(2);
   });
 });
+
+describe('lib/eval/findings-review-run de-identified sheet', () => {
+  it('drops accession and date and scrubs dates and IDs, keeping case numbers and verdict lines', () => {
+    const findings = 'Compared with CT on 2026-08-01 (accession 12345678). 2.1 cm nodule in segment 6 of the left lobe.';
+    const review = parseFindingsReview(
+      issue({ type: 'location', quote: 'segment 6 of the left lobe', other_quote: '', explanation: 'Seen 2026-08-01.' }),
+      findings
+    );
+    const final = {
+      study_key: 'S1',
+      accession_num: 'ACC99',
+      modality: 'CT',
+      description: 'Abdomen CT',
+      study_date: '2026-10-01T09:00:00',
+      findings,
+      conclusion: '',
+    } as FinalReport;
+    const sheet = renderReviewSheet(
+      [{ id: 'plain', promptHash: 'h1', reviews: new Map([['S1', review]]) }],
+      new Map([['S1', final]]),
+      { deidentified: true }
+    );
+    expect(sheet).not.toMatch(/ACC99|2026-10-01|2026-08-01|12345678/);
+    expect(sheet).toContain('## 1. CT Abdomen CT');
+    expect(sheet).toContain('### 1-1 location · plain');
+    expect(sheet).toContain('**segment 6 of the left lobe**');
+    expect(sheet).toContain('2.1 cm');
+    expect(sheet).toContain('[DATE1]');
+    expect(tallyVerdicts(sheet.replace('[ ] 오류', '[x] 오류')).byVariant.plain.real).toBe(1);
+  });
+});

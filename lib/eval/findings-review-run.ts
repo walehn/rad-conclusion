@@ -19,6 +19,7 @@ import {
   type FindingsReview,
   type FindingsReviewType,
 } from "@/lib/findings-review";
+import { deidentify } from "./deidentify";
 import { matchKey, type FinalReport } from "./finals";
 import { REPLAY_MODEL, TEST_FROM, thinkingModel, type ReplayCase, type ReplayOutput } from "./replay";
 
@@ -183,8 +184,17 @@ function sameIssue(a: FindingsIssue, b: FindingsIssue): boolean {
  * One sheet for every variant, so a case flagged by several is judged once.
  * Each issue heading lists the variants that reported it; --tally scores each
  * variant on the issues it reported.
+ *
+ * `deidentified` drops the accession number and exam date from each heading
+ * and scrubs dates, ID numbers and hospital names from the text, for reading
+ * on another device. Case numbers match the full sheet, and --tally reads
+ * either one.
  */
-export function renderReviewSheet(variants: SheetVariant[], finals: Map<string, FinalReport>): string {
+export function renderReviewSheet(
+  variants: SheetVariant[],
+  finals: Map<string, FinalReport>,
+  { deidentified = false }: { deidentified?: boolean } = {}
+): string {
   const byCase = new Map<string, SheetIssue[]>();
   for (const v of variants) {
     for (const [id, r] of v.reviews) {
@@ -206,26 +216,37 @@ export function renderReviewSheet(variants: SheetVariant[], finals: Map<string, 
     "",
     `서명 판독문 ${reviewed}건 중 ${flagged.length}건에 경고가 나왔습니다. 경고마다 판정 칸 하나에 x를 넣어 주세요.`,
     "제목 끝은 그 경고를 낸 검사 방식입니다. 다 표시한 뒤 `npm run eval -- findings-review --tally <이 파일>`로 집계합니다.",
+    ...(deidentified
+      ? ["", "> 비식별본: accession·검사일을 빼고 날짜·번호·병원명을 가렸습니다. 케이스 번호는 PC의 원본 검토표와 같습니다."]
+      : []),
     "",
   ];
   flagged.forEach(([id, issues], n) => {
     const f = finals.get(id);
-    parts.push(
-      `## ${n + 1}. ${f?.accession_num || id}  ${f?.study_date.slice(0, 10) ?? ""}  ${f?.modality ?? ""} ${f?.description ?? ""}`.trimEnd(),
-      ""
-    );
+    const quotes = issues.flatMap((i) => [i.quote, ...(i.otherQuote ? [i.otherQuote] : [])]);
+    // One de-identify call per case, so a placeholder means the same value in every line of it.
+    const raw = [
+      f?.description ?? "",
+      highlight(f?.findings ?? "", quotes),
+      ...issues.flatMap((i) => [i.quote, i.otherQuote ?? "", i.explanation]),
+    ];
+    const text = deidentified ? deidentify(raw).texts : raw;
+    const heading = deidentified
+      ? `## ${n + 1}. ${f?.modality ?? ""} ${text[0]}`
+      : `## ${n + 1}. ${f?.accession_num || id}  ${f?.study_date.slice(0, 10) ?? ""}  ${f?.modality ?? ""} ${text[0]}`;
+    parts.push(heading.trimEnd(), "");
     issues.forEach((i, k) => {
+      const [quote, otherQuote, explanation] = text.slice(2 + k * 3, 5 + k * 3);
       parts.push(
         `### ${n + 1}-${k + 1} ${i.type} · ${i.variants.join(", ")}`,
         "",
-        `- 근거: "${i.quote}"${i.otherQuote ? ` ↔ "${i.otherQuote}"` : ""}`,
-        `- 설명: ${i.explanation}`,
+        `- 근거: "${quote}"${otherQuote ? ` ↔ "${otherQuote}"` : ""}`,
+        `- 설명: ${explanation}`,
         `- ${VERDICT_LINE}`,
         ""
       );
     });
-    const quotes = issues.flatMap((i) => [i.quote, ...(i.otherQuote ? [i.otherQuote] : [])]);
-    parts.push("<details><summary>소견 전문</summary>", "", highlight(f?.findings ?? "", quotes), "", "</details>", "");
+    parts.push("<details><summary>소견 전문</summary>", "", text[1], "", "</details>", "");
   });
   return parts.join("\n");
 }
