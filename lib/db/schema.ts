@@ -98,3 +98,52 @@ export const generations = sqliteTable(
 
 export type Generation = typeof generations.$inferSelect;
 export type NewGeneration = typeof generations.$inferInsert;
+
+/**
+ * Structured reports table — durable record of every report the Structured
+ * Report Generator produces (/api/structured-report/generate).
+ *
+ * Kept apart from `generations`: those rows carry conclusion-only columns
+ * (style, promptVersion) and feed the conclusion review and eval tooling.
+ *
+ * `formState` keeps the raw form input next to the serialized `findings`, so
+ * reports can be replayed after the serializer or the form fields change.
+ */
+export const structuredReports = sqliteTable(
+  'structured_reports',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    /** Null-able so history outlives the account that produced it. */
+    userId: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
+    diseaseCategory: text('disease_category').notNull(), // 'RCC' | 'ProstateCancer' | 'UterineMyoma'
+    modality: text('modality').notNull(), // 'CT' | 'MRI' | 'US' | 'Auto'
+    lang: text('lang').notNull(),
+    /** Serialized findings text exactly as sent to the model. */
+    findings: text('findings').notNull(),
+    /** JSON of the client form state. Null for non-browser callers. */
+    formState: text('form_state'),
+    /** Raw model output. */
+    report: text('report').notNull(),
+    /** Short sha256 of the rendered system prompt and user prompt template. */
+    promptHash: text('prompt_hash').notNull(),
+    provider: text('provider').notNull(),
+    model: text('model').notNull(),
+    finishReason: text('finish_reason'),
+    promptTokens: integer('prompt_tokens'),
+    completionTokens: integer('completion_tokens'),
+    /** Time to first token, milliseconds. Null when no token ever arrived. */
+    ttftMs: integer('ttft_ms'),
+    /** Full stream duration, milliseconds. */
+    totalMs: integer('total_ms'),
+    createdAt: integer('created_at', { mode: 'timestamp' })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => ({
+    createdAtIdx: index('structured_reports_created_at_idx').on(t.createdAt),
+    diseaseIdx: index('structured_reports_disease_idx').on(t.diseaseCategory),
+  })
+);
+
+export type StructuredReport = typeof structuredReports.$inferSelect;
+export type NewStructuredReport = typeof structuredReports.$inferInsert;

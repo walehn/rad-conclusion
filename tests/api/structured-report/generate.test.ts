@@ -18,6 +18,19 @@ vi.mock('next/headers', () => ({
 // Mock the LLM layer entirely — we don't want to talk to real providers from tests.
 vi.mock('@/lib/providers/registry', () => ({
   getModel: vi.fn(() => ({ __mock: true })),
+  getModelWithKey: vi.fn(() => ({ __mock: true })),
+  resolvedModelId: vi.fn((_provider: string, model: string) => model),
+}));
+
+vi.mock('@/lib/api-keys/resolve', () => ({
+  resolveApiKey: vi.fn(async () => null),
+}));
+
+// Persistence is asserted through this mock; the real writer is covered in
+// tests/structured-reports/record.test.ts.
+vi.mock('@/lib/structured-reports/record', () => ({
+  hashReportPrompt: vi.fn(() => 'hash-stub'),
+  recordStructuredReport: vi.fn(),
 }));
 
 vi.mock('ai', () => ({
@@ -33,6 +46,8 @@ vi.mock('ai', () => ({
 import { createCookieStore } from '../../helpers/mock-next-cookies';
 cookieStoreRef.current = createCookieStore();
 
+import { streamText } from 'ai';
+import { recordStructuredReport } from '@/lib/structured-reports/record';
 import { POST } from '@/app/api/structured-report/generate/route';
 import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from '@/lib/auth/csrf';
 import { issueSession } from '@/lib/auth/session';
@@ -124,5 +139,73 @@ describe('POST /api/structured-report/generate', () => {
     expect(res.status).toBe(403);
     const body = await res.json();
     expect(body.error).toMatch(/CSRF/i);
+  });
+
+  it('records the finished report with findings, form state and metadata', async () => {
+    await authenticate();
+    setCsrfCookie();
+    const formState = { kind: 'ProstateCancer', input: { psa: '7.2' } };
+    const res = await POST(
+      makeReportRequest({
+        ...validBody,
+        diseaseCategory: 'ProstateCancer',
+        modality: 'MRI',
+        formState,
+      })
+    );
+    expect(res.status).toBe(200);
+
+    const opts = vi.mocked(streamText).mock.calls[0][0] as unknown as {
+      onFinish: (e: unknown) => void;
+    };
+    opts.onFinish({
+      text: 'IMPRESSION: PI-RADS 4',
+      usage: { promptTokens: 100, completionTokens: 20 },
+      finishReason: 'stop',
+    });
+
+    expect(recordStructuredReport).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(recordStructuredReport).mock.calls[0][0]).toMatchObject({
+      userId: 1,
+      diseaseCategory: 'ProstateCancer',
+      modality: 'MRI',
+      lang: 'en',
+      findings: validBody.findings,
+      formState: JSON.stringify(formState),
+      report: 'IMPRESSION: PI-RADS 4',
+      promptHash: 'hash-stub',
+      provider: 'openai',
+      model: 'gpt-4o-mini',
+      finishReason: 'stop',
+      promptTokens: 100,
+      completionTokens: 20,
+      ttftMs: null,
+    });
+  });
+
+  it('stores a null form state when the caller omits it', async () => {
+    await authenticate();
+    setCsrfCookie();
+    await POST(makeReportRequest(validBody));
+
+    const opts = vi.mocked(streamText).mock.calls[0][0] as unknown as {
+      onFinish: (e: unknown) => void;
+    };
+    opts.onFinish({ text: 'report', usage: undefined, finishReason: 'stop' });
+
+    expect(vi.mocked(recordStructuredReport).mock.calls[0][0]).toMatchObject({
+      formState: null,
+      modality: 'CT',
+    });
+  });
+
+  it('returns 400 when the form state exceeds the size cap', async () => {
+    await authenticate();
+    setCsrfCookie();
+    const res = await POST(
+      makeReportRequest({ ...validBody, formState: { blob: 'x'.repeat(100_001) } })
+    );
+    expect(res.status).toBe(400);
+    expect(recordStructuredReport).not.toHaveBeenCalled();
   });
 });

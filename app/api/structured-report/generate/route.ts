@@ -15,7 +15,15 @@
  *   - The raw Findings text is NEVER logged. Only metadata
  *     (diseaseCategory, modality, lang, provider, model, findingsLength)
  *     is emitted on error paths.
+ *   - Findings, form state and the finished report ARE persisted to the
+ *     local SQLite `structured_reports` table for review (never to logs).
  */
+
+/** Upper bound on the serialized form state, mirroring the findings cap. */
+const MAX_FORM_STATE_CHARS = 100_000;
+
+/** Fixed sample input so the prompt hash tracks prompt text, not findings. */
+const SAMPLE_FINDINGS = "SAMPLE FINDINGS";
 
 import { streamText } from "ai";
 import { z } from "zod";
@@ -29,6 +37,10 @@ import { requireApiSession } from "@/lib/auth/guard";
 import { validateCsrfOrFail } from "@/lib/auth/csrf";
 import { resolveApiKey } from "@/lib/api-keys/resolve";
 import { perfLog } from "@/lib/perf-log";
+import {
+  hashReportPrompt,
+  recordStructuredReport,
+} from "@/lib/structured-reports/record";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -60,6 +72,15 @@ const requestSchema = z.object({
   lang: z.enum(["ko", "en", "mixed"]),
   provider: z.enum(["local", "openai", "anthropic", "google"]),
   model: z.string().min(1, "Model identifier is required"),
+  // Raw form input, stored alongside the serialized findings. Bounded after
+  // serialization so an oversized payload is rejected rather than truncated.
+  formState: z
+    .unknown()
+    .optional()
+    .refine(
+      (v) => v === undefined || JSON.stringify(v).length <= MAX_FORM_STATE_CHARS,
+      `Form state exceeds maximum length (${MAX_FORM_STATE_CHARS} characters)`
+    ),
 });
 
 export async function POST(req: Request) {
@@ -84,8 +105,15 @@ export async function POST(req: Request) {
       );
     }
 
-    const { findings, diseaseCategory, modality, lang, provider, model } =
-      parsed.data;
+    const {
+      findings,
+      diseaseCategory,
+      modality,
+      lang,
+      provider,
+      model,
+      formState,
+    } = parsed.data;
 
     // Privacy: log metadata only. The raw findings text is NEVER serialized.
     const requestMeta = {
@@ -113,6 +141,16 @@ export async function POST(req: Request) {
       findings,
     });
 
+    const promptHash = hashReportPrompt(
+      systemPrompt,
+      buildReportUserPrompt({
+        diseaseCategory,
+        lang,
+        modality,
+        findings: SAMPLE_FINDINGS,
+      })
+    );
+
     // Perf instrumentation: t at LLM-call boundary so TTFT excludes auth/parse.
     // `disease` lets us group perf records by disease category in `jq` analysis.
     const tLLMStart = performance.now();
@@ -128,6 +166,7 @@ export async function POST(req: Request) {
       maxTokensConfig,
     } as const;
     let firstTokenLogged = false;
+    let ttftMs: number | null = null;
 
     const result = streamText({
       model: llmModel,
@@ -140,21 +179,43 @@ export async function POST(req: Request) {
         if (firstTokenLogged) return;
         if (chunk.type !== "text-delta") return;
         firstTokenLogged = true;
+        ttftMs = Math.round(performance.now() - tLLMStart);
         try {
           perfLog({
             perf: "gen",
             stage: "ttft",
             ...baseTags,
-            ms: Math.round(performance.now() - tLLMStart),
+            ms: ttftMs,
             preLLMMs: Math.round(tLLMStart - tReq),
           });
         } catch {
           /* observability must never break the stream */
         }
       },
-      onFinish: ({ usage, finishReason }) => {
+      onFinish: ({ text, usage, finishReason }) => {
+        const totalMs = performance.now() - tLLMStart;
+
+        // Durable history row. Written here rather than from the browser so a
+        // closed tab cannot lose the record.
+        recordStructuredReport({
+          userId: session.userId,
+          diseaseCategory,
+          modality: modality ?? "Auto",
+          lang,
+          findings,
+          formState: formState === undefined ? null : JSON.stringify(formState),
+          report: text,
+          promptHash,
+          provider,
+          model: modelId,
+          finishReason,
+          promptTokens: usage?.promptTokens ?? null,
+          completionTokens: usage?.completionTokens ?? null,
+          ttftMs,
+          totalMs: Math.round(totalMs),
+        });
+
         try {
-          const totalMs = performance.now() - tLLMStart;
           const completion = usage?.completionTokens ?? 0;
           const tps =
             totalMs > 0 ? (completion / (totalMs / 1000)) : 0;

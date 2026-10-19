@@ -368,6 +368,9 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
           lang,
           provider,
           model,
+          // Persisted server-side so the report can be replayed after the
+          // serializer or form fields change.
+          formState,
         }),
         signal: controller.signal,
       });
