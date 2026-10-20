@@ -8,7 +8,7 @@
     "start": "next start --port 3957",
     "lint": "next lint",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx -e \"import('./lib/db/index').then(m => m.runMigrations())\"",
+    "db:migrate": "tsx -e \"require('./lib/db/index').runMigrations()\"",
     "seed:user": "tsx scripts/seed-user.ts",
     "test": "vitest run",
     "test:watch": "vitest",
