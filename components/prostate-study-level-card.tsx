@@ -6,7 +6,7 @@ import {
   BONE_INVOLVEMENT_OPTIONS,
   CLINICAL_M_OPTIONS,
   CLINICAL_N_OPTIONS,
-  CLINICAL_T_OPTIONS,
+  MRI_T_OPTIONS,
   LOCAL_INVOLVEMENT_OPTIONS,
   OTHER_DISTANT_METS_OPTIONS,
   PIQUAL_DCE_SUBSCORE_OPTIONS,
@@ -15,7 +15,7 @@ import {
   type BoneInvolvement,
   type ClinicalM,
   type ClinicalN,
-  type ClinicalT,
+  type MriT,
   type EauRiskGroup,
   type LocalInvolvement,
   type OtherDistantMets,
@@ -27,12 +27,14 @@ import {
 import {
   deriveClinicalM,
   deriveClinicalN,
-  deriveClinicalT,
+  deriveMriT,
+  deriveMriT2Laterality,
   deriveEauRiskGroup,
   deriveMriProtocol,
   derivePiQualOverall,
   deriveProstateVolume,
   derivePsaDensity,
+  type MriT2Laterality,
   type ProstateLymphNode,
   type ProstateStructuredInput,
 } from "@/lib/prompts/disease-templates/prostate-serializer";
@@ -102,6 +104,12 @@ const CLINICAL_M_LABEL: Record<ClinicalM, string> = {
   M1a: "M1a",
   M1b: "M1b",
   M1c: "M1c",
+};
+
+const T2_SIDE_LABEL: Record<MriT2Laterality, string> = {
+  right: "우엽",
+  left: "좌엽",
+  both: "양엽",
 };
 
 const EAU_LABEL: Record<EauRiskGroup, string> = {
@@ -307,7 +315,7 @@ export function ProstateStudyLevelCard({
   const id = (suffix: string) => `prostate-study-${suffix}`;
 
   // Derived staging values.
-  const derivedT = deriveClinicalT(value);
+  const derivedT = deriveMriT(value);
   const derivedN = deriveClinicalN(value);
   const derivedM = deriveClinicalM(value);
   const eauRiskGroup = deriveEauRiskGroup(value);
@@ -355,19 +363,19 @@ export function ProstateStudyLevelCard({
   const overridden = value.isStagingOverridden === true;
 
   // When auto-derive is active (overridden=false), keep the stored
-  // clinicalT/N/M synced to the canonical derivation. This guarantees
+  // mriT/clinicalN/M synced to the canonical derivation. This guarantees
   // consumers reading the structured input see consistent staging values
   // without having to call the derive helpers themselves.
   React.useEffect(() => {
     if (overridden) return;
     if (
-      value.clinicalT !== derivedT ||
+      value.mriT !== derivedT ||
       value.clinicalN !== derivedN ||
       value.clinicalM !== derivedM
     ) {
       onChange({
         ...value,
-        clinicalT: derivedT,
+        mriT: derivedT,
         clinicalN: derivedN,
         clinicalM: derivedM,
       });
@@ -381,7 +389,7 @@ export function ProstateStudyLevelCard({
     onChange({
       ...value,
       isStagingOverridden: !overridden,
-      clinicalT: derivedT,
+      mriT: derivedT,
       clinicalN: derivedN,
       clinicalM: derivedM,
     });
@@ -437,9 +445,10 @@ export function ProstateStudyLevelCard({
   }
 
   const shownM = overridden ? (value.clinicalM ?? derivedM) : derivedM;
+  const t2Side = derivedT === "T2" ? deriveMriT2Laterality(value) : undefined;
   const stagingText = overridden
     ? undefined
-    : `${derivedT} · c${derivedN} · ${
+    : `${derivedT ? `MRI ${derivedT}${t2Side ? ` (${T2_SIDE_LABEL[t2Side]})` : ""}` : "MRI T 없음"} · c${derivedN} · ${
         derivedM === "not_assessed" ? "cM 평가 안 함" : `c${derivedM}`
       }`;
 
@@ -703,7 +712,7 @@ export function ProstateStudyLevelCard({
         </Row>
       </Disclosure>
 
-      {/* Auto-derived staging (cT / cN / cM) with override. Hidden on
+      {/* Auto-derived staging (MRI T / cN / cM) with override. Hidden on
           negative MRI: AJCC categorisation is replaced by the "Not
           applicable" line in the rendered STAGING section. */}
       {showStaging && (
@@ -716,16 +725,16 @@ export function ProstateStudyLevelCard({
             )}
             {overridden && (
               <>
-                <InlineField label="cT" htmlFor={id("ctOverride")}>
+                <InlineField label="MRI T" htmlFor={id("mriTOverride")}>
                   <select
-                    id={id("ctOverride")}
-                    value={value.clinicalT ?? derivedT}
+                    id={id("mriTOverride")}
+                    value={value.mriT ?? derivedT ?? "T2"}
                     onChange={(e) =>
-                      onChange({ ...value, clinicalT: e.target.value as ClinicalT })
+                      onChange({ ...value, mriT: e.target.value as MriT })
                     }
                     className={selectClass}
                   >
-                    {CLINICAL_T_OPTIONS.map((opt) => (
+                    {MRI_T_OPTIONS.map((opt) => (
                       <option key={opt} value={opt}>
                         {opt}
                       </option>

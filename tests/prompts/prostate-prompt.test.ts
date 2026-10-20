@@ -39,8 +39,20 @@ describe("buildProstateReportSystemPrompt", () => {
     expect(prompt).not.toMatch(/IMPRESSION section MUST (also )?(include|carry)/);
   });
 
-  it("keeps cT / cN / cM codes out of IMPRESSION", () => {
-    expect(impression).toContain("Do NOT write cT / cN / cM codes here");
+  it("keeps T / N / M categories out of IMPRESSION", () => {
+    expect(impression).toContain("Do NOT write T / N / M categories here");
+  });
+
+  it("reports the MRI T stage apart from the DRE-based clinical T", () => {
+    const staging = prompt.slice(
+      prompt.indexOf("=== STAGING SECTION GUIDANCE ==="),
+      prompt.indexOf("=== IMPRESSION SECTION GUIDANCE ===")
+    );
+    expect(staging).toContain('write the input\'s "MRI T stage:" line');
+    expect(staging).toContain('never relabel it "Clinical T" or "cT", and never subdivide T2');
+    expect(staging).toContain("A DRE clinical T supplied by the referring clinician belongs to CLINICAL INFORMATION");
+    expect(prompt).toMatch(/CLINICAL INFORMATION: .*the DRE clinical T when supplied/);
+    expect(prompt).not.toMatch(/cT2 sub-stage|cT2a \/ cT2b|auto-derives cT2/);
   });
 
   it("takes the protocol from the MRI protocol line for both modality hints", () => {

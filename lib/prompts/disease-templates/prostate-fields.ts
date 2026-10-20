@@ -121,6 +121,14 @@ export const CLINICAL_T_OPTIONS = [
 ] as const;
 export type ClinicalT = (typeof CLINICAL_T_OPTIONS)[number];
 
+/**
+ * MRI-based local T category, reported apart from the DRE-based cT (EAU
+ * 2026: cT is DRE-only; imaging staging is reported separately). T2 is not
+ * subdivided — T2a/b/c are palpation categories.
+ */
+export const MRI_T_OPTIONS = ["T2", "T3a", "T3b", "T4"] as const;
+export type MriT = (typeof MRI_T_OPTIONS)[number];
+
 export const CLINICAL_N_OPTIONS = ["NX", "N0", "N1"] as const;
 export type ClinicalN = (typeof CLINICAL_N_OPTIONS)[number];
 

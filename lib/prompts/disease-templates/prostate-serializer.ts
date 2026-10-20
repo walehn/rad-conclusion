@@ -11,14 +11,15 @@
  *    recommendations) is round-tripped verbatim under "Other findings:" —
  *    multi-line preserved (RCC parity).
  *
- * Six derivation helpers encode PI-RADS v2.1 / AJCC 8th / EAU 2025 rules:
+ * Six derivation helpers encode PI-RADS v2.1 / AJCC 8th / EAU 2026 rules:
  *  - derivePiradsCategory:   PI-RADS v2.1 PZ/CZ + TZ/AFMS decision tables.
- *  - deriveClinicalT:        MRI-based T heuristic (deviates from AJCC 8th,
- *                            which assigns cT from DRE only).
+ *  - deriveMriT:             MRI-based local T (T2/T3a/T3b/T4), reported
+ *                            apart from the DRE-based cT the clinician
+ *                            may supply.
  *  - deriveClinicalN:        regional ≥ 8 mm OR suspicious features → N1.
  *  - deriveClinicalM:        bone definite → M1b; non-regional nodes → M1a.
  *  - derivePsaDensity:       psa / volume rounded to 1 decimal place.
- *  - deriveEauRiskGroup:     Cornford 2025 EAU low/intermediate/high, or
+ *  - deriveEauRiskGroup:     EAU 2026 Table 4.3 low/intermediate/high, or
  *                            metastatic for cM1.
  *  - deriveMriProtocol:      mpMRI when any DCE result was recorded, else bpMRI.
  */
@@ -33,6 +34,7 @@ import type {
   EauRiskGroup,
   EpeRisk,
   Laterality,
+  MriT,
   LocalInvolvement,
   NvbInvolvement,
   OtherDistantMets,
@@ -102,6 +104,11 @@ export interface ProstateStructuredInput {
   priorBiopsyStatus: PriorBiopsyStatus;
   /** ISO date YYYY-MM-DD. */
   priorBiopsyDate?: string;
+  /**
+   * Clinical T from the referring clinician's DRE, when supplied. The only
+   * source of a cT code: MRI staging is reported as `MRI T stage`.
+   */
+  dreClinicalT?: ClinicalT;
   additionalClinicalNotes?: string;
   /**
    * Negative-MRI shortcut. When true, the form hides Section 2 (lesion list)
@@ -140,8 +147,8 @@ export interface ProstateStructuredInput {
   boneInvolvement: BoneInvolvement;
   boneLesionLocations?: string[];
   otherDistantMetastasis: OtherDistantMets;
-  /** Auto-derivable; presence + isStagingOverridden=true → use this value. */
-  clinicalT?: ClinicalT;
+  /** MRI T; auto-derived, used as is when isStagingOverridden=true. */
+  mriT?: MriT;
   clinicalN?: ClinicalN;
   clinicalM?: ClinicalM;
   isStagingOverridden?: boolean;
@@ -353,96 +360,88 @@ export function derivePiradsCategory(
 // ---------------------------------------------------------------------------
 
 /**
- * AJCC 8th clinical T-stage — MRI-based heuristic (Korean clinical workflow).
+ * MRI-based local T category.
  *
- * NOTE: This implementation deviates from AJCC 8th's strict requirement that
- * cT2 sub-staging requires palpation evidence. In Korean practice DRE results
- * are rarely communicated to the radiology service, so the form intentionally
- * derives cT2a/b/c from MRI lesion laterality and size. Clinicians who hold
- * authoritative palpation/biopsy data can correct the value via the
- * `isStagingOverridden` + `clinicalT` override path.
+ * AJCC 8th and EAU 2026 assign cT from DRE only and ask for imaging staging
+ * to be reported separately, so the MRI stage is its own category and is
+ * never written as cT. T2 is not subdivided: T2a/b/c ("half of one lobe")
+ * are palpation categories with no MRI definition, and EAU 2026 risk groups
+ * no longer use them. The lobe distribution is reported instead
+ * (`deriveMriT2Laterality`). A radiologist who disagrees overrides via
+ * `isStagingOverridden` + `mriT`.
  *
- * Priority order (highest cT wins):
- *  1. noSuspiciousLesion === true                               → cT1c
+ * Priority order (highest T wins):
+ *  1. noSuspiciousLesion === true                               → none
  *  2. structural invasion (bladder neck / ext. sphincter /
- *     rectum / pelvic sidewall === 'invasion')                  → cT4
- *  3. seminalVesicleInvasionWholeGland !== 'none'                → cT3b
- *  4. any lesion's epeRiskMehralivand === 3 (frank breach)       → cT3a
+ *     rectum / pelvic sidewall === 'invasion')                  → T4
+ *  3. seminalVesicleInvasionWholeGland !== 'none'                → T3b
+ *  4. any lesion's epeRiskMehralivand === 3 (frank breach)       → T3a
  *     Grades 1–2 are EPE risk features, not EPE: in Mehralivand
  *     2019 only 24% (grade 1) and 38% (grade 2) had pathologic EPE,
- *     against 66% for grade 3. They stay in the cT2 heuristic, and
- *     a radiologist who reads grade 2 as EPE uses the override.
- *  5. lesion-side cT2 heuristic:
- *     - any lesion laterality 'midline_bilateral' OR
- *       lesions span both 'right' AND 'left'                     → cT2c
- *     - unilateral lesion(s) with largest sizeMaxAxialMm >=
- *       prostateWidthMm / 4 — half of one lobe, the AJCC
- *       cT2a/cT2b boundary (or >= 10 mm fallback when width
- *       missing)                                                 → cT2b
- *     - any other unilateral lesion present                      → cT2a
- *  6. lesion 0개 + noSuspiciousLesion=false                      → cT1c
+ *     against 66% for grade 3. A radiologist who reads grade 2 as
+ *     EPE uses the override.
+ *  5. any lesion                                                 → T2
+ *  6. no lesion                                                  → none
  */
-export function deriveClinicalT(input: ProstateStructuredInput): ClinicalT {
-  // Step 1: explicit no-lesion shortcut.
-  if (input.noSuspiciousLesion) {
-    return "cT1c";
-  }
+export function deriveMriT(input: ProstateStructuredInput): MriT | undefined {
+  if (input.noSuspiciousLesion) return undefined;
 
-  // Step 2: cT4 — structural invasion.
   if (
     input.bladderNeckInvolvement === "invasion" ||
     input.externalSphincterInvolvement === "invasion" ||
     input.rectalInvolvement === "invasion" ||
     input.pelvicSidewallInvolvement === "invasion"
   ) {
-    return "cT4";
+    return "T4";
   }
 
-  // Step 3: cT3b — seminal vesicle invasion (whole-gland field is the single
-  // source of truth after the lesion-level SVI suspicion field was retired).
-  if (input.seminalVesicleInvasionWholeGland !== "none") {
-    return "cT3b";
-  }
+  // The whole-gland field is the single source of truth for SVI.
+  if (input.seminalVesicleInvasionWholeGland !== "none") return "T3b";
 
-  // Step 4: cT3a — visible extraprostatic extension (Mehralivand grade 3).
   if (input.lesions.some((l) => l.epeRiskMehralivand === "3_frank_breach")) {
-    return "cT3a";
+    return "T3a";
   }
 
-  // Step 5: cT2 sub-stage from MRI lesion geometry.
-  if (input.lesions.length === 0) {
-    return "cT1c";
-  }
+  return input.lesions.length > 0 ? "T2" : undefined;
+}
 
-  const hasMidlineBilateral = input.lesions.some(
-    (l) => l.laterality === "midline_bilateral"
-  );
-  const hasRight = input.lesions.some((l) => l.laterality === "right");
-  const hasLeft = input.lesions.some((l) => l.laterality === "left");
-  if (hasMidlineBilateral || (hasRight && hasLeft)) {
-    return "cT2c";
-  }
+export type MriT2Laterality = "right" | "left" | "both";
 
-  // Single-side lesion(s). AJCC cT2a is "one-half of one side or less", so
-  // the largest axial dimension across all lesions is compared with half of
-  // one lobe — a quarter of the transverse gland width.
-  const halfLobeWidth =
-    typeof input.prostateWidthMm === "number" &&
-    !Number.isNaN(input.prostateWidthMm) &&
-    input.prostateWidthMm > 0
-      ? input.prostateWidthMm / 4
-      : 10; // 10 mm fallback (a 40 mm gland) when width is missing.
-  const largestAxial = Math.max(
-    ...input.lesions.map((l) =>
-      typeof l.sizeMaxAxialMm === "number" && !Number.isNaN(l.sizeMaxAxialMm)
-        ? l.sizeMaxAxialMm
-        : 0
-    )
-  );
-  if (largestAxial >= halfLobeWidth) {
-    return "cT2b";
+/**
+ * Lobes holding MRI-visible lesions, for the T2 descriptor. A midline or
+ * bilateral lesion, or lesions on both sides, count as both lobes.
+ */
+export function deriveMriT2Laterality(
+  input: ProstateStructuredInput
+): MriT2Laterality | undefined {
+  const sides = new Set(input.lesions.map((l) => l.laterality));
+  if (sides.has("midline_bilateral") || (sides.has("right") && sides.has("left"))) {
+    return "both";
   }
-  return "cT2a";
+  if (sides.has("right")) return "right";
+  if (sides.has("left")) return "left";
+  return undefined;
+}
+
+const MRI_T2_LATERALITY_TEXT: Record<MriT2Laterality, string> = {
+  right: "MRI-visible tumour in the right lobe",
+  left: "MRI-visible tumour in the left lobe",
+  both: "MRI-visible tumour in both lobes",
+};
+
+const MRI_T_DESCRIPTOR: Record<Exclude<MriT, "T2">, string> = {
+  T3a: "extraprostatic extension",
+  T3b: "seminal vesicle invasion",
+  T4: "invasion of adjacent structures",
+};
+
+/** "T2 (organ-confined; MRI-visible tumour in the right lobe)" etc. */
+function describeMriT(t: MriT, input: ProstateStructuredInput): string {
+  if (t !== "T2") return `${t} (${MRI_T_DESCRIPTOR[t]})`;
+  const side = deriveMriT2Laterality(input);
+  return side
+    ? `T2 (organ-confined; ${MRI_T2_LATERALITY_TEXT[side]})`
+    : "T2 (organ-confined)";
 }
 
 /**
@@ -728,7 +727,8 @@ function extractIsupGrade(status: PriorBiopsyStatus): number {
 }
 
 export interface ResolvedStaging {
-  cT: ClinicalT;
+  /** Absent on a study with no MRI-visible tumour. */
+  mriT?: MriT;
   cN: ClinicalN;
   cM: ClinicalM;
 }
@@ -741,10 +741,8 @@ export interface ResolvedStaging {
 export function resolveStaging(input: ProstateStructuredInput): ResolvedStaging {
   const overridden = input.isStagingOverridden === true;
   return {
-    cT:
-      overridden && input.clinicalT !== undefined
-        ? input.clinicalT
-        : deriveClinicalT(input),
+    mriT:
+      overridden && input.mriT !== undefined ? input.mriT : deriveMriT(input),
     cN:
       overridden && input.clinicalN !== undefined
         ? input.clinicalN
@@ -756,25 +754,39 @@ export function resolveStaging(input: ProstateStructuredInput): ResolvedStaging 
   };
 }
 
+const LOCALLY_ADVANCED_T = new Set(["T3a", "T3b", "T4", "cT3a", "cT3b", "cT4"]);
+
 /**
- * EAU 2025/2026 risk group (Cornford 2025 Table 4.3, simplified).
+ * Whether the EAU risk group takes its T category from MRI: no DRE cT was
+ * supplied and the MRI stage is T3–4, the only T that changes the group.
+ */
+export function eauTFromMri(input: ProstateStructuredInput): boolean {
+  if (input.dreClinicalT !== undefined) return false;
+  const { mriT } = resolveStaging(input);
+  return mriT !== undefined && LOCALLY_ADVANCED_T.has(mriT);
+}
+
+/**
+ * EAU risk group (EAU 2026 Table 4.3).
  *
  * Only computed when `clinicalIndication === 'staging_after_diagnosis'`. For
  * pre-biopsy indications, returns 'not_applicable'.
  *
- * T/N/M come from `resolveStaging`, so staging overrides are honoured.
+ * Table 4.3 no longer subdivides cT1-2, so T matters only as T3–4. Its cT is
+ * DRE-based: the clinician's DRE cT is used when supplied, otherwise the MRI
+ * T stands in (flagged by `eauTFromMri`). N/M come from `resolveStaging`, so
+ * staging overrides are honoured.
  *
  * Rules:
- *  - metastatic: clinicalM in {M1a, M1b, M1c}. Takes precedence over every
- *    other rule, since the risk groups cover non-metastatic disease only.
- *  - low: PSA < 10 AND ISUP === 1 AND clinicalT in {cT1c, cT2a}.
- *  - high: PSA > 20 OR ISUP >= 4 OR clinicalT in {cT3a, cT3b, cT4} OR
- *    clinicalN === N1 (cN+ is locally advanced, which EAU groups as high).
- *  - intermediate factors: PSA 10–20, ISUP 2 or 3, clinicalT in {cT2b, cT2c}.
- *      • 2+ factors → intermediate_unfavourable.
- *      • exactly 1 factor → intermediate_favourable.
- *  - Fallback (ISUP 0 with no positive biopsy on record): 'not_applicable',
- *    since EAU risk requires biopsy-confirmed disease.
+ *  - metastatic: cM1a/b/c. Takes precedence over every other rule, since
+ *    the risk groups cover non-metastatic disease only.
+ *  - high: ISUP 4/5 OR PSA > 20 OR T3–4 OR cN1 (locally advanced is part
+ *    of the high-risk group).
+ *  - intermediate_unfavourable: ISUP 3, OR ISUP 2 with PSA 10–20.
+ *  - intermediate_favourable: ISUP 2 with PSA < 10, OR ISUP 1 with PSA 10–20.
+ *  - low: ISUP 1 with PSA < 10.
+ *  - not_applicable: no positive biopsy on record (EAU risk requires
+ *    biopsy-confirmed disease).
  */
 export function deriveEauRiskGroup(
   input: ProstateStructuredInput
@@ -796,35 +808,23 @@ export function deriveEauRiskGroup(
     return "not_applicable";
   }
 
-  const { cT, cN, cM } = resolveStaging(input);
+  const { mriT, cN, cM } = resolveStaging(input);
+  const t = input.dreClinicalT ?? mriT;
   const psa = input.psaNgPerMl;
 
   if (cM === "M1a" || cM === "M1b" || cM === "M1c") return "metastatic";
 
-  // High-risk gates (any ONE triggers high).
-  if (psa > 20) return "high";
-  if (isup >= 4) return "high";
-  if (cT === "cT3a" || cT === "cT3b" || cT === "cT4") return "high";
-  if (cN === "N1") return "high";
-
-  // Low-risk gates (ALL must hold).
-  if (psa < 10 && isup === 1 && (cT === "cT1c" || cT === "cT2a")) {
-    return "low";
+  if (isup >= 4 || psa > 20) return "high";
+  if ((t !== undefined && LOCALLY_ADVANCED_T.has(t)) || cN === "N1") {
+    return "high";
   }
 
-  // Intermediate factor count.
-  let factors = 0;
-  if (psa >= 10 && psa <= 20) factors += 1;
-  if (isup === 2 || isup === 3) factors += 1;
-  if (cT === "cT2b" || cT === "cT2c") factors += 1;
-
-  if (factors >= 2) return "intermediate_unfavourable";
-  if (factors === 1) return "intermediate_favourable";
-
-  // No high-risk trigger, doesn't satisfy low-risk all-of, and no intermediate
-  // factor (e.g., ISUP 1, PSA < 10, but cT is non-T2a like cT1c with no
-  // additional risk drivers — already handled by low-risk path). Fall back.
-  return "not_applicable";
+  const psaIntermediate = psa >= 10 && psa <= 20;
+  if (isup === 3 || (isup === 2 && psaIntermediate)) {
+    return "intermediate_unfavourable";
+  }
+  if (isup === 2 || psaIntermediate) return "intermediate_favourable";
+  return "low";
 }
 
 // ---------------------------------------------------------------------------
@@ -845,6 +845,7 @@ function clinicalContextBlock(input: ProstateStructuredInput): string[] {
   );
   pushBullet(lines, "Prior biopsy status", input.priorBiopsyStatus);
   pushBullet(lines, "Prior biopsy date", input.priorBiopsyDate);
+  pushBullet(lines, "DRE clinical T (referring clinician)", input.dreClinicalT);
   if (input.noSuspiciousLesion) {
     lines.push("- No suspicious lesion: yes (PI-RADS ≤ 2 negative MRI)");
   }
@@ -1155,7 +1156,7 @@ function wholeGlandStagingBlock(input: ProstateStructuredInput): string[] {
   // Negative-MRI shortcut: when noSuspiciousLesion=true AND no manual override
   // is supplied, AJCC TNM categorization is not meaningful (TNM presupposes
   // confirmed disease whose extent can be measured). The block omits the
-  // Clinical T/N/M and EAU lines so the downstream prompt can render the
+  // MRI T / clinical N/M and EAU lines so the downstream prompt can render the
   // STAGING section as "Not applicable — negative MRI." A user-driven
   // isStagingOverridden=true is honoured even on a negative MRI, since it
   // signals authoritative clinical knowledge (e.g. staging_after_diagnosis
@@ -1166,14 +1167,16 @@ function wholeGlandStagingBlock(input: ProstateStructuredInput): string[] {
 
   if (stagingSuppressed) {
     // Explicit "not applicable" marker so downstream prompts cannot silently
-    // hallucinate a default cT1c / N0 / M0 from the absence of cT lines.
+    // hallucinate a default T / N0 / M0 from the absence of staging lines.
     lines.push(
       "- AJCC TNM staging: not applicable on negative MRI (no measurable disease)"
     );
     lines.push("- EAU risk group: not applicable");
   } else {
-    const { cT, cN, cM } = resolveStaging(input);
-    lines.push(`- Clinical T: ${cT}`);
+    const { mriT, cN, cM } = resolveStaging(input);
+    if (mriT !== undefined) {
+      lines.push(`- MRI T stage: ${describeMriT(mriT, input)}`);
+    }
     lines.push(`- Clinical N: ${cN}`);
     lines.push(`- Clinical M: ${String(humanizeEnum(cM))}`);
     if (overridden) {
@@ -1181,7 +1184,11 @@ function wholeGlandStagingBlock(input: ProstateStructuredInput): string[] {
     }
 
     const eau = deriveEauRiskGroup(input);
-    lines.push(`- EAU risk group: ${humanizeEnum(eau)}`);
+    const basis =
+      eau !== "not_applicable" && eau !== "metastatic" && eauTFromMri(input)
+        ? " (T category from MRI; DRE not provided)"
+        : "";
+    lines.push(`- EAU risk group: ${humanizeEnum(eau)}${basis}`);
   }
 
   return lines;

@@ -3,8 +3,10 @@
 import * as React from "react";
 import {
   CLINICAL_INDICATION_OPTIONS,
+  CLINICAL_T_OPTIONS,
   PRIOR_BIOPSY_STATUS_OPTIONS,
   type ClinicalIndication,
+  type ClinicalT,
   type PriorBiopsyStatus,
 } from "@/lib/prompts/disease-templates/prostate-fields";
 import type { ProstateStructuredInput } from "@/lib/prompts/disease-templates/prostate-serializer";
@@ -19,8 +21,10 @@ import {
   InlineField,
   NumberInput,
   Row,
+  compactInputClass,
   compactTextareaClass,
 } from "@/components/compact-form";
+import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
 // Option labels — short Korean labels so each group fits one row
@@ -145,11 +149,12 @@ export function ProstateClinicalContextCard({
   const notes = value.additionalClinicalNotes?.trim();
   const extraSummary =
     [
+      value.dreClinicalT && `DRE ${value.dreClinicalT}`,
       value.priorMRIDate && `이전 MRI ${value.priorMRIDate}`,
       notes && "임상 메모 있음",
     ]
       .filter(Boolean)
-      .join(" · ") || "이전 MRI 날짜 · 임상 메모";
+      .join(" · ") || "DRE · 이전 MRI 날짜 · 임상 메모";
 
   return (
     <FormSection id="prostate-section-clinical" step={1} title="임상 정보">
@@ -243,8 +248,31 @@ export function ProstateClinicalContextCard({
         id={id("extra")}
         label="추가 정보"
         summary={extraSummary}
-        forceOpen={Boolean(value.priorMRIDate || notes)}
+        forceOpen={Boolean(value.dreClinicalT || value.priorMRIDate || notes)}
       >
+        <Row label="DRE (cT)" htmlFor={id("dreClinicalT")}>
+          <select
+            id={id("dreClinicalT")}
+            value={value.dreClinicalT ?? ""}
+            onChange={(e) =>
+              onChange({
+                ...value,
+                dreClinicalT: (e.target.value || undefined) as ClinicalT | undefined,
+              })
+            }
+            className={cn(compactInputClass, "w-auto pr-6")}
+          >
+            <option value="">제공 안 됨</option>
+            {CLINICAL_T_OPTIONS.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+          <span className="text-xs text-muted-foreground">
+            의뢰의의 직장수지검사 결과. MRI 병기와 따로 표기됩니다.
+          </span>
+        </Row>
         <Row label="이전 MRI" htmlFor={id("priorMRIDate")}>
           <DateInput
             id={id("priorMRIDate")}

@@ -145,6 +145,39 @@ describe("clinical and other sections", () => {
   });
 });
 
+describe("staging", () => {
+  it("summarises the MRI T with its lobe instead of a cT2 sub-stage", () => {
+    renderForm({
+      lesions: [{ ...createEmptyProstateLesion(1), sectorMapLocation: ["R-mid"], laterality: "right" }],
+    });
+    expect(screen.getByText(/MRI T2 \(우엽\)/)).toBeTruthy();
+    expect(screen.queryByText(/cT2[abc]/)).toBeNull();
+  });
+
+  it("offers MRI T categories when the staging is overridden", () => {
+    renderForm(withLesion());
+    // The staging toggle is the last "수동 수정"; the lesion's PI-RADS row has one too.
+    fireEvent.click(screen.getAllByRole("button", { name: "수동 수정" }).at(-1)!);
+    const select = screen.getByLabelText("MRI T") as HTMLSelectElement;
+    expect(Array.from(select.options).map((o) => o.value)).toEqual(["T2", "T3a", "T3b", "T4"]);
+    fireEvent.change(select, { target: { value: "T3a" } });
+    expect(latest.mriT).toBe("T3a");
+    expect(latest.isStagingOverridden).toBe(true);
+  });
+
+  it("records the clinician's DRE cT in the clinical section", () => {
+    renderForm();
+    fireEvent.click(screen.getByRole("button", { name: /추가 정보/ }));
+    fireEvent.change(screen.getByLabelText("DRE (cT)"), { target: { value: "cT2a" } });
+    expect(latest.dreClinicalT).toBe("cT2a");
+    expect(serializeProstateStructuredInput(latest)).toContain(
+      "- DRE clinical T (referring clinician): cT2a"
+    );
+    fireEvent.change(screen.getByLabelText("DRE (cT)"), { target: { value: "" } });
+    expect(latest.dreClinicalT).toBeUndefined();
+  });
+});
+
 describe("serialized input is unchanged by the layout", () => {
   it("a form-built case serializes like the same state built directly", () => {
     renderForm(withLesion());
