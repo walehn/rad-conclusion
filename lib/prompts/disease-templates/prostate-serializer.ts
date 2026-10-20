@@ -529,9 +529,11 @@ export function deriveMriProtocol(input: ProstateStructuredInput): MriProtocol {
   return lesionHasDce || piQualRatesDce ? "mpMRI" : "bpMRI";
 }
 
+// Protocol name only: the prompt supplies the institution's sequence list as
+// a fixed sentence, and a second, shorter list here would compete with it.
 const MRI_PROTOCOL_LABEL: Record<MriProtocol, string> = {
-  mpMRI: "multiparametric MRI (mpMRI) — T2W, DWI/ADC and DCE",
-  bpMRI: "biparametric MRI (bpMRI) — T2W and DWI/ADC; DCE not performed",
+  mpMRI: "multiparametric MRI (mpMRI), with DCE",
+  bpMRI: "biparametric MRI (bpMRI), DCE not performed",
 };
 
 // ---------------------------------------------------------------------------
@@ -908,9 +910,8 @@ function lesionBlock(
     lesion.neurovascularBundleInvolvement
   );
   pushBullet(lines, "Prior MRI comparison", lesion.priorMRIComparison);
-  lines.push(
-    `- Target for biopsy: ${lesion.targetForBiopsy ? "yes" : "no"}`
-  );
+  // The biopsy-target flag is not a finding; it feeds
+  // biopsyRecommendationBlock. As a lesion line it was copied into FINDINGS.
 
   return lines;
 }
@@ -1233,6 +1234,27 @@ function otherFindingsBlock(input: ProstateStructuredInput): string[] {
   return lines;
 }
 
+/**
+ * Lesions whose IMPRESSION item carries an MRI-targeted biopsy
+ * recommendation: those flagged as biopsy targets, on a pre-biopsy study
+ * only. Decided here rather than left to the model, which must then only
+ * attach the sentence. Returns [] when no lesion qualifies.
+ */
+function biopsyRecommendationBlock(input: ProstateStructuredInput): string[] {
+  const preBiopsy =
+    input.clinicalIndication === "pre_biopsy_initial" ||
+    input.clinicalIndication === "pre_biopsy_repeat_after_negative";
+  if (!preBiopsy) return [];
+  const targets = input.lesions.flatMap((lesion, idx) =>
+    lesion.targetForBiopsy ? [`Lesion ${idx + 1}`] : []
+  );
+  if (targets.length === 0) return [];
+  return [
+    "BIOPSY RECOMMENDATION",
+    `- MRI-targeted biopsy recommended for: ${targets.join(", ")}`,
+  ];
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -1251,6 +1273,7 @@ function otherFindingsBlock(input: ProstateStructuredInput): string[] {
  *   ...
  *   WHOLE-GLAND & STAGING
  *   OTHER FINDINGS
+ *   BIOPSY RECOMMENDATION
  */
 export function serializeProstateStructuredInput(
   input: ProstateStructuredInput
@@ -1271,6 +1294,11 @@ export function serializeProstateStructuredInput(
   const other = otherFindingsBlock(input);
   if (other.length > 0) {
     blocks.push(other.join("\n"));
+  }
+
+  const biopsy = biopsyRecommendationBlock(input);
+  if (biopsy.length > 0) {
+    blocks.push(biopsy.join("\n"));
   }
 
   return blocks.join("\n\n");

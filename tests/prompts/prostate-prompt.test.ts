@@ -10,9 +10,13 @@ import {
 } from "@/lib/prompts/disease-templates/prostate";
 
 const BP_FINDINGS =
-  "CLINICAL CONTEXT\n- PSA: 7.2 ng/mL\n\nTECHNIQUE\n- MRI protocol: biparametric MRI (bpMRI) — T2W and DWI/ADC; DCE not performed";
+  "CLINICAL CONTEXT\n- PSA: 7.2 ng/mL\n\nTECHNIQUE\n- MRI protocol: biparametric MRI (bpMRI), DCE not performed";
 const MP_FINDINGS =
-  "CLINICAL CONTEXT\n- PSA: 7.2 ng/mL\n\nTECHNIQUE\n- MRI protocol: multiparametric MRI (mpMRI) — T2W, DWI/ADC and DCE";
+  "CLINICAL CONTEXT\n- PSA: 7.2 ng/mL\n\nTECHNIQUE\n- MRI protocol: multiparametric MRI (mpMRI), with DCE";
+const EN_BP_TECHNIQUE =
+  "Biparametric MRI (bpMRI): axial/sagittal/coronal T2W, axial T1W, and DWI (b = 0, 100, 1000, 1500 s/mm²) with ADC map. DCE not performed.";
+const EN_MP_TECHNIQUE =
+  "Multiparametric MRI (mpMRI): axial/sagittal/coronal T2W, axial T1W, DWI (b = 0, 100, 1000, 1500 s/mm²) with ADC map, and DCE.";
 
 describe("buildProstateReportSystemPrompt", () => {
   const prompt = buildProstateReportSystemPrompt({ lang: "ko", modality: "MRI" });
@@ -94,9 +98,11 @@ describe("fixed phrases follow the report language", () => {
 describe("biopsy recommendation and EPE wording rules", () => {
   const prompt = buildProstateReportSystemPrompt({ lang: "en", modality: "MRI" });
 
-  it("ties the biopsy recommendation to a pre-biopsy indication and the target flag", () => {
-    expect(prompt).toContain('that lesion\'s input says "Target for biopsy: yes"');
-    expect(prompt).toContain("On a staging MRI after biopsy-confirmed diagnosis, never recommend biopsy.");
+  it("ties the biopsy recommendation to the BIOPSY RECOMMENDATION block", () => {
+    expect(prompt).toContain(
+      'When the input has a BIOPSY RECOMMENDATION block, end the item of each lesion it lists with "MRI-targeted biopsy recommended."'
+    );
+    expect(prompt).not.toMatch(/Target for biopsy/);
   });
 
   it("reserves extraprostatic extension for EPE grade 3", () => {
@@ -160,3 +166,62 @@ describe("pelvic field of view", () => {
   });
 });
 
+describe("TECHNIQUE is the institution's fixed protocol sentence", () => {
+  it("names no magnet strength and no paraphrased sequence list", () => {
+    for (const lang of ["en", "ko", "mixed"] as const) {
+      for (const modality of ["MRI", "Auto"] as const) {
+        const p = buildProstateReportSystemPrompt({ lang, modality });
+        expect(p).not.toMatch(/magnet|\b(3|1\.5)T\b|tri-planar|high-b/i);
+      }
+    }
+  });
+
+  it("quotes both protocol sentences in the report language", () => {
+    const en = buildProstateReportSystemPrompt({ lang: "en", modality: "MRI" });
+    expect(en).toContain(`"${EN_BP_TECHNIQUE}"`);
+    expect(en).toContain(`"${EN_MP_TECHNIQUE}"`);
+    for (const lang of ["ko", "mixed"] as const) {
+      const p = buildProstateReportSystemPrompt({ lang, modality: "MRI" });
+      expect(p).toContain("DWI (b = 0, 100, 1000, 1500 s/mm²) 및 ADC map. DCE 미시행.");
+      expect(p).not.toContain(EN_BP_TECHNIQUE);
+    }
+  });
+
+  it("restates the matching sentence in the case directives", () => {
+    const bp = buildProstateReportUserPrompt({ lang: "en", modality: "Auto", findings: BP_FINDINGS });
+    const mp = buildProstateReportUserPrompt({ lang: "en", modality: "Auto", findings: MP_FINDINGS });
+    expect(bp).toContain(`then exactly "${EN_BP_TECHNIQUE}"`);
+    expect(bp).not.toContain(EN_MP_TECHNIQUE);
+    expect(mp).toContain(`then exactly "${EN_MP_TECHNIQUE}"`);
+    expect(mp).not.toContain(EN_BP_TECHNIQUE);
+  });
+});
+
+describe("biopsy directive", () => {
+  const withBlock = `${BP_FINDINGS}\n\nBIOPSY RECOMMENDATION\n- MRI-targeted biopsy recommended for: Lesion 1, Lesion 3`;
+
+  it("names the listed lesions and the sentence in the report language", () => {
+    const en = buildProstateReportUserPrompt({ lang: "en", modality: "MRI", findings: withBlock });
+    const ko = buildProstateReportUserPrompt({ lang: "ko", modality: "MRI", findings: withBlock });
+    expect(en).toContain('In IMPRESSION, end the item of Lesion 1, Lesion 3 with "MRI-targeted biopsy recommended."');
+    expect(ko).toContain('end the item of Lesion 1, Lesion 3 with "MRI 표적 생검 권고."');
+  });
+
+  it("rules out a biopsy recommendation when lesions exist without the block", () => {
+    const lesion = `${BP_FINDINGS}\n\nLESION 1\n- Zone: peripheral zone (PZ)`;
+    const out = buildProstateReportUserPrompt({ lang: "en", modality: "MRI", findings: lesion });
+    expect(out).not.toContain("In IMPRESSION, end the item of");
+    expect(out).toContain("this report carries no biopsy recommendation.");
+    const withTargets = buildProstateReportUserPrompt({
+      lang: "en",
+      modality: "MRI",
+      findings: `${lesion}\n\nBIOPSY RECOMMENDATION\n- MRI-targeted biopsy recommended for: Lesion 1`,
+    });
+    expect(withTargets).not.toContain("carries no biopsy recommendation");
+  });
+
+  it("says nothing about biopsy on a study without lesions", () => {
+    const out = buildProstateReportUserPrompt({ lang: "en", modality: "MRI", findings: BP_FINDINGS });
+    expect(out).not.toMatch(/biopsy recommendation|end the item of/);
+  });
+});

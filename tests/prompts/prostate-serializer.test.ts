@@ -1243,16 +1243,69 @@ describe("serializeProstateStructuredInput — required fields verbatim", () => 
     expect(result).toContain("- PI-QUAL DCE subscore: +");
   });
 
-  it("emits target for biopsy as yes/no", () => {
-    const yesResult = serializeProstateStructuredInput(
-      makeInput({ lesions: [makeLesion({ targetForBiopsy: true })] })
-    );
-    expect(yesResult).toContain("- Target for biopsy: yes");
+  // -------------------------------------------------------------------------
+  // Biopsy recommendation: decided by the serializer, not by the model. The
+  // per-lesion target flag was copied into FINDINGS as "Target for biopsy:".
+  // -------------------------------------------------------------------------
 
-    const noResult = serializeProstateStructuredInput(
-      makeInput({ lesions: [makeLesion({ targetForBiopsy: false })] })
-    );
-    expect(noResult).toContain("- Target for biopsy: no");
+  describe("biopsy recommendation block", () => {
+    const BLOCK = "BIOPSY RECOMMENDATION";
+
+    it("never prints the target flag as a lesion line", () => {
+      for (const targetForBiopsy of [true, false]) {
+        const out = serializeProstateStructuredInput(
+          makeInput({ lesions: [makeLesion({ targetForBiopsy })] })
+        );
+        expect(out).not.toMatch(/Target for biopsy/i);
+      }
+    });
+
+    it("lists flagged lesions on an initial pre-biopsy study", () => {
+      const out = serializeProstateStructuredInput(
+        makeInput({
+          clinicalIndication: "pre_biopsy_initial",
+          lesions: [
+            makeLesion({ targetForBiopsy: true }),
+            makeLesion({ lesionIndex: 2, targetForBiopsy: false }),
+            makeLesion({ lesionIndex: 3, targetForBiopsy: true }),
+          ],
+        })
+      );
+      expect(out.endsWith(
+        `${BLOCK}\n- MRI-targeted biopsy recommended for: Lesion 1, Lesion 3`
+      )).toBe(true);
+    });
+
+    it("applies to a repeat pre-biopsy study after a negative biopsy", () => {
+      const out = serializeProstateStructuredInput(
+        makeInput({
+          clinicalIndication: "pre_biopsy_repeat_after_negative",
+          lesions: [makeLesion({ targetForBiopsy: true })],
+        })
+      );
+      expect(out).toContain("- MRI-targeted biopsy recommended for: Lesion 1");
+    });
+
+    it("is absent on a staging MRI even when a lesion is flagged", () => {
+      const out = serializeProstateStructuredInput(
+        makeInput({
+          clinicalIndication: "staging_after_diagnosis",
+          lesions: [makeLesion({ targetForBiopsy: true })],
+        })
+      );
+      expect(out).not.toContain(BLOCK);
+    });
+
+    it("is absent when no lesion is flagged or there is no lesion", () => {
+      const unflagged = serializeProstateStructuredInput(
+        makeInput({ lesions: [makeLesion({ targetForBiopsy: false })] })
+      );
+      const negative = serializeProstateStructuredInput(
+        makeInput({ noSuspiciousLesion: true, lesions: [] })
+      );
+      expect(unflagged).not.toContain(BLOCK);
+      expect(negative).not.toContain(BLOCK);
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -1637,7 +1690,7 @@ describe("serializeProstateStructuredInput — TECHNIQUE block and single placem
       })
     );
     expect(out).toContain(
-      "- MRI protocol: biparametric MRI (bpMRI) — T2W and DWI/ADC; DCE not performed"
+      "- MRI protocol: biparametric MRI (bpMRI), DCE not performed"
     );
     expect(out).not.toContain("- DCE result:");
     expect(out).not.toContain("- PI-QUAL DCE subscore:");
@@ -1652,7 +1705,7 @@ describe("serializeProstateStructuredInput — TECHNIQUE block and single placem
       })
     );
     expect(out).toContain(
-      "- MRI protocol: multiparametric MRI (mpMRI) — T2W, DWI/ADC and DCE"
+      "- MRI protocol: multiparametric MRI (mpMRI), with DCE"
     );
     expect(out).toContain("- DCE result: positive");
     expect(out).toContain("- PI-QUAL DCE subscore: +");
