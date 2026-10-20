@@ -13,11 +13,13 @@
  *
  * Six derivation helpers encode PI-RADS v2.1 / AJCC 8th / EAU 2025 rules:
  *  - derivePiradsCategory:   PI-RADS v2.1 PZ/CZ + TZ/AFMS decision tables.
- *  - deriveClinicalT:        AJCC 8th palpation rule (MRI alone → cT1c).
+ *  - deriveClinicalT:        MRI-based T heuristic (deviates from AJCC 8th,
+ *                            which assigns cT from DRE only).
  *  - deriveClinicalN:        regional ≥ 8 mm OR suspicious features → N1.
  *  - deriveClinicalM:        bone definite → M1b; non-regional nodes → M1a.
  *  - derivePsaDensity:       psa / volume rounded to 1 decimal place.
  *  - deriveEauRiskGroup:     Cornford 2025 EAU low/intermediate/high.
+ *  - deriveMriProtocol:      mpMRI when any DCE result was recorded, else bpMRI.
  */
 
 import type {
@@ -360,12 +362,17 @@ export function derivePiradsCategory(
  *  2. structural invasion (bladder neck / ext. sphincter /
  *     rectum / pelvic sidewall === 'invasion')                  → cT4
  *  3. seminalVesicleInvasionWholeGland !== 'none'                → cT3b
- *  4. any lesion's epeRiskMehralivand ∈ {1, 2, 3}                → cT3a
+ *  4. any lesion's epeRiskMehralivand === 3 (frank breach)       → cT3a
+ *     Grades 1–2 are EPE risk features, not EPE: in Mehralivand
+ *     2019 only 24% (grade 1) and 38% (grade 2) had pathologic EPE,
+ *     against 66% for grade 3. They stay in the cT2 heuristic, and
+ *     a radiologist who reads grade 2 as EPE uses the override.
  *  5. lesion-side cT2 heuristic:
  *     - any lesion laterality 'midline_bilateral' OR
  *       lesions span both 'right' AND 'left'                     → cT2c
- *     - single unilateral lesion with sizeMaxAxialMm >=
- *       prostateWidthMm / 2 (or >= 20 mm fallback when width
+ *     - unilateral lesion(s) with largest sizeMaxAxialMm >=
+ *       prostateWidthMm / 4 — half of one lobe, the AJCC
+ *       cT2a/cT2b boundary (or >= 10 mm fallback when width
  *       missing)                                                 → cT2b
  *     - any other unilateral lesion present                      → cT2a
  *  6. lesion 0개 + noSuspiciousLesion=false                      → cT1c
@@ -392,15 +399,8 @@ export function deriveClinicalT(input: ProstateStructuredInput): ClinicalT {
     return "cT3b";
   }
 
-  // Step 4: cT3a — extraprostatic extension per Mehralivand grade.
-  if (
-    input.lesions.some(
-      (l) =>
-        l.epeRiskMehralivand === "1_curvilinear_or_bulge" ||
-        l.epeRiskMehralivand === "2_both_features" ||
-        l.epeRiskMehralivand === "3_frank_breach"
-    )
-  ) {
+  // Step 4: cT3a — visible extraprostatic extension (Mehralivand grade 3).
+  if (input.lesions.some((l) => l.epeRiskMehralivand === "3_frank_breach")) {
     return "cT3a";
   }
 
@@ -418,14 +418,15 @@ export function deriveClinicalT(input: ProstateStructuredInput): ClinicalT {
     return "cT2c";
   }
 
-  // Single-side lesion(s). Use the largest axial dimension across all lesions
-  // versus the half-width threshold to discriminate cT2a vs cT2b.
-  const halfWidth =
+  // Single-side lesion(s). AJCC cT2a is "one-half of one side or less", so
+  // the largest axial dimension across all lesions is compared with half of
+  // one lobe — a quarter of the transverse gland width.
+  const halfLobeWidth =
     typeof input.prostateWidthMm === "number" &&
     !Number.isNaN(input.prostateWidthMm) &&
     input.prostateWidthMm > 0
-      ? input.prostateWidthMm / 2
-      : 20; // 20 mm fallback when width is missing.
+      ? input.prostateWidthMm / 4
+      : 10; // 10 mm fallback (a 40 mm gland) when width is missing.
   const largestAxial = Math.max(
     ...input.lesions.map((l) =>
       typeof l.sizeMaxAxialMm === "number" && !Number.isNaN(l.sizeMaxAxialMm)
@@ -433,7 +434,7 @@ export function deriveClinicalT(input: ProstateStructuredInput): ClinicalT {
         : 0
     )
   );
-  if (largestAxial >= halfWidth) {
+  if (largestAxial >= halfLobeWidth) {
     return "cT2b";
   }
   return "cT2a";
@@ -500,6 +501,34 @@ export function deriveClinicalM(input: ProstateStructuredInput): ClinicalM {
   }
   return "M0";
 }
+
+// ---------------------------------------------------------------------------
+// Derivation: MRI protocol
+// ---------------------------------------------------------------------------
+
+export type MriProtocol = "mpMRI" | "bpMRI";
+
+/**
+ * Derive the acquisition protocol from the DCE evidence in the form.
+ *
+ * DCE counts as acquired when any lesion carries a positive/negative DCE
+ * result or the PI-QUAL DCE subscore is rated (+/-). Absent evidence means
+ * bpMRI, matching the lesion form's own default ("not_performed_bpMRI") —
+ * so an mpMRI study with no lesion must rate the PI-QUAL DCE subscore.
+ */
+export function deriveMriProtocol(input: ProstateStructuredInput): MriProtocol {
+  const lesionHasDce = input.lesions.some(
+    (l) => l.dceResult === "positive" || l.dceResult === "negative"
+  );
+  const piQualRatesDce =
+    input.piQualDCESubscore === "+" || input.piQualDCESubscore === "-";
+  return lesionHasDce || piQualRatesDce ? "mpMRI" : "bpMRI";
+}
+
+const MRI_PROTOCOL_LABEL: Record<MriProtocol, string> = {
+  mpMRI: "multiparametric MRI (mpMRI) — T2W, DWI/ADC and DCE",
+  bpMRI: "biparametric MRI (bpMRI) — T2W and DWI/ADC; DCE not performed",
+};
 
 // ---------------------------------------------------------------------------
 // Derivation: PSA density and EAU risk group
@@ -693,7 +722,8 @@ function extractIsupGrade(status: PriorBiopsyStatus): number {
  *
  * Rules:
  *  - low: PSA < 10 AND ISUP === 1 AND clinicalT in {cT1c, cT2a}.
- *  - high: PSA > 20 OR ISUP >= 4 OR clinicalT in {cT3a, cT3b, cT4}.
+ *  - high: PSA > 20 OR ISUP >= 4 OR clinicalT in {cT3a, cT3b, cT4} OR
+ *    clinicalN === N1 (cN+ is locally advanced, which EAU groups as high).
  *  - intermediate factors: PSA 10–20, ISUP 2 or 3, clinicalT in {cT2b, cT2c}.
  *      • 2+ factors → intermediate_unfavourable.
  *      • exactly 1 factor → intermediate_favourable.
@@ -721,12 +751,14 @@ export function deriveEauRiskGroup(
   }
 
   const cT = deriveClinicalT(input);
+  const cN = deriveClinicalN(input);
   const psa = input.psaNgPerMl;
 
   // High-risk gates (any ONE triggers high).
   if (psa > 20) return "high";
   if (isup >= 4) return "high";
   if (cT === "cT3a" || cT === "cT3b" || cT === "cT4") return "high";
+  if (cN === "N1") return "high";
 
   // Low-risk gates (ALL must hold).
   if (psa < 10 && isup === 1 && (cT === "cT1c" || cT === "cT2a")) {
@@ -770,16 +802,6 @@ function clinicalContextBlock(input: ProstateStructuredInput): string[] {
     lines.push("- No suspicious lesion: yes (PI-RADS ≤ 2 negative MRI)");
   }
 
-  const psaDensity = derivePsaDensity(
-    input.psaNgPerMl,
-    input.prostateVolumeMl
-  );
-  if (psaDensity !== undefined) {
-    // Always render with 2 decimal places (e.g. 0.20, not 0.2) so the report
-    // surface reads cleanly across PSA/volume combinations.
-    lines.push(`- PSA density: ${psaDensity.toFixed(2)} ng/mL/cc`);
-  }
-
   const notes = input.additionalClinicalNotes?.trim();
   if (notes) {
     lines.push(`- Additional clinical notes: ${notes}`);
@@ -788,7 +810,11 @@ function clinicalContextBlock(input: ProstateStructuredInput): string[] {
   return lines;
 }
 
-function lesionBlock(lesion: ProstateLesion, index: number): string[] {
+function lesionBlock(
+  lesion: ProstateLesion,
+  index: number,
+  protocol: MriProtocol
+): string[] {
   const header = `LESION ${index + 1}`;
   const lines: string[] = [header];
   pushBullet(lines, "Zone", lesion.zone);
@@ -814,7 +840,11 @@ function lesionBlock(lesion: ProstateLesion, index: number): string[] {
   );
   pushBullet(lines, "T2W score", lesion.t2wScore);
   pushBullet(lines, "DWI score", lesion.dwiScore);
-  pushBullet(lines, "DCE result", lesion.dceResult);
+  // On bpMRI the TECHNIQUE block already says DCE was not performed; a
+  // per-lesion repeat only invites the report to restate it per lesion.
+  if (protocol === "mpMRI") {
+    pushBullet(lines, "DCE result", lesion.dceResult);
+  }
   pushBullet(lines, "Overall PI-RADS category", lesion.overallPiradsCategory);
   if (lesion.isPiradsOverridden) {
     lines.push("- Overall PI-RADS overridden: yes");
@@ -882,6 +912,18 @@ function wholeGlandStagingBlock(input: ProstateStructuredInput): string[] {
     );
   }
   pushBullet(lines, "Prostate volume", formatMl(input.prostateVolumeMl));
+
+  // Emitted next to the volume it derives from, so the report states it once
+  // in FINDINGS rather than again under CLINICAL INFORMATION.
+  const psaDensity = derivePsaDensity(
+    input.psaNgPerMl,
+    input.prostateVolumeMl
+  );
+  if (psaDensity !== undefined) {
+    // Always render with 2 decimal places (e.g. 0.20, not 0.2) so the report
+    // surface reads cleanly across PSA/volume combinations.
+    lines.push(`- PSA density: ${psaDensity.toFixed(2)} ng/mL/cc`);
+  }
 
   // ---------------------------------------------------------------------
   // Whole-gland review + nodal/distant sweep.
@@ -1096,12 +1138,26 @@ function wholeGlandStagingBlock(input: ProstateStructuredInput): string[] {
     lines.push(`- EAU risk group: ${humanizeEnum(eau)}`);
   }
 
-  // PI-QUAL
+  return lines;
+}
+
+/**
+ * Acquisition protocol and PI-QUAL image quality — the inputs for the
+ * report's TECHNIQUE section, kept in one block so they are reported there
+ * only.
+ */
+function techniqueBlock(
+  input: ProstateStructuredInput,
+  protocol: MriProtocol
+): string[] {
+  const lines: string[] = ["TECHNIQUE"];
+  lines.push(`- MRI protocol: ${MRI_PROTOCOL_LABEL[protocol]}`);
   pushBullet(lines, "PI-QUAL overall", input.piQualOverall);
   pushBullet(lines, "PI-QUAL T2W subscore", input.piQualT2WSubscore);
   pushBullet(lines, "PI-QUAL DWI subscore", input.piQualDWISubscore);
-  pushBullet(lines, "PI-QUAL DCE subscore", input.piQualDCESubscore);
-
+  if (protocol === "mpMRI") {
+    pushBullet(lines, "PI-QUAL DCE subscore", input.piQualDCESubscore);
+  }
   return lines;
 }
 
@@ -1144,6 +1200,7 @@ function otherFindingsBlock(input: ProstateStructuredInput): string[] {
  *
  * Section order:
  *   CLINICAL CONTEXT
+ *   TECHNIQUE
  *   LESION 1
  *   LESION 2
  *   ...
@@ -1155,10 +1212,13 @@ export function serializeProstateStructuredInput(
 ): string {
   const blocks: string[] = [];
 
+  const protocol = deriveMriProtocol(input);
+
   blocks.push(clinicalContextBlock(input).join("\n"));
+  blocks.push(techniqueBlock(input, protocol).join("\n"));
 
   input.lesions.forEach((lesion, idx) => {
-    blocks.push(lesionBlock(lesion, idx).join("\n"));
+    blocks.push(lesionBlock(lesion, idx, protocol).join("\n"));
   });
 
   blocks.push(wholeGlandStagingBlock(input).join("\n"));

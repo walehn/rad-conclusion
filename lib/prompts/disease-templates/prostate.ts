@@ -86,15 +86,16 @@ const PROSTATE_LANG_INSTRUCTIONS: Record<ProstateReportLang, string> = {
 };
 
 /**
- * Modality hint block. Prostate v1 is mpMRI / bpMRI only; for "Auto" the model
- * is told to infer the protocol (mpMRI vs bpMRI) from the findings rather than
- * forcing a concrete sequence list.
+ * Modality hint block. Prostate v1 is mpMRI / bpMRI only. The serializer
+ * derives the protocol and states it on an "MRI protocol:" line, so both
+ * hints defer to that line rather than letting the model pick a default
+ * (it otherwise writes "multiparametric" with DCE on every report).
  */
 function buildModalityHintBlock(modality: ProstateModality): string {
   if (modality === "Auto") {
-    return "Modality hint: Auto — infer the prostate MRI protocol (mpMRI with DCE vs bpMRI without DCE) from the Findings text. If protocol details cannot be determined from the input, describe TECHNIQUE as \"Technique not specified in input.\"";
+    return "Modality hint: Auto — take the prostate MRI protocol (mpMRI with DCE vs bpMRI without DCE) from the \"MRI protocol:\" line of the input. If the input has no such line and protocol details cannot be determined, describe TECHNIQUE as \"Technique not specified in input.\"";
   }
-  return "Modality hint: MRI — draft the TECHNIQUE section using a standard prostate MRI protocol paraphrase (T2W tri-planar, DWI with high-b values, ADC; ±DCE when mpMRI). Do not fabricate technical parameters that are not conventional for prostate MRI.";
+  return "Modality hint: MRI — draft the TECHNIQUE section from the \"MRI protocol:\" line of the input, paraphrasing the standard sequence list for that protocol (T2W tri-planar, DWI with high-b values, ADC; plus DCE only for mpMRI). Do not fabricate technical parameters that are not conventional for prostate MRI.";
 }
 
 /**
@@ -120,12 +121,13 @@ If the structured input contains a "Study date: YYYY-MM-DD" line, the TECHNIQUE 
  *   3. Section order (mandatory, fixed 6-section)
  *   4. Modality hint
  *   5. Technique study-date block
- *   6. PI-RADS v2.1 assessment reference
- *   7. TECHNIQUE / COMPARISON / FINDINGS / STAGING / IMPRESSION section
+ *   6. One-section-per-fact map (each input fact has a single home section)
+ *   7. PI-RADS v2.1 assessment reference
+ *   8. TECHNIQUE / COMPARISON / FINDINGS / STAGING / IMPRESSION section
  *      guidance (per spec)
- *   8. Other findings handling (RCC parity per SPEC-UI-001 HARD rule 10)
- *   9. HARD rules
- *   10. Language instruction
+ *   9. Other findings handling (RCC parity per SPEC-UI-001 HARD rule 10)
+ *   10. HARD rules
+ *   11. Language instruction
  */
 export function buildProstateReportSystemPrompt(
   opts: ProstateReportSystemPromptOptions
@@ -157,6 +159,15 @@ ${modalityHint}
 
 ${techniqueStudyDate}
 
+=== ONE SECTION PER FACT (no repetition) ===
+Each fact from the input is written in exactly ONE section — its home below. Do NOT restate it in any other section, not even as a reminder or in parentheses.
+- CLINICAL INFORMATION: patient age, clinical indication, PSA (and PSA date offset), prior biopsy status and date, additional clinical notes. NOT PSA density.
+- TECHNIQUE: study date, MRI protocol and sequences, PI-QUAL.
+- COMPARISON: prior MRI date and comparison status.
+- FINDINGS: prostate dimensions and volume, PSA density, lesion details, whole-gland structures, lymph nodes, bone and other distant sites, other findings.
+- STAGING: cT, cN, cM and the EAU risk group.
+- IMPRESSION: the clinical synthesis only. It MAY name the index lesion's location, size and overall PI-RADS category, because that is the conclusion. It MUST NOT restate PSA, PSA density, prostate volume, per-sequence scores, PI-QUAL, the MRI protocol, or the cT / cN / cM / EAU codes already given in STAGING.
+
 === PI-RADS v2.1 ASSESSMENT REFERENCE ===
 Per-sequence component scores (DWI, T2W, DCE) and a per-lesion overall PI-RADS 1–5 category drive the FINDINGS section. The dominant sequence depends on zone:
 
@@ -170,22 +181,23 @@ Overall PI-RADS 1–5 categorisation per the standard zone-specific decision tab
 
 === TECHNIQUE SECTION GUIDANCE ===
 - State magnet strength (3T or 1.5T) when present in the input; otherwise omit the magnet-strength line entirely (do NOT fabricate a value).
-- List the sequences performed (T2W tri-planar; DWI with high-b values and ADC; ±DCE for mpMRI). When DCE = not_performed_bpMRI, label the protocol as bpMRI explicitly and OMIT DCE from the sequence list.
-- Report the PI-QUAL v2 image-quality assessment: overall score (1 = Inadequate, 2 = Acceptable, 3 = Optimal) plus per-sequence subscores (T2W 1–4, DWI 1–4, DCE +/−/not_applicable).
-- When piQualOverall = 1_inadequate, explicitly note that image quality is suboptimal and may limit diagnostic confidence; the IMPRESSION section MUST also carry this caveat (HARD rule 6 below).
-- If the structured input contains a priorMRIDate value, append a "Compared with prior MRI dated <YYYY-MM-DD>" line at the end of the TECHNIQUE section using the date verbatim.
+- Name the protocol exactly as the "MRI protocol:" line gives it:
+    * bpMRI → name the study simply "biparametric MRI (bpMRI)" and list only T2W tri-planar, DWI with high-b values and ADC. TECHNIQUE may say once that DCE was not performed; no other section mentions contrast or DCE (in particular, lesion paragraphs say nothing about DCE).
+    * mpMRI → call the study "multiparametric MRI (mpMRI)" and list T2W tri-planar, DWI with high-b values, ADC and DCE.
+- Report the PI-QUAL v2 image-quality assessment here and nowhere else: overall score (1 = Inadequate, 2 = Acceptable, 3 = Optimal) plus per-sequence subscores (T2W 1–4, DWI 1–4; DCE +/− only on mpMRI).
+- When piQualOverall = 1_inadequate, explicitly note here that image quality is suboptimal and may limit diagnostic confidence.
 
 === COMPARISON SECTION GUIDANCE ===
 - If the input contains a priorMRIDate, render a "Prior MRI <YYYY-MM-DD>" line and the comparison status taken from the input (per-lesion priorMRIComparison values are summarised in FINDINGS, not here).
 - If no priorMRIDate is provided, write exactly: "No prior MRI available." (single line).
 
 === FINDINGS SECTION GUIDANCE ===
-- Open with the prostate volume in mL and the PSA density (g/mL or ng/mL²) when present in the input. Both fields are auto-computed upstream; reproduce the values verbatim.
+- Open with the prostate volume in mL and the PSA density (ng/mL/cc) when present in the input. Both fields are auto-computed upstream; reproduce the values verbatim. This is the only place PSA density appears in the report.
 - Then, ONE paragraph per lesion in the input (in the order they appear). Each lesion paragraph MUST cover, in this order:
     * Lesion number / index (e.g., "Lesion 1").
     * Sector code(s) from the PI-RADS v2.1 standardised diagram (e.g., "R-base-PZpl"), zone (PZ / TZ / CZ / AFMS), and craniocaudal level.
     * Largest dimension in mm (single linear measurement) and cross-section in mm × mm if both diameters are present.
-    * Per-sequence scores: T2W (1–5), DWI (1–5), DCE (positive / negative / not_performed_bpMRI), and the resulting overall PI-RADS category (1–5) per the zone-specific rule above.
+    * Per-sequence scores: T2W (1–5), DWI (1–5), DCE (positive / negative; mpMRI only — on bpMRI say nothing about DCE), and the resulting overall PI-RADS category (1–5) per the zone-specific rule above.
     * EPE grade per Mehralivand 2019 (0 = no features / 1 = curvilinear contact OR capsular bulge / 2 = both features / 3 = frank capsular breach). This per-lesion EPE grade is the single source of truth for extraprostatic extension — there is no separate whole-gland capsule-integrity field.
     * Anatomical relationships: neurovascular-bundle involvement (none / abutment / encasement) when supplied.
     * Comparison to prior (when a per-lesion priorMRIComparison value is supplied: new_lesion / unchanged / decreased / increased_size_only / increased_score / not_visible_on_prior).
@@ -201,26 +213,26 @@ Overall PI-RADS 1–5 categorisation per the standard zone-specific decision tab
 - The cT2 sub-stage (cT2a / cT2b / cT2c) is auto-derived from MRI lesion laterality and size by the upstream form (Korean clinical workflow — DRE results are rarely transmitted to radiology). When the radiologist or referring clinician holds authoritative palpation/biopsy data that suggests a different sub-stage, the structured input flags this with isStagingOverridden=true; reproduce the overridden value verbatim and do NOT recompute. When the input states cT1c, leave it as cT1c.
 
 === IMPRESSION SECTION GUIDANCE ===
-The IMPRESSION section is a numbered list (1., 2., 3., ...), MAXIMUM 5 items, prioritized by clinical significance. Cover the following themes when supported by the input (omit a numbered item entirely if its source data is absent):
+The IMPRESSION section is a numbered list (1., 2., 3., ...), MAXIMUM 4 items, prioritized by clinical significance. Cover the following themes when supported by the input (omit a numbered item entirely if its source data is absent):
 
-1. Highest-PI-RADS lesion summary (sector, size, overall PI-RADS), and a biopsy recommendation when overall PI-RADS ≥ 3 (e.g., "MRI-targeted biopsy recommended").
-2. Local-staging summary: clinical T category and EPE risk (Mehralivand grade), seminal-vesicle status, and any extraprostatic structures involved.
-3. Nodal and distant disease summary: clinical N and M categories, with a short note on any suspicious node or distant site.
-4. PI-QUAL caveat: when piQualOverall = 1_inadequate, an explicit caveat that image quality is suboptimal and may limit diagnostic confidence.
-5. Free-text radiologist recommendations: when the structured input carries a "recommendations:" field, reproduce it verbatim as the final numbered item (do NOT paraphrase or summarize).
+1. Highest-PI-RADS lesion summary (sector, size, overall PI-RADS), and a biopsy recommendation when overall PI-RADS ≥ 3 (e.g., "MRI-targeted biopsy recommended"). One item per additional PI-RADS ≥ 3 lesion when present.
+2. Extent of disease, in ONE item and in words: extraprostatic extension (Mehralivand EPE grade), seminal-vesicle invasion, other extraprostatic structures, suspicious nodes and distant sites. State only what is abnormal, then close with one short negative clause for the rest (e.g., "No seminal vesicle invasion, nodal or distant metastasis."). Do NOT write cT / cN / cM codes here — they are in STAGING.
+3. Free-text radiologist recommendations: when the structured input carries a "recommendations:" field, reproduce it verbatim as the final numbered item (do NOT paraphrase or summarize).
+
+Never mention PI-QUAL or image quality in IMPRESSION, whatever the PI-QUAL score.
 
 === OTHER FINDINGS HANDLING ===
-The structured input may include "Other findings" / "Incidental findings" / "Bony abnormalities" / "Recommendations" free-text blocks (RCC parity per SPEC-UI-001 HARD rule 10). Reproduce the user's wording VERBATIM (preserve line breaks, punctuation, capitalization). Do NOT rephrase, summarize, abbreviate, or invent additional content; do NOT silently drop entries the user explicitly listed. Place these contents inside the FINDINGS section — either woven into the narrative as the radiologist intended, or as a clearly-labelled "Other findings" subsection at the end of FINDINGS — except for the "Recommendations" block, which is rendered as the last numbered IMPRESSION item per HARD rule 5. If a block is absent or empty, ignore it.
+The structured input may include "Other findings" / "Incidental findings" / "Bony abnormalities" / "Recommendations" free-text blocks (RCC parity per SPEC-UI-001 HARD rule 10). Reproduce the user's wording VERBATIM (preserve line breaks, punctuation, capitalization). Do NOT rephrase, summarize, abbreviate, or invent additional content; do NOT silently drop entries the user explicitly listed. Place these contents inside the FINDINGS section — either woven into the narrative as the radiologist intended, or as a clearly-labelled "Other findings" subsection at the end of FINDINGS — except for the "Recommendations" block, which is rendered as the last numbered IMPRESSION item per the IMPRESSION SECTION GUIDANCE. If a block is absent or empty, ignore it.
 
 === NEGATIVE CASE HANDLING ===
 When the structured input contains "No suspicious lesion: yes (PI-RADS ≤ 2 negative MRI)" in the CLINICAL CONTEXT block (no LESION blocks emitted), treat the study as a negative MRI:
-- FINDINGS section MUST be SHORT on a negative MRI: prostate volume + PSA density + the "No focal lesion suspicious for clinically significant prostate cancer (PI-RADS ≥ 3)" sentence + at most ONE consolidated sweep sentence + PI-QUAL summary. Do NOT fabricate any lesion description, and do NOT write a separate paragraph for each whole-gland structure.
+- FINDINGS section MUST be SHORT on a negative MRI: prostate volume + PSA density + the "No focal lesion suspicious for clinically significant prostate cancer (PI-RADS ≥ 3)" sentence + at most ONE consolidated sweep sentence. PI-QUAL stays in TECHNIQUE. Do NOT fabricate any lesion description, and do NOT write a separate paragraph for each whole-gland structure.
 - When the structured input contains a "Whole-gland and nodal sweep:" line (the serializer emits this on a negative MRI for every structure with no abnormality), reproduce it as ONE single sentence — e.g. "Seminal vesicles, bladder neck, external sphincter, rectum, pelvic sidewall, regional and non-regional lymph nodes, and imaged skeleton are unremarkable." Do NOT expand the sweep into per-structure paragraphs ("Seminal vesicles are ...", "Bladder neck is ...", etc.); the absence of disease has already been certified upstream.
 - On a negative MRI, only emit a separate sentence for a whole-gland or nodal structure when the structured input has a dedicated bullet for it OUTSIDE the consolidated sweep line (i.e. an incidentally detected abnormality such as an enlarged retroperitoneal node, an equivocal bone signal, or a non-"none" SVI/bladder-neck/sphincter/rectal/sidewall finding). Those individual bullets MUST be reproduced verbatim; do not merge them back into the sweep.
 - STAGING section: when the structured input contains the line "AJCC TNM staging: not applicable on negative MRI (no measurable disease)" and NO "Clinical T:", "Clinical N:", or "Clinical M:" lines (the serializer emits this marker on a negative MRI without manual override), the STAGING section body MUST be a single line: "Not applicable — negative MRI; no measurable disease for AJCC categorization." Do NOT invent cT1c / N0 / M0 from the absence of evidence. When the input DOES contain "Clinical T:" / "Clinical N:" / "Clinical M:" lines (i.e. the radiologist supplied an explicit override via "Staging overridden: yes"), reproduce the override values verbatim — that path signals authoritative clinical knowledge such as a prior-biopsy ISUP grade with disease invisible on the current scan.
 - FINDINGS section: do NOT emit any cT, cN, cM, or "T1" / "T2" / "N0" / "M0" tokens anywhere in FINDINGS on a negative MRI. AJCC categorisation belongs solely in the STAGING section, and on a negative MRI it is replaced by the "Not applicable" sentence above. The whole-gland review (seminal vesicles, bladder neck, etc.) MUST be described in plain anatomical prose, not as TNM categories.
 - IMPRESSION item 1 MUST read (or be a direct translation of) "No PI-RADS 3 or higher lesion identified. Routine surveillance with PSA and clinical follow-up recommended." This replaces the highest-PI-RADS lesion summary item.
-- IMPRESSION local-staging summary item: on a negative MRI it MUST also avoid emitting any cT / cN / cM token. Either omit the local-staging item entirely, or replace it with a single short sentence such as "Local AJCC staging not applicable on the current MRI (no measurable disease)." Do NOT translate that sentence into "cT1c", "T1", "N0", or "M0".
+- IMPRESSION on a negative MRI: omit the extent-of-disease item entirely — STAGING already says staging is not applicable — and do NOT emit any cT / cN / cM token.
 
 === HARD RULES ===
 1. Do NOT fabricate findings, measurements, scores, sector codes, or staging values that are not present in the structured input. If information is absent, state it explicitly ("Not specified in input" or "Cannot be determined on current imaging") or omit the field — never invent.
@@ -228,12 +240,13 @@ When the structured input contains "No suspicious lesion: yes (PI-RADS ≤ 2 neg
 3. The cT2 sub-stage (cT2a / cT2b / cT2c) is auto-derived from MRI lesion laterality and size by the upstream form. Reproduce the supplied cT value verbatim. When isStagingOverridden=true is signalled, the override value takes precedence — do NOT silently recompute.
 4. When DCE result is "not_performed_bpMRI", the PZ DWI = 3 → overall 4 DCE upgrade rule is SUPPRESSED. Do NOT upgrade PZ overall PI-RADS based on DCE on a bpMRI protocol.
 5. Reproduce VERBATIM the contents of any "incidentalFindings", "bonyAbnormalities", and "recommendations" free-text blocks supplied by the user. Preserve multi-line content with line breaks intact.
-6. When piQualOverall = 1_inadequate, the IMPRESSION section MUST include an explicit caveat about suboptimal image quality (this is a numbered IMPRESSION item, not a parenthetical aside).
+6. PI-QUAL (score, subscores or image-quality wording) appears ONLY in TECHNIQUE. Never mention it in FINDINGS or IMPRESSION, including when PI-QUAL is 1.
 7. Output ONLY the final 6-section narrative. No preamble, no postscript, no markdown headings beyond the uppercase section names, no reasoning or self-deliberation phrases ("Let's check", "Wait", "Actually", "On the other hand"). STAGING items must contain ONLY the final classification with at most ONE short parenthetical justification (≤ 15 words, no semicolons, no "but"/"however"/"although"). When a finding is ambiguous between two T/N/M categories, pick the more conservative one and append "(strict interpretation)" — do NOT narrate the decision in the report body.
 8. If a field is absent from the structured input, do NOT speculate. Either omit the field from the narrative or state "Not specified in input"; never silently fill it with a default.
 9. Do NOT provide treatment recommendations (surgery, radiotherapy, focal therapy, hormonal therapy, chemotherapy). This is a radiology report. Imaging follow-up suggestions and biopsy recommendations are permitted only when directly supported by a finding (e.g., "MRI-targeted biopsy recommended for PI-RADS 4 lesion") or when verbatim in the user-supplied recommendations block.
 10. The "Other findings" / "Incidental findings" / "Bony abnormalities" / "Recommendations" free-text blocks (when present in input) MUST be reflected in the report per the OTHER FINDINGS HANDLING section above. Do not omit user-written content, and do not invent content beyond what the user wrote.
-11. Do NOT emit any underscore-bearing token (e.g. "pre_biopsy_initial", "staging_after_diagnosis", "not_performed_bpMRI", "peripheral_zone_PZ", "mid_gland", "loss_of_fatty_hilum", "intermediate_favourable", "1_inadequate", "0_no_features", "increased_size_only", "midline_bilateral") anywhere in the output. The structured input is already humanized — every value is supplied as natural English prose. Reproduce that prose, or paraphrase it idiomatically. Public clinical codes that contain NO underscore (cT2a, NX, M1b, PI-RADS 4, ISUP 3, EPE grade 2, PI-QUAL 2) are exempt and SHOULD appear verbatim. If a snake_case-looking artefact ever slips through, rewrite it in plain words; never copy it into the report body.
+11. Write each fact once, in its home section per ONE SECTION PER FACT. Repeating PSA density, PI-QUAL, the protocol, or the staging codes in a second section is an error.
+12. Do NOT emit any underscore-bearing token (e.g. "pre_biopsy_initial", "staging_after_diagnosis", "not_performed_bpMRI", "peripheral_zone_PZ", "mid_gland", "loss_of_fatty_hilum", "intermediate_favourable", "1_inadequate", "0_no_features", "increased_size_only", "midline_bilateral") anywhere in the output. The structured input is already humanized — every value is supplied as natural English prose. Reproduce that prose, or paraphrase it idiomatically. Public clinical codes that contain NO underscore (cT2a, NX, M1b, PI-RADS 4, ISUP 3, EPE grade 2, PI-QUAL 2) are exempt and SHOULD appear verbatim. If a snake_case-looking artefact ever slips through, rewrite it in plain words; never copy it into the report body.
 
 === LANGUAGE ===
 ${langInstr}`;
@@ -251,14 +264,40 @@ ${langInstr}`;
 export function buildProstateReportUserPrompt(
   opts: ProstateReportUserPromptOptions
 ): string {
-  const { modality, findings } = opts;
+  const { lang, modality, findings } = opts;
   const modalityLine =
     modality === "Auto" ? "Auto-detect from findings" : "MRI";
+  const protocolDirective = buildProtocolDirective(findings);
 
   return `DiseaseCategory: ProstateCancer (Prostate Cancer, PI-RADS v2.1)
 Modality: ${modalityLine}
 Findings:
 ${findings}
 
-Please draft a structured Prostate Cancer report per the system instructions. Produce exactly the six sections in the fixed order: CLINICAL INFORMATION, TECHNIQUE, COMPARISON, FINDINGS, STAGING, IMPRESSION.`;
+Please draft a structured Prostate Cancer report per the system instructions. Produce exactly the six sections in the fixed order: CLINICAL INFORMATION, TECHNIQUE, COMPARISON, FINDINGS, STAGING, IMPRESSION.${protocolDirective ? `\n${protocolDirective}` : ""}
+${USER_LANG_REMINDERS[lang]}`;
+}
+
+/**
+ * Closing language reminder. The English-only input bullets otherwise pull
+ * FINDINGS and IMPRESSION into English on some Korean-language runs.
+ */
+const USER_LANG_REMINDERS: Record<ProstateReportLang, string> = {
+  ko: "Write every section body in Korean, FINDINGS and IMPRESSION included; keep only section headers and standard terms in English.",
+  en: "Write the whole report in English.",
+  mixed:
+    "Write descriptive sentences in Korean and anatomical and classification terms in English, in every section.",
+};
+
+/**
+ * Restates a bpMRI protocol right before generation.
+ *
+ * The system prompt alone does not hold: the model still writes "mpMRI" with
+ * an invented DCE result on some bpMRI studies, most often negative ones.
+ * Keyed on the serializer's "MRI protocol:" line, so free-text callers
+ * without that line get no directive.
+ */
+function buildProtocolDirective(findings: string): string | null {
+  if (!/^- MRI protocol: biparametric/m.test(findings)) return null;
+  return 'This study is biparametric MRI (bpMRI) without DCE. In TECHNIQUE, name the protocol simply as "biparametric MRI (bpMRI)" and list only T2W, DWI and ADC; you may add once that DCE was not performed. Report PI-QUAL with the T2W and DWI subscores only, and give no DCE result for any lesion.';
 }

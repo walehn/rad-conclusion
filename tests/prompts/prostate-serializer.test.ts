@@ -8,6 +8,7 @@
  *  - deriveClinicalN / deriveClinicalM
  *  - derivePsaDensity (NaN-safe)
  *  - deriveEauRiskGroup (Cornford 2025)
+ *  - deriveMriProtocol (DCE evidence → mpMRI, else bpMRI)
  *  - serializeProstateStructuredInput (skip-empty + verbatim Section-4 RCC parity)
  */
 
@@ -20,6 +21,7 @@ import {
   deriveProstateVolume,
   derivePsaDensity,
   deriveEauRiskGroup,
+  deriveMriProtocol,
   hasMinimumProstateFields,
   serializeProstateStructuredInput,
   type ProstateStructuredInput,
@@ -306,8 +308,10 @@ describe("deriveClinicalT", () => {
     ).toBe("cT1c");
   });
 
-  // ----- Step 4: cT3a from per-lesion EPE -----------------------------------
-  it("cT3a: any lesion EPE = 1_curvilinear_or_bulge → cT3a", () => {
+  // ----- Step 4: cT3a from per-lesion EPE (grade 3 only) ----------------------
+  // Grades 1–2 are risk features, not EPE; they fall through to the cT2
+  // heuristic (12 mm unilateral lesion in a 40 mm gland → cT2b).
+  it("not cT3a: EPE grade 1 (curvilinear contact or bulge) stays in cT2", () => {
     expect(
       deriveClinicalT(
         makeInput({
@@ -316,17 +320,17 @@ describe("deriveClinicalT", () => {
           ],
         })
       )
-    ).toBe("cT3a");
+    ).toBe("cT2b");
   });
 
-  it("cT3a: any lesion EPE = 2_both_features → cT3a", () => {
+  it("not cT3a: EPE grade 2 (both features) stays in cT2", () => {
     expect(
       deriveClinicalT(
         makeInput({
           lesions: [makeLesion({ epeRiskMehralivand: "2_both_features" })],
         })
       )
-    ).toBe("cT3a");
+    ).toBe("cT2b");
   });
 
   it("cT3a: any lesion EPE = 3_frank_breach → cT3a", () => {
@@ -416,49 +420,78 @@ describe("deriveClinicalT", () => {
     ).toBe("cT2c");
   });
 
-  // ----- Step 5: MRI cT2 heuristic — cT2b (size >= half-width) -------------
-  it("cT2b: single unilateral lesion with size = halfWidth (boundary) → cT2b", () => {
-    // prostateWidthMm=40 → halfWidth=20; sizeMaxAxialMm=20 hits >= threshold.
+  // ----- Step 5: MRI cT2 heuristic — cT2b (size >= half of one lobe) ---------
+  // AJCC cT2a is "one-half of one side or less": half of one lobe is a
+  // quarter of the transverse gland width.
+  it("cT2b: single unilateral lesion with size = width / 4 (boundary) → cT2b", () => {
+    // prostateWidthMm=40 → halfLobeWidth=10; sizeMaxAxialMm=10 hits >= threshold.
     expect(
       deriveClinicalT(
         makeInput({
           prostateWidthMm: 40,
           lesions: [
-            makeLesion({ laterality: "right", sizeMaxAxialMm: 20 }),
+            makeLesion({ laterality: "right", sizeMaxAxialMm: 10 }),
           ],
         })
       )
     ).toBe("cT2b");
   });
 
-  it("cT2b: single unilateral lesion with size > halfWidth → cT2b", () => {
+  it("cT2a: single unilateral lesion just under width / 4 → cT2a", () => {
     expect(
       deriveClinicalT(
         makeInput({
           prostateWidthMm: 40,
           lesions: [
-            makeLesion({ laterality: "right", sizeMaxAxialMm: 25 }),
+            makeLesion({ laterality: "right", sizeMaxAxialMm: 9 }),
+          ],
+        })
+      )
+    ).toBe("cT2a");
+  });
+
+  it("cT2b: a lesion under half the gland width but over half a lobe → cT2b", () => {
+    // 15 mm in a 40 mm gland: cT2a under the old width / 2 rule.
+    expect(
+      deriveClinicalT(
+        makeInput({
+          prostateWidthMm: 40,
+          lesions: [
+            makeLesion({ laterality: "right", sizeMaxAxialMm: 15 }),
           ],
         })
       )
     ).toBe("cT2b");
   });
 
-  it("cT2b: missing prostateWidthMm uses 20 mm fallback threshold", () => {
+  it("cT2b: missing prostateWidthMm uses 10 mm fallback threshold", () => {
     expect(
       deriveClinicalT(
         makeInput({
           prostateWidthMm: undefined,
           lesions: [
-            makeLesion({ laterality: "right", sizeMaxAxialMm: 22 }),
+            makeLesion({ laterality: "right", sizeMaxAxialMm: 10 }),
           ],
         })
       )
     ).toBe("cT2b");
   });
 
+  it("cT2a: missing prostateWidthMm and a lesion under 10 mm → cT2a", () => {
+    expect(
+      deriveClinicalT(
+        makeInput({
+          prostateWidthMm: undefined,
+          lesions: [
+            makeLesion({ laterality: "right", sizeMaxAxialMm: 9 }),
+          ],
+        })
+      )
+    ).toBe("cT2a");
+  });
+
   // ----- Step 5: MRI cT2 heuristic — cT2a (default unilateral small) -------
-  it("cT2a: single unilateral lesion with size < halfWidth → cT2a", () => {
+  it("cT2a: single unilateral lesion with size < width / 4 → cT2a", () => {
     expect(
       deriveClinicalT(
         makeInput({
@@ -514,14 +547,14 @@ describe("deriveClinicalT", () => {
     ).toBe("cT3b");
   });
 
-  it("priority: cT3a dominates cT2 heuristic (EPE positive + bilateral lesion)", () => {
+  it("priority: cT3a dominates cT2 heuristic (EPE grade 3 + bilateral lesion)", () => {
     expect(
       deriveClinicalT(
         makeInput({
           lesions: [
             makeLesion({
               laterality: "midline_bilateral",
-              epeRiskMehralivand: "1_curvilinear_or_bulge",
+              epeRiskMehralivand: "3_frank_breach",
               sizeMaxAxialMm: 30,
             }),
           ],
@@ -885,6 +918,33 @@ describe("deriveEauRiskGroup", () => {
     ).toBe("high");
   });
 
+  it("high: PSA=8, ISUP1, cT2a but cN1 → high (locally advanced)", () => {
+    expect(
+      deriveEauRiskGroup(
+        makeInput({
+          clinicalIndication: "staging_after_diagnosis",
+          psaNgPerMl: 8,
+          priorBiopsyStatus: "positive_ISUP1",
+          lesions: [makeLesion({ sizeMaxAxialMm: 8 })],
+          regionalLymphNodes: [{ shortAxisMm: 10 }],
+        })
+      )
+    ).toBe("high");
+  });
+
+  it("low: the same case with no suspicious node stays low", () => {
+    expect(
+      deriveEauRiskGroup(
+        makeInput({
+          clinicalIndication: "staging_after_diagnosis",
+          psaNgPerMl: 8,
+          priorBiopsyStatus: "positive_ISUP1",
+          lesions: [makeLesion({ sizeMaxAxialMm: 8 })],
+        })
+      )
+    ).toBe("low");
+  });
+
   it("high: ISUP5 always high regardless of other factors", () => {
     expect(
       deriveEauRiskGroup(
@@ -1064,12 +1124,12 @@ describe("serializeProstateStructuredInput — required fields verbatim", () => 
 
   it("emits derived clinical T/N/M when not overridden", () => {
     // makeInput() seeds a single right-side lesion of 12 mm against a 40 mm
-    // prostate width — the MRI-based heuristic discriminates this as cT2a
-    // (unilateral, size < halfWidth=20). N/M default to N0/M0: empty
+    // prostate width — the MRI-based heuristic discriminates this as cT2b
+    // (unilateral, size >= halfLobeWidth=10). N/M default to N0/M0: empty
     // lymph node arrays are treated as a deliberate negative assessment
     // (Korean clinical-workflow convention), and no metastasis declared.
     const result = serializeProstateStructuredInput(makeInput());
-    expect(result).toContain("- Clinical T: cT2a");
+    expect(result).toContain("- Clinical T: cT2b");
     expect(result).toContain("- Clinical N: N0");
     expect(result).toContain("- Clinical M: M0");
     expect(result).not.toContain("- Staging overridden:");
@@ -1443,13 +1503,126 @@ describe("serializeProstateStructuredInput — determinism and snapshot", () => 
       "- EPE risk (Mehralivand): Mehralivand grade 1 (curvilinear contact or capsular bulge)"
     );
 
-    // Staging — derived (cT3a from EPE; ISUP=2, PSA=12.5, cT3a → high)
-    expect(result).toContain("- Clinical T: cT3a");
+    // Staging — derived. EPE grade 1 is not cT3a; the 14 mm unilateral
+    // lesion exceeds half a lobe (40 / 4 = 10 mm) → cT2b. The suspicious
+    // obturator node makes it cN1, which EAU groups as high risk.
+    expect(result).toContain("- Clinical T: cT2b");
+    expect(result).toContain("- Clinical N: N1");
     expect(result).toContain("- EAU risk group: high");
 
     // Section 4 verbatim
     expect(result).toContain("Right inguinal hernia.");
     expect(result).toContain("Targeted biopsy of right mid PZ lesion.");
     expect(result).not.toContain("Bony abnormalities:");
+  });
+});
+
+describe("deriveMriProtocol", () => {
+  it("bpMRI when no lesion has a DCE result and PI-QUAL DCE is unrated", () => {
+    expect(deriveMriProtocol(makeInput())).toBe("bpMRI");
+  });
+
+  it("bpMRI when every lesion is not_performed_bpMRI", () => {
+    expect(
+      deriveMriProtocol(
+        makeInput({ lesions: [makeLesion({ dceResult: "not_performed_bpMRI" })] })
+      )
+    ).toBe("bpMRI");
+  });
+
+  it("bpMRI when PI-QUAL DCE is not_applicable", () => {
+    expect(
+      deriveMriProtocol(makeInput({ piQualDCESubscore: "not_applicable" }))
+    ).toBe("bpMRI");
+  });
+
+  it.each(["positive", "negative"] as const)(
+    "mpMRI when a lesion DCE result is %s",
+    (dceResult) => {
+      expect(
+        deriveMriProtocol(makeInput({ lesions: [makeLesion({ dceResult })] }))
+      ).toBe("mpMRI");
+    }
+  );
+
+  it.each(["+", "-"] as const)(
+    "mpMRI on a negative MRI when PI-QUAL DCE is rated %s",
+    (piQualDCESubscore) => {
+      expect(
+        deriveMriProtocol(
+          makeInput({ noSuspiciousLesion: true, lesions: [], piQualDCESubscore })
+        )
+      ).toBe("mpMRI");
+    }
+  );
+
+  it("mpMRI when any one lesion has DCE, even if another says not performed", () => {
+    expect(
+      deriveMriProtocol(
+        makeInput({
+          lesions: [
+            makeLesion({ dceResult: "not_performed_bpMRI" }),
+            makeLesion({ lesionIndex: 2, dceResult: "negative" }),
+          ],
+        })
+      )
+    ).toBe("mpMRI");
+  });
+});
+
+describe("serializeProstateStructuredInput — TECHNIQUE block and single placement", () => {
+  it("emits a TECHNIQUE block after CLINICAL CONTEXT, before the lesions", () => {
+    const out = serializeProstateStructuredInput(makeInput());
+    const clinical = out.indexOf("CLINICAL CONTEXT");
+    const technique = out.indexOf("TECHNIQUE\n");
+    const lesion = out.indexOf("LESION 1");
+    expect(clinical).toBeLessThan(technique);
+    expect(technique).toBeLessThan(lesion);
+  });
+
+  it("states bpMRI and drops every DCE line on a bpMRI study", () => {
+    const out = serializeProstateStructuredInput(
+      makeInput({
+        lesions: [makeLesion({ dceResult: "not_performed_bpMRI" })],
+        piQualDCESubscore: "not_applicable",
+      })
+    );
+    expect(out).toContain(
+      "- MRI protocol: biparametric MRI (bpMRI) — T2W and DWI/ADC; DCE not performed"
+    );
+    expect(out).not.toContain("- DCE result:");
+    expect(out).not.toContain("- PI-QUAL DCE subscore:");
+    expect(out).not.toMatch(/multiparametric/);
+  });
+
+  it("states mpMRI and keeps DCE lines on an mpMRI study", () => {
+    const out = serializeProstateStructuredInput(
+      makeInput({
+        lesions: [makeLesion({ dceResult: "positive" })],
+        piQualDCESubscore: "+",
+      })
+    );
+    expect(out).toContain(
+      "- MRI protocol: multiparametric MRI (mpMRI) — T2W, DWI/ADC and DCE"
+    );
+    expect(out).toContain("- DCE result: positive");
+    expect(out).toContain("- PI-QUAL DCE subscore: +");
+  });
+
+  it("puts PI-QUAL in the TECHNIQUE block only", () => {
+    const out = serializeProstateStructuredInput(makeInput());
+    const technique = out.slice(out.indexOf("TECHNIQUE\n"), out.indexOf("LESION 1"));
+    expect(technique).toContain("- PI-QUAL overall:");
+    expect(out.match(/PI-QUAL overall/g)).toHaveLength(1);
+  });
+
+  it("emits PSA density once, right after the prostate volume", () => {
+    const out = serializeProstateStructuredInput(
+      makeInput({ psaNgPerMl: 8, prostateVolumeMl: 40 })
+    );
+    expect(out.match(/PSA density/g)).toHaveLength(1);
+    expect(out).toContain("- Prostate volume: 40 mL\n- PSA density: 0.20 ng/mL/cc");
+    const clinical = out.slice(0, out.indexOf("TECHNIQUE\n"));
+    expect(clinical).not.toContain("PSA density");
   });
 });
