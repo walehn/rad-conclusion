@@ -124,7 +124,12 @@ export type ClinicalT = (typeof CLINICAL_T_OPTIONS)[number];
 export const CLINICAL_N_OPTIONS = ["NX", "N0", "N1"] as const;
 export type ClinicalN = (typeof CLINICAL_N_OPTIONS)[number];
 
-export const CLINICAL_M_OPTIONS = ["M0", "M1a", "M1b", "M1c", "MX"] as const;
+/**
+ * "not_assessed" is the derived default: a pelvic MRI cannot exclude distant
+ * disease, so M0 is reserved for an override backed by systemic staging.
+ * (MX was dropped from AJCC in the 7th edition.)
+ */
+export const CLINICAL_M_OPTIONS = ["not_assessed", "M0", "M1a", "M1b", "M1c"] as const;
 export type ClinicalM = (typeof CLINICAL_M_OPTIONS)[number];
 
 export const EAU_RISK_GROUP_OPTIONS = [

@@ -218,6 +218,9 @@ const HUMAN_ENUM_LABELS: Readonly<Record<string, string>> = {
   // EauRiskGroup
   intermediate_favourable: "intermediate-favourable",
   intermediate_unfavourable: "intermediate-unfavourable",
+
+  // ClinicalM
+  not_assessed: "not assessed on pelvic MRI",
   metastatic: "metastatic disease (cM1) — localised risk groups not applicable",
   not_applicable: "not applicable",
 
@@ -474,12 +477,14 @@ export function deriveClinicalN(input: ProstateStructuredInput): ClinicalN {
 }
 
 /**
- * AJCC 8th clinical M-stage.
+ * AJCC 8th clinical M-stage, as far as a pelvic MRI can tell.
  *  - M1c: visceral metastasis (lung / liver / other).
  *  - M1b: bone involvement === 'definite'.
  *  - M1a: any non-regional lymph nodes present.
- *  - MX:  bone involvement === 'equivocal' (and no other M1 evidence).
- *  - M0:  none of the above.
+ *  - not_assessed: none of the above. The scan covers part of the pelvis
+ *    only, so the absence of M1 evidence is not M0; equivocal bone findings
+ *    are described in FINDINGS instead. M0 needs systemic staging and comes
+ *    from the override path.
  */
 export function deriveClinicalM(input: ProstateStructuredInput): ClinicalM {
   if (
@@ -498,10 +503,7 @@ export function deriveClinicalM(input: ProstateStructuredInput): ClinicalM {
   ) {
     return "M1a";
   }
-  if (input.boneInvolvement === "equivocal") {
-    return "MX";
-  }
-  return "M0";
+  return "not_assessed";
 }
 
 // ---------------------------------------------------------------------------
@@ -914,8 +916,10 @@ function lymphNodeLines(
   const lines: string[] = [`- ${label}:`];
   nodes.forEach((node, idx) => {
     const parts: string[] = [];
-    if (!isAbsent(node.station)) parts.push(`station ${node.station}`);
-    if (!isAbsent(node.location)) parts.push(`location ${node.location}`);
+    // Bare labels: a "station"/"location" prefix was echoed into the report
+    // as a stray "(station)".
+    if (!isAbsent(node.station)) parts.push(String(humanizeEnum(node.station)));
+    if (!isAbsent(node.location)) parts.push(String(humanizeEnum(node.location)));
     parts.push(`short axis ${node.shortAxisMm} mm`);
     if (!isAbsent(node.morphology)) {
       parts.push(`morphology ${humanizeEnum(node.morphology)}`);
@@ -1004,7 +1008,7 @@ function wholeGlandStagingBlock(input: ProstateStructuredInput): string[] {
     // empty arrays are treated as a deliberate negative assessment.
     if (regionalLn.length === 0 && nonRegionalLn.length === 0) {
       lines.push(
-        "- Lymph nodes: no suspicious regional or non-regional lymph nodes (clinical N0)"
+        "- Lymph nodes: no suspicious lymph node within the imaged field (clinical N0)"
       );
     } else {
       lines.push(
@@ -1018,7 +1022,13 @@ function wholeGlandStagingBlock(input: ProstateStructuredInput): string[] {
       );
     }
 
-    pushBullet(lines, "Bone involvement", input.boneInvolvement);
+    // Negatives are limited to the imaged field: the scan covers part of the
+    // pelvis only, so it cannot rule out disease beyond it.
+    if (input.boneInvolvement === "none") {
+      lines.push("- Bone: no suspicious bone lesion within the imaged field");
+    } else {
+      pushBullet(lines, "Bone involvement", input.boneInvolvement);
+    }
     if (
       input.boneLesionLocations !== undefined &&
       input.boneLesionLocations.length > 0
@@ -1027,7 +1037,11 @@ function wholeGlandStagingBlock(input: ProstateStructuredInput): string[] {
         `- Bone lesion locations: ${input.boneLesionLocations.join(", ")}`
       );
     }
-    pushBullet(lines, "Other distant metastasis", input.otherDistantMetastasis);
+    // Organs outside the pelvis are mostly not imaged: report them only when
+    // a finding was recorded, never as a negative.
+    if (input.otherDistantMetastasis !== "none") {
+      pushBullet(lines, "Other distant metastasis", input.otherDistantMetastasis);
+    }
   } else {
     // Negative MRI: split each category into "negative" vs "abnormal".
     // Negative ones feed a single consolidated sweep line; abnormal ones
@@ -1083,7 +1097,7 @@ function wholeGlandStagingBlock(input: ProstateStructuredInput): string[] {
     );
 
     if (regionalLn.length === 0 && nonRegionalLn.length === 0) {
-      negativeSweep.push("regional and non-regional lymph nodes");
+      negativeSweep.push("lymph nodes");
     } else {
       abnormalBullets.push(
         ...lymphNodeLines("Regional lymph nodes", input.regionalLymphNodes)
@@ -1096,12 +1110,7 @@ function wholeGlandStagingBlock(input: ProstateStructuredInput): string[] {
       );
     }
 
-    handleEnum(
-      input.boneInvolvement,
-      "none",
-      "imaged skeleton",
-      "Bone involvement"
-    );
+    handleEnum(input.boneInvolvement, "none", "bones", "Bone involvement");
     if (
       input.boneLesionLocations !== undefined &&
       input.boneLesionLocations.length > 0
@@ -1113,16 +1122,20 @@ function wholeGlandStagingBlock(input: ProstateStructuredInput): string[] {
         `- Bone lesion locations: ${input.boneLesionLocations.join(", ")}`
       );
     }
-    handleEnum(
-      input.otherDistantMetastasis,
-      "none",
-      "distant metastatic sites",
-      "Other distant metastasis"
-    );
+    // Organs outside the pelvis are not part of the sweep: a negative there
+    // is not something this scan can certify.
+    if (
+      input.otherDistantMetastasis !== undefined &&
+      input.otherDistantMetastasis !== "none"
+    ) {
+      abnormalBullets.push(
+        `- Other distant metastasis: ${String(humanizeEnum(input.otherDistantMetastasis))}`
+      );
+    }
 
     if (negativeSweep.length > 0) {
       lines.push(
-        `- Whole-gland and nodal sweep: no abnormality in ${negativeSweep.join(", ")}.`
+        `- Whole-gland and nodal sweep: no abnormality in ${negativeSweep.join(", ")} within the imaged field.`
       );
     }
     lines.push(...abnormalBullets);
@@ -1154,7 +1167,7 @@ function wholeGlandStagingBlock(input: ProstateStructuredInput): string[] {
     const { cT, cN, cM } = resolveStaging(input);
     lines.push(`- Clinical T: ${cT}`);
     lines.push(`- Clinical N: ${cN}`);
-    lines.push(`- Clinical M: ${cM}`);
+    lines.push(`- Clinical M: ${String(humanizeEnum(cM))}`);
     if (overridden) {
       lines.push("- Staging overridden: yes");
     }

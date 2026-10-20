@@ -659,8 +659,8 @@ describe("deriveClinicalN", () => {
 // ---------------------------------------------------------------------------
 
 describe("deriveClinicalM", () => {
-  it("M0: no metastasis", () => {
-    expect(deriveClinicalM(makeInput())).toBe("M0");
+  it("not_assessed: no M1 evidence is not M0 on a pelvic MRI", () => {
+    expect(deriveClinicalM(makeInput())).toBe("not_assessed");
   });
 
   it("M1c: otherDistantMetastasis=lung", () => {
@@ -695,10 +695,10 @@ describe("deriveClinicalM", () => {
     ).toBe("M1a");
   });
 
-  it("MX: boneInvolvement=equivocal (no other M1 evidence)", () => {
+  it("not_assessed: equivocal bone is described in FINDINGS, not staged", () => {
     expect(
       deriveClinicalM(makeInput({ boneInvolvement: "equivocal" }))
-    ).toBe("MX");
+    ).toBe("not_assessed");
   });
 
   it("priority: visceral metastasis dominates bone definite (M1c)", () => {
@@ -1127,13 +1127,13 @@ describe("serializeProstateStructuredInput — required fields verbatim", () => 
   it("emits derived clinical T/N/M when not overridden", () => {
     // makeInput() seeds a single right-side lesion of 12 mm against a 40 mm
     // prostate width — the MRI-based heuristic discriminates this as cT2b
-    // (unilateral, size >= halfLobeWidth=10). N/M default to N0/M0: empty
+    // (unilateral, size >= halfLobeWidth=10). N defaults to N0: empty
     // lymph node arrays are treated as a deliberate negative assessment
     // (Korean clinical-workflow convention), and no metastasis declared.
     const result = serializeProstateStructuredInput(makeInput());
     expect(result).toContain("- Clinical T: cT2b");
     expect(result).toContain("- Clinical N: N0");
-    expect(result).toContain("- Clinical M: M0");
+    expect(result).toContain("- Clinical M: not assessed on pelvic MRI");
     expect(result).not.toContain("- Staging overridden:");
   });
 
@@ -1218,13 +1218,13 @@ describe("serializeProstateStructuredInput — required fields verbatim", () => 
       })
     );
     expect(result).toContain("- Regional lymph nodes:");
-    expect(result).toContain("  - Node 1: station obturator");
+    expect(result).toContain("  - Node 1: obturator");
     expect(result).toContain("short axis 10 mm");
     expect(result).toContain("morphology round");
     expect(result).toContain("features: necrosis");
-    expect(result).toContain("  - Node 2: station internal_iliac");
+    expect(result).toContain("  - Node 2: internal iliac");
     expect(result).toContain("- Non-regional lymph nodes:");
-    expect(result).toContain("  - Node 1: location retroperitoneal");
+    expect(result).toContain("  - Node 1: retroperitoneal");
   });
 
   it("emits PI-QUAL subscores", () => {
@@ -1272,7 +1272,7 @@ describe("serializeProstateStructuredInput — required fields verbatim", () => 
         })
       );
       expect(result).toContain(
-        "- Whole-gland and nodal sweep: no abnormality in seminal vesicles, bladder neck, external sphincter, rectum, pelvic sidewall, regional and non-regional lymph nodes, imaged skeleton, distant metastatic sites."
+        "- Whole-gland and nodal sweep: no abnormality in seminal vesicles, bladder neck, external sphincter, rectum, pelvic sidewall, lymph nodes, bones within the imaged field."
       );
       // Each per-category bullet that the positive-MRI path emits MUST be
       // absent — that is the whole point of consolidation.
@@ -1281,9 +1281,7 @@ describe("serializeProstateStructuredInput — required fields verbatim", () => 
       expect(result).not.toContain("- External sphincter involvement:");
       expect(result).not.toContain("- Rectal involvement:");
       expect(result).not.toContain("- Pelvic sidewall involvement:");
-      expect(result).not.toContain(
-        "- Lymph nodes: no suspicious regional or non-regional lymph nodes"
-      );
+      expect(result).not.toContain("- Lymph nodes: no suspicious lymph node");
       expect(result).not.toContain("- Bone involvement:");
       expect(result).not.toContain("- Other distant metastasis:");
     });
@@ -1318,7 +1316,7 @@ describe("serializeProstateStructuredInput — required fields verbatim", () => 
         })
       );
       expect(result).toContain("- Regional lymph nodes:");
-      expect(result).toContain("  - Node 1: station obturator");
+      expect(result).toContain("  - Node 1: obturator");
       // Sweep no longer mentions lymph nodes when one is present.
       expect(result).not.toMatch(
         /- Whole-gland and nodal sweep: no abnormality in[^\n]*lymph nodes/
@@ -1332,7 +1330,55 @@ describe("serializeProstateStructuredInput — required fields verbatim", () => 
       // Positive-MRI path keeps every per-category bullet.
       expect(result).toContain("- Seminal vesicle invasion (whole gland):");
       expect(result).toContain("- Bladder neck involvement:");
-      expect(result).toContain("- Bone involvement:");
+      expect(result).toContain(
+        "- Bone: no suspicious bone lesion within the imaged field"
+      );
+    });
+  });
+
+  describe("negatives limited to the imaged field", () => {
+    it("limits node and bone negatives to the imaged field", () => {
+      const result = serializeProstateStructuredInput(makeInput());
+      expect(result).toContain(
+        "- Lymph nodes: no suspicious lymph node within the imaged field (clinical N0)"
+      );
+      expect(result).toContain(
+        "- Bone: no suspicious bone lesion within the imaged field"
+      );
+    });
+
+    it("says nothing about organs outside the pelvis when none is recorded", () => {
+      expect(serializeProstateStructuredInput(makeInput())).not.toContain(
+        "Other distant metastasis"
+      );
+      expect(
+        serializeProstateStructuredInput(
+          makeInput({ noSuspiciousLesion: true, lesions: [] })
+        )
+      ).not.toMatch(/distant/);
+    });
+
+    it("still reports a recorded distant finding", () => {
+      expect(
+        serializeProstateStructuredInput(
+          makeInput({ otherDistantMetastasis: "liver" })
+        )
+      ).toContain("- Other distant metastasis: liver");
+      expect(
+        serializeProstateStructuredInput(
+          makeInput({
+            noSuspiciousLesion: true,
+            lesions: [],
+            otherDistantMetastasis: "liver",
+          })
+        )
+      ).toContain("- Other distant metastasis: liver");
+    });
+
+    it("keeps an equivocal bone finding as its own bullet", () => {
+      expect(
+        serializeProstateStructuredInput(makeInput({ boneInvolvement: "equivocal" }))
+      ).toContain("- Bone involvement: equivocal");
     });
   });
 
@@ -1637,7 +1683,7 @@ describe("resolveStaging", () => {
       resolveStaging(
         makeInput({ clinicalT: "cT4", clinicalN: "N1", clinicalM: "M1b" })
       )
-    ).toEqual({ cT: "cT2b", cN: "N0", cM: "M0" });
+    ).toEqual({ cT: "cT2b", cN: "N0", cM: "not_assessed" });
   });
 
   it("returns the override values when isStagingOverridden=true", () => {
@@ -1656,7 +1702,7 @@ describe("resolveStaging", () => {
   it("falls back per category when an override value is missing", () => {
     expect(
       resolveStaging(makeInput({ isStagingOverridden: true, clinicalT: "cT3a" }))
-    ).toEqual({ cT: "cT3a", cN: "N0", cM: "M0" });
+    ).toEqual({ cT: "cT3a", cN: "N0", cM: "not_assessed" });
   });
 });
 
@@ -1696,7 +1742,7 @@ describe("deriveEauRiskGroup — metastatic disease and staging overrides", () =
     ).toBe("metastatic");
   });
 
-  it("MX (equivocal bone) is not metastatic", () => {
+  it("equivocal bone (cM not assessed) is not metastatic", () => {
     expect(
       deriveEauRiskGroup(makeInput({ ...lowRisk, boneInvolvement: "equivocal" }))
     ).toBe("low");

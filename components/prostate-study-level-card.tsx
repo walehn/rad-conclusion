@@ -217,6 +217,14 @@ const PIQUAL_DCE_LABEL: Record<PiQualDceSubscore, string> = {
   not_applicable: "N/A · 미수행",
 };
 
+const CLINICAL_M_LABEL: Record<ClinicalM, string> = {
+  not_assessed: "Not assessed · 골반 MRI로 평가 안 함",
+  M0: "M0",
+  M1a: "M1a",
+  M1b: "M1b",
+  M1c: "M1c",
+};
+
 function toLabeledOptions<T extends string>(
   values: ReadonlyArray<T>,
   labels: Record<T, string>
@@ -929,7 +937,7 @@ export function ProstateStudyLevelCard({
                       cM
                     </span>
                     <p className="text-sm font-semibold text-foreground">
-                      {derivedM}
+                      {CLINICAL_M_LABEL[derivedM]}
                     </p>
                   </div>
                 </>
@@ -1006,7 +1014,7 @@ export function ProstateStudyLevelCard({
                     >
                       {CLINICAL_M_OPTIONS.map((opt) => (
                         <option key={opt} value={opt}>
-                          {opt}
+                          {CLINICAL_M_LABEL[opt]}
                         </option>
                       ))}
                     </select>
