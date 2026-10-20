@@ -573,29 +573,36 @@ export function deriveProstateVolume(
 }
 
 /**
- * Derive the PI-QUAL v2 overall image-quality category from the per-sequence
- * T2W and DWI sub-scores per de Rooij M et al., European Radiology 2024.
+ * Derive the PI-QUAL v2 overall image-quality category (de Rooij M et al.,
+ * European Radiology 2024, Table 3).
  *
- * Conversion table (T2W and DWI on a 1–4 scale):
+ * Without contrast (DCE not rated or not performed), T2W and DWI on a 1–4
+ * scale decide alone:
  *  - Either sub-score ≤ 2                         → 1 (inadequate)
  *  - T2W = 4 AND DWI = 4                          → 3 (optimal)
  *  - Otherwise (any 3/3, 3/4, or 4/3 combination) → 2 (acceptable)
  *
- * The DCE sub-score does not directly determine overall quality in this
- * simplified mapping (it remains a reportable per-sequence field). For
- * mpMRI protocols the radiologist may still opt to downgrade overall
- * quality manually; for this template the T2W+DWI rule is the single
- * source of truth.
+ * On mpMRI the DCE rating ("+" = both DCE criteria met) adjusts that:
+ *  - 3 with DCE "−"                               → 2 (downgrade)
+ *  - 1 with DCE "+" and T2W or DWI = 4            → 2 (upgrade; the
+ *    paper's "safety net", e.g. DWI ruined by hip metalwork)
+ *  - 2 is never moved by DCE.
  */
 export function derivePiQualOverall(
   t2w: PiQualT2WDwiSubscore,
-  dwi: PiQualT2WDwiSubscore
+  dwi: PiQualT2WDwiSubscore,
+  dce?: PiQualDceSubscore
 ): PiQualOverall {
   const t = Number.parseInt(t2w, 10);
   const d = Number.parseInt(dwi, 10);
-  if (t <= 2 || d <= 2) return "1_inadequate";
-  if (t === 4 && d === 4) return "3_optimal";
-  return "2_acceptable";
+  const withoutContrast: PiQualOverall =
+    t <= 2 || d <= 2 ? "1_inadequate" : t === 4 && d === 4 ? "3_optimal" : "2_acceptable";
+
+  if (dce === "-" && withoutContrast === "3_optimal") return "2_acceptable";
+  if (dce === "+" && withoutContrast === "1_inadequate" && Math.max(t, d) === 4) {
+    return "2_acceptable";
+  }
+  return withoutContrast;
 }
 
 /**

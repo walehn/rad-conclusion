@@ -23,6 +23,7 @@ import {
   derivePsaDensity,
   deriveEauRiskGroup,
   deriveMriProtocol,
+  derivePiQualOverall,
   hasMinimumProstateFields,
   resolveStaging,
   serializeProstateStructuredInput,
@@ -1820,3 +1821,36 @@ describe("deriveEauRiskGroup — metastatic disease and staging overrides", () =
     );
   });
 });
+
+describe("derivePiQualOverall — PI-QUAL v2 Table 3 (de Rooij 2024)", () => {
+  // [T2W, DWI, no-contrast score, score with DCE "−", score with DCE "+"],
+  // one row per sub-score band of the paper's flowchart (1 stands for "1 or 2").
+  const TABLE_3: ReadonlyArray<[string, string, string, string, string]> = [
+    ["1", "1", "1", "1", "1"],
+    ["3", "1", "1", "1", "1"],
+    ["4", "1", "1", "1", "2"],
+    ["1", "3", "1", "1", "1"],
+    ["3", "3", "2", "2", "2"],
+    ["4", "3", "2", "2", "2"],
+    ["1", "4", "1", "1", "2"],
+    ["3", "4", "2", "2", "2"],
+    ["4", "4", "3", "2", "3"],
+  ];
+  const score = (o: string) => o.charAt(0);
+  type Sub = "1" | "2" | "3" | "4";
+
+  it.each(TABLE_3)(
+    "T2W %s / DWI %s → %s without contrast, %s with DCE −, %s with DCE +",
+    (t2w, dwi, noContrast, withMinus, withPlus) => {
+      for (const t of t2w === "1" ? (["1", "2"] as Sub[]) : [t2w as Sub]) {
+        for (const d of dwi === "1" ? (["1", "2"] as Sub[]) : [dwi as Sub]) {
+          expect(score(derivePiQualOverall(t, d))).toBe(noContrast);
+          expect(score(derivePiQualOverall(t, d, "not_applicable"))).toBe(noContrast);
+          expect(score(derivePiQualOverall(t, d, "-"))).toBe(withMinus);
+          expect(score(derivePiQualOverall(t, d, "+"))).toBe(withPlus);
+        }
+      }
+    }
+  );
+});
+

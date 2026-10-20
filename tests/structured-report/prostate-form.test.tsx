@@ -98,6 +98,31 @@ describe("usually-negative block", () => {
   });
 });
 
+describe("PI-QUAL", () => {
+  const dceGroup = () => screen.getByRole("radiogroup", { name: "PI-QUAL DCE subscore" });
+
+  it("downgrades 4/4 to PI-QUAL 2 when DCE is rated −", () => {
+    renderForm();
+    expect(latest.piQualOverall).toBe("3_optimal");
+    fireEvent.click(within(dceGroup()).getByRole("radio", { name: "− 부적절" }));
+    expect(latest.piQualOverall).toBe("2_acceptable");
+    fireEvent.click(within(dceGroup()).getByRole("radio", { name: "미시행" }));
+    expect(latest.piQualOverall).toBe("3_optimal");
+  });
+
+  it("asks for a DCE rating when a lesion has a DCE result", () => {
+    renderForm({ lesions: [{ ...createEmptyProstateLesion(1), dceResult: "positive" }] });
+    expect(screen.getByText(/PI-QUAL DCE를 평가하세요/)).toBeTruthy();
+    fireEvent.click(within(dceGroup()).getByRole("radio", { name: "+ 적절" }));
+    expect(screen.queryByText(/PI-QUAL DCE를 평가하세요/)).toBeNull();
+  });
+
+  it("does not ask on a bpMRI study", () => {
+    renderForm(withLesion());
+    expect(screen.queryByText(/PI-QUAL DCE를 평가하세요/)).toBeNull();
+  });
+});
+
 describe("clinical and other sections", () => {
   it("leaves an unset PSA box empty rather than showing 0", () => {
     renderForm();

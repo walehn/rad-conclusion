@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, X } from "lucide-react";
+import { AlertTriangle, Plus, X } from "lucide-react";
 import {
   BONE_INVOLVEMENT_OPTIONS,
   CLINICAL_M_OPTIONS,
@@ -29,6 +29,7 @@ import {
   deriveClinicalN,
   deriveClinicalT,
   deriveEauRiskGroup,
+  deriveMriProtocol,
   derivePiQualOverall,
   deriveProstateVolume,
   derivePsaDensity,
@@ -90,9 +91,9 @@ const PIQUAL_OVERALL_LABEL: Record<PiQualOverall, string> = {
 };
 
 const PIQUAL_DCE_LABEL: Record<PiQualDceSubscore, string> = {
-  "+": "+",
-  "-": "−",
-  not_applicable: "N/A",
+  "+": "+ 적절",
+  "-": "− 부적절",
+  not_applicable: "미시행",
 };
 
 const CLINICAL_M_LABEL: Record<ClinicalM, string> = {
@@ -318,8 +319,15 @@ export function ProstateStudyLevelCard({
   const psaDensity = derivePsaDensity(value.psaNgPerMl, value.prostateVolumeMl);
   const piQualOverall = derivePiQualOverall(
     value.piQualT2WSubscore,
-    value.piQualDWISubscore
+    value.piQualDWISubscore,
+    value.piQualDCESubscore
   );
+  // PI-QUAL v2 scores mpMRI with its DCE images: a lesion DCE result with
+  // no DCE quality rating leaves the overall score on the no-contrast table.
+  const dceUnrated =
+    deriveMriProtocol(value) === "mpMRI" &&
+    value.piQualDCESubscore !== "+" &&
+    value.piQualDCESubscore !== "-";
 
   /**
    * Apply a single dimension change. The new dimensions are run through
@@ -517,7 +525,11 @@ export function ProstateStudyLevelCard({
               onChange({
                 ...value,
                 piQualT2WSubscore: next,
-                piQualOverall: derivePiQualOverall(next, value.piQualDWISubscore),
+                piQualOverall: derivePiQualOverall(
+                  next,
+                  value.piQualDWISubscore,
+                  value.piQualDCESubscore
+                ),
               })
             }
           />
@@ -533,21 +545,37 @@ export function ProstateStudyLevelCard({
               onChange({
                 ...value,
                 piQualDWISubscore: next,
-                piQualOverall: derivePiQualOverall(value.piQualT2WSubscore, next),
+                piQualOverall: derivePiQualOverall(
+                  value.piQualT2WSubscore,
+                  next,
+                  value.piQualDCESubscore
+                ),
               })
             }
           />
         </InlineField>
-        <InlineField label="DCE">
-          <SegmentedControl<PiQualDceSubscore>
-            name={id("piqualDCE")}
-            ariaLabel="PI-QUAL DCE subscore"
-            size="xs"
-            value={value.piQualDCESubscore}
-            options={toLabeledOptions(PIQUAL_DCE_SUBSCORE_OPTIONS, PIQUAL_DCE_LABEL)}
-            onChange={(next) => onChange({ ...value, piQualDCESubscore: next })}
-          />
-        </InlineField>
+        <span title="+ : DCE 화질 기준 2개 모두 충족 · − : 1개 이하 충족 · 미시행 : DCE를 찍지 않음 (bpMRI, T2W·DWI만으로 판정)">
+          <InlineField label="DCE">
+            <SegmentedControl<PiQualDceSubscore>
+              name={id("piqualDCE")}
+              ariaLabel="PI-QUAL DCE subscore"
+              size="xs"
+              value={value.piQualDCESubscore}
+              options={toLabeledOptions(PIQUAL_DCE_SUBSCORE_OPTIONS, PIQUAL_DCE_LABEL)}
+              onChange={(next) =>
+                onChange({
+                  ...value,
+                  piQualDCESubscore: next,
+                  piQualOverall: derivePiQualOverall(
+                    value.piQualT2WSubscore,
+                    value.piQualDWISubscore,
+                    next
+                  ),
+                })
+              }
+            />
+          </InlineField>
+        </span>
         <span role="status" aria-live="polite">
           <Readout
             label="종합"
@@ -561,6 +589,15 @@ export function ProstateStudyLevelCard({
             }
           />
         </span>
+        {dceUnrated && (
+          <span
+            role="note"
+            className="inline-flex items-center gap-1 text-xs text-amber-700 dark:text-amber-300"
+          >
+            <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
+            병변에 DCE 결과가 있습니다. DCE를 시행했다면 PI-QUAL DCE를 평가하세요.
+          </span>
+        )}
       </Row>
 
       <Disclosure
