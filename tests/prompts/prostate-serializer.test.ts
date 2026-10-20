@@ -9,6 +9,7 @@
  *  - derivePsaDensity (NaN-safe)
  *  - deriveEauRiskGroup (Cornford 2025)
  *  - deriveMriProtocol (DCE evidence → mpMRI, else bpMRI)
+ *  - resolveStaging (override values win only when isStagingOverridden)
  *  - serializeProstateStructuredInput (skip-empty + verbatim Section-4 RCC parity)
  */
 
@@ -23,6 +24,7 @@ import {
   deriveEauRiskGroup,
   deriveMriProtocol,
   hasMinimumProstateFields,
+  resolveStaging,
   serializeProstateStructuredInput,
   type ProstateStructuredInput,
   type ProstateLesion,
@@ -1624,5 +1626,151 @@ describe("serializeProstateStructuredInput — TECHNIQUE block and single placem
     expect(out).toContain("- Prostate volume: 40 mL\n- PSA density: 0.20 ng/mL/cc");
     const clinical = out.slice(0, out.indexOf("TECHNIQUE\n"));
     expect(clinical).not.toContain("PSA density");
+  });
+});
+
+describe("resolveStaging", () => {
+  it("returns the derived T/N/M when not overridden, ignoring stored values", () => {
+    // The form keeps clinicalT/N/M synced to the derivation; a stale stored
+    // value must not leak through while the override is off.
+    expect(
+      resolveStaging(
+        makeInput({ clinicalT: "cT4", clinicalN: "N1", clinicalM: "M1b" })
+      )
+    ).toEqual({ cT: "cT2b", cN: "N0", cM: "M0" });
+  });
+
+  it("returns the override values when isStagingOverridden=true", () => {
+    expect(
+      resolveStaging(
+        makeInput({
+          isStagingOverridden: true,
+          clinicalT: "cT3a",
+          clinicalN: "N1",
+          clinicalM: "M1a",
+        })
+      )
+    ).toEqual({ cT: "cT3a", cN: "N1", cM: "M1a" });
+  });
+
+  it("falls back per category when an override value is missing", () => {
+    expect(
+      resolveStaging(makeInput({ isStagingOverridden: true, clinicalT: "cT3a" }))
+    ).toEqual({ cT: "cT3a", cN: "N0", cM: "M0" });
+  });
+});
+
+describe("deriveEauRiskGroup — metastatic disease and staging overrides", () => {
+  // ISUP 1, PSA 8, 8 mm unilateral lesion in a 40 mm gland → cT2a → low.
+  const lowRisk = {
+    clinicalIndication: "staging_after_diagnosis" as const,
+    psaNgPerMl: 8,
+    priorBiopsyStatus: "positive_ISUP1" as const,
+    lesions: [makeLesion({ sizeMaxAxialMm: 8 })],
+  };
+
+  it("baseline: the low-risk fixture is low", () => {
+    expect(deriveEauRiskGroup(makeInput(lowRisk))).toBe("low");
+  });
+
+  it.each([
+    ["M1a", { nonRegionalLymphNodes: [{ shortAxisMm: 12 }] }],
+    ["M1b", { boneInvolvement: "definite" as const }],
+    ["M1c", { otherDistantMetastasis: "liver" as const }],
+  ])("metastatic: derived %s", (_m, extra) => {
+    expect(deriveEauRiskGroup(makeInput({ ...lowRisk, ...extra }))).toBe(
+      "metastatic"
+    );
+  });
+
+  it("metastatic takes precedence over high-risk gates", () => {
+    expect(
+      deriveEauRiskGroup(
+        makeInput({
+          ...lowRisk,
+          psaNgPerMl: 30,
+          priorBiopsyStatus: "positive_ISUP5",
+          boneInvolvement: "definite",
+        })
+      )
+    ).toBe("metastatic");
+  });
+
+  it("MX (equivocal bone) is not metastatic", () => {
+    expect(
+      deriveEauRiskGroup(makeInput({ ...lowRisk, boneInvolvement: "equivocal" }))
+    ).toBe("low");
+  });
+
+  it("honours an overridden cT", () => {
+    expect(
+      deriveEauRiskGroup(
+        makeInput({ ...lowRisk, isStagingOverridden: true, clinicalT: "cT3a" })
+      )
+    ).toBe("high");
+  });
+
+  it("honours an overridden cN", () => {
+    expect(
+      deriveEauRiskGroup(
+        makeInput({ ...lowRisk, isStagingOverridden: true, clinicalN: "N1" })
+      )
+    ).toBe("high");
+  });
+
+  it("honours an overridden cM", () => {
+    expect(
+      deriveEauRiskGroup(
+        makeInput({ ...lowRisk, isStagingOverridden: true, clinicalM: "M1b" })
+      )
+    ).toBe("metastatic");
+  });
+
+  it("an override can lower the derived stage", () => {
+    expect(
+      deriveEauRiskGroup(
+        makeInput({
+          ...lowRisk,
+          lesions: [makeLesion({ epeRiskMehralivand: "3_frank_breach", sizeMaxAxialMm: 8 })],
+          isStagingOverridden: true,
+          clinicalT: "cT2a",
+        })
+      )
+    ).toBe("low");
+  });
+
+  it("negative MRI with an override is stratified from the override", () => {
+    expect(
+      deriveEauRiskGroup(
+        makeInput({
+          ...lowRisk,
+          priorBiopsyStatus: "positive_ISUP2",
+          noSuspiciousLesion: true,
+          lesions: [],
+          isStagingOverridden: true,
+          clinicalT: "cT1c",
+          clinicalN: "N0",
+          clinicalM: "M0",
+        })
+      )
+    ).toBe("intermediate_favourable");
+  });
+
+  it("negative MRI without an override stays not applicable", () => {
+    expect(
+      deriveEauRiskGroup(
+        makeInput({ ...lowRisk, noSuspiciousLesion: true, lesions: [] })
+      )
+    ).toBe("not_applicable");
+  });
+
+  it("serializes the metastatic group as readable prose", () => {
+    expect(
+      serializeProstateStructuredInput(
+        makeInput({ ...lowRisk, boneInvolvement: "definite" })
+      )
+    ).toContain(
+      "- EAU risk group: metastatic disease (cM1) — localised risk groups not applicable"
+    );
   });
 });

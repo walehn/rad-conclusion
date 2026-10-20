@@ -132,6 +132,8 @@ export const EAU_RISK_GROUP_OPTIONS = [
   "intermediate_favourable",
   "intermediate_unfavourable",
   "high",
+  // cM1: EAU's localised / locally advanced risk groups do not apply.
+  "metastatic",
   "not_applicable",
 ] as const;
 export type EauRiskGroup = (typeof EAU_RISK_GROUP_OPTIONS)[number];

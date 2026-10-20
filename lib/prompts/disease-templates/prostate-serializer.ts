@@ -18,7 +18,8 @@
  *  - deriveClinicalN:        regional ≥ 8 mm OR suspicious features → N1.
  *  - deriveClinicalM:        bone definite → M1b; non-regional nodes → M1a.
  *  - derivePsaDensity:       psa / volume rounded to 1 decimal place.
- *  - deriveEauRiskGroup:     Cornford 2025 EAU low/intermediate/high.
+ *  - deriveEauRiskGroup:     Cornford 2025 EAU low/intermediate/high, or
+ *                            metastatic for cM1.
  *  - deriveMriProtocol:      mpMRI when any DCE result was recorded, else bpMRI.
  */
 
@@ -217,6 +218,7 @@ const HUMAN_ENUM_LABELS: Readonly<Record<string, string>> = {
   // EauRiskGroup
   intermediate_favourable: "intermediate-favourable",
   intermediate_unfavourable: "intermediate-unfavourable",
+  metastatic: "metastatic disease (cM1) — localised risk groups not applicable",
   not_applicable: "not applicable",
 
   // Zone
@@ -714,13 +716,46 @@ function extractIsupGrade(status: PriorBiopsyStatus): number {
   }
 }
 
+export interface ResolvedStaging {
+  cT: ClinicalT;
+  cN: ClinicalN;
+  cM: ClinicalM;
+}
+
+/**
+ * The T/N/M actually reported: the radiologist's override values when
+ * `isStagingOverridden` is set, else the auto-derived ones. Shared by the
+ * serializer and the EAU risk group so both see the same staging.
+ */
+export function resolveStaging(input: ProstateStructuredInput): ResolvedStaging {
+  const overridden = input.isStagingOverridden === true;
+  return {
+    cT:
+      overridden && input.clinicalT !== undefined
+        ? input.clinicalT
+        : deriveClinicalT(input),
+    cN:
+      overridden && input.clinicalN !== undefined
+        ? input.clinicalN
+        : deriveClinicalN(input),
+    cM:
+      overridden && input.clinicalM !== undefined
+        ? input.clinicalM
+        : deriveClinicalM(input),
+  };
+}
+
 /**
  * EAU 2025/2026 risk group (Cornford 2025 Table 4.3, simplified).
  *
  * Only computed when `clinicalIndication === 'staging_after_diagnosis'`. For
  * pre-biopsy indications, returns 'not_applicable'.
  *
+ * T/N/M come from `resolveStaging`, so staging overrides are honoured.
+ *
  * Rules:
+ *  - metastatic: clinicalM in {M1a, M1b, M1c}. Takes precedence over every
+ *    other rule, since the risk groups cover non-metastatic disease only.
  *  - low: PSA < 10 AND ISUP === 1 AND clinicalT in {cT1c, cT2a}.
  *  - high: PSA > 20 OR ISUP >= 4 OR clinicalT in {cT3a, cT3b, cT4} OR
  *    clinicalN === N1 (cN+ is locally advanced, which EAU groups as high).
@@ -737,7 +772,7 @@ export function deriveEauRiskGroup(
     return "not_applicable";
   }
 
-  if (input.noSuspiciousLesion) {
+  if (input.noSuspiciousLesion && input.isStagingOverridden !== true) {
     // Negative MRI: even with biopsy-confirmed prior disease, this scan
     // contributes no measurable T-stage evidence so EAU stratification
     // is left to the clinician via the staging override path.
@@ -750,9 +785,10 @@ export function deriveEauRiskGroup(
     return "not_applicable";
   }
 
-  const cT = deriveClinicalT(input);
-  const cN = deriveClinicalN(input);
+  const { cT, cN, cM } = resolveStaging(input);
   const psa = input.psaNgPerMl;
+
+  if (cM === "M1a" || cM === "M1b" || cM === "M1c") return "metastatic";
 
   // High-risk gates (any ONE triggers high).
   if (psa > 20) return "high";
@@ -1115,18 +1151,7 @@ function wholeGlandStagingBlock(input: ProstateStructuredInput): string[] {
     );
     lines.push("- EAU risk group: not applicable");
   } else {
-    const cT =
-      overridden && input.clinicalT !== undefined
-        ? input.clinicalT
-        : deriveClinicalT(input);
-    const cN =
-      overridden && input.clinicalN !== undefined
-        ? input.clinicalN
-        : deriveClinicalN(input);
-    const cM =
-      overridden && input.clinicalM !== undefined
-        ? input.clinicalM
-        : deriveClinicalM(input);
+    const { cT, cN, cM } = resolveStaging(input);
     lines.push(`- Clinical T: ${cT}`);
     lines.push(`- Clinical N: ${cN}`);
     lines.push(`- Clinical M: ${cM}`);
