@@ -1,138 +1,101 @@
 "use client";
 
 import * as React from "react";
+import { Plus } from "lucide-react";
 import type { ProstateStructuredInput } from "@/lib/prompts/disease-templates/prostate-serializer";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { FormSection, Row, compactTextareaClass } from "@/components/compact-form";
 
 interface ProstateOtherFindingsCardProps {
   value: ProstateStructuredInput;
   onChange: (next: ProstateStructuredInput) => void;
 }
 
+type FreeTextKey = "incidentalFindings" | "bonyAbnormalities" | "recommendations";
+
 /**
  * Section 4 — Other findings (free-text, prostate variant).
  *
- * Mirrors `RccOtherFindingsCard` (SPEC-UI-001 §4) verbatim in structure.
- * Surfaces three free-text fields that the prostate serializer round-trips
- * verbatim under the `OTHER FINDINGS` block (multi-line preserved):
- *  - incidentalFindings (≤1000 chars)
- *  - bonyAbnormalities  (≤500 chars)
- *  - recommendations    (≤500 chars)
- *
- * Soft length caps via `maxLength` keep the LLM-input prompt within budget;
- * the serializer itself does not truncate.
+ * Three free-text fields that the prostate serializer round-trips verbatim
+ * under the `OTHER FINDINGS` block (multi-line preserved). Each stays a
+ * one-word button until opened; a field that holds text is always shown.
+ * Soft length caps via `maxLength` keep the prompt within budget; the
+ * serializer itself does not truncate.
  */
+const FIELDS: ReadonlyArray<{
+  key: FreeTextKey;
+  label: string;
+  maxLength: number;
+  placeholder: string;
+}> = [
+  {
+    key: "incidentalFindings",
+    label: "우연 소견",
+    maxLength: 1000,
+    placeholder:
+      "예) Right adrenal nodule (1 cm, likely adenoma) / Mild hip joint degenerative changes",
+  },
+  {
+    key: "bonyAbnormalities",
+    label: "골 소견",
+    maxLength: 500,
+    placeholder: "예) L4-5 mild facet arthropathy",
+  },
+  {
+    key: "recommendations",
+    label: "권고사항",
+    maxLength: 500,
+    placeholder: "예) MRI-targeted biopsy of lesion #1; PSMA-PET if equivocal bone",
+  },
+];
+
 export function ProstateOtherFindingsCard({
   value,
   onChange,
 }: ProstateOtherFindingsCardProps) {
   const id = (suffix: string) => `prostate-other-${suffix}`;
+  const [opened, setOpened] = React.useState<ReadonlySet<FreeTextKey>>(
+    () => new Set()
+  );
+  const isShown = (key: FreeTextKey) => opened.has(key) || Boolean(value[key]);
+  const shown = FIELDS.filter((f) => isShown(f.key));
+  const hidden = FIELDS.filter((f) => !isShown(f.key));
 
   return (
-    <Card className="shadow-sm ring-1 ring-border/50">
-      <CardHeader className="pb-4">
-        {/* Numbered section header (4/4) — mirrors RCC parity. */}
-        <CardTitle className="flex items-center gap-3 text-lg font-bold tracking-tight text-foreground">
-          <span
-            aria-hidden="true"
-            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground shadow-sm"
-          >
-            4
-          </span>
-          Other findings
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid gap-x-6 gap-y-5">
-          {/* Incidental findings — verbatim multi-line preserved by serializer. */}
-          <div className="rounded-lg border border-border p-3 flex flex-col gap-2">
-            <label
-              htmlFor={id("incidental")}
-              className="text-[0.9375rem] font-bold tracking-tight text-foreground"
-            >
-              Incidental findings
-              <span className="ml-2 text-xs font-normal text-muted-foreground">
-                우연히 발견된 소견 (선택사항)
-              </span>
-            </label>
-            <textarea
-              id={id("incidental")}
-              rows={4}
-              maxLength={1000}
-              value={value.incidentalFindings ?? ""}
-              onChange={(e) =>
-                onChange({
-                  ...value,
-                  incidentalFindings: e.target.value || undefined,
-                })
-              }
-              placeholder="예) Right adrenal nodule (1 cm, likely adenoma) / Mild hip joint degenerative changes"
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-y"
-            />
-          </div>
-
-          {/* Bony abnormalities — separate block so the LLM can weave it into
-              the bone-survey portion of FINDINGS without scrambling
-              recommendations. */}
-          <div className="rounded-lg border border-border p-3 flex flex-col gap-2">
-            <label
-              htmlFor={id("bony")}
-              className="text-[0.9375rem] font-bold tracking-tight text-foreground"
-            >
-              Bony abnormalities
-              <span className="ml-2 text-xs font-normal text-muted-foreground">
-                골격계 이상 소견 (선택사항)
-              </span>
-            </label>
-            <textarea
-              id={id("bony")}
-              rows={3}
-              maxLength={500}
-              value={value.bonyAbnormalities ?? ""}
-              onChange={(e) =>
-                onChange({
-                  ...value,
-                  bonyAbnormalities: e.target.value || undefined,
-                })
-              }
-              placeholder="예) L4-5 mild facet arthropathy"
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-y"
-            />
-          </div>
-
-          {/* Recommendations — final IMPRESSION-adjacent free-text. */}
-          <div className="rounded-lg border border-border p-3 flex flex-col gap-2">
-            <label
-              htmlFor={id("recommendations")}
-              className="text-[0.9375rem] font-bold tracking-tight text-foreground"
-            >
-              Recommendations
-              <span className="ml-2 text-xs font-normal text-muted-foreground">
-                권장사항 (선택사항)
-              </span>
-            </label>
-            <textarea
-              id={id("recommendations")}
-              rows={3}
-              maxLength={500}
-              value={value.recommendations ?? ""}
-              onChange={(e) =>
-                onChange({
-                  ...value,
-                  recommendations: e.target.value || undefined,
-                })
-              }
-              placeholder="예) MRI-targeted biopsy of lesion #1; PSMA-PET if equivocal bone"
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-y"
-            />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+    <FormSection
+      id="prostate-section-other"
+      step={4}
+      title="기타 소견"
+      summary="입력한 문장 그대로 리포트에 들어갑니다"
+      actions={hidden.map((f) => (
+        <button
+          key={f.key}
+          type="button"
+          onClick={() => setOpened((prev) => new Set(prev).add(f.key))}
+          className="inline-flex h-7 items-center gap-1 rounded-md border border-border px-2 text-xs text-foreground/80 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+          {f.label}
+        </button>
+      ))}
+    >
+      {shown.length > 0
+        ? shown.map((f) => (
+            <Row key={f.key} label={f.label} htmlFor={id(f.key)} align="start">
+              <textarea
+                id={id(f.key)}
+                rows={2}
+                maxLength={f.maxLength}
+                autoFocus={opened.has(f.key) && !value[f.key]}
+                value={value[f.key] ?? ""}
+                onChange={(e) =>
+                  onChange({ ...value, [f.key]: e.target.value || undefined })
+                }
+                placeholder={f.placeholder}
+                className={compactTextareaClass}
+              />
+            </Row>
+          ))
+        : undefined}
+    </FormSection>
   );
 }

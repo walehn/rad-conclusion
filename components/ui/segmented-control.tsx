@@ -47,6 +47,8 @@ const containerVariants = cva(
       size: {
         // `min-h-*` (not `h-*`) reserves the prior single-row height while
         // still permitting growth when wrapping kicks in.
+        // Dense worksheet rows (compact structured forms).
+        xs: "min-h-7 gap-0.5 p-0.5 text-[13px]",
         sm: "min-h-8 text-xs",
         md: "min-h-9 text-sm",
       },
@@ -69,6 +71,7 @@ const optionVariants = cva(
       size: {
         // Wider horizontal padding (vs. previous px-2.5/3) enlarges the click
         // target and gives the active primary fill room to breathe.
+        xs: "px-2.5 py-0.5",
         sm: "px-3 py-1",
         md: "px-4 py-1",
       },
@@ -225,16 +228,20 @@ export function SegmentedControl<T extends string>({
             {/* Leading dot — radio-style affordance signalling that each
                 pill is a selectable option. Hollow ring when inactive, solid
                 fill when active. Color tracks the active text color so the
-                contrast against the primary fill stays consistent. */}
-            <span
-              aria-hidden="true"
-              className={cn(
-                "inline-block h-1.5 w-1.5 shrink-0 rounded-full transition-colors",
-                active
-                  ? "bg-primary-foreground"
-                  : "border border-muted-foreground/50 bg-transparent"
-              )}
-            />
+                contrast against the primary fill stays consistent. Dropped
+                at xs, where the pill shape alone carries the affordance and
+                the width matters more. */}
+            {size !== "xs" && (
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "inline-block h-1.5 w-1.5 shrink-0 rounded-full transition-colors",
+                  active
+                    ? "bg-primary-foreground"
+                    : "border border-muted-foreground/50 bg-transparent"
+                )}
+              />
+            )}
             {/* Render the label as plain text — no `truncate` class — so long
                 option labels (e.g. ">=50% exophytic") are always visible in
                 full. `whitespace-nowrap` on the button keeps each individual

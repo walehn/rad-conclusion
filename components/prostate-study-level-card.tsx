@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { Plus, X } from "lucide-react";
-import { cn } from "@/lib/utils";
 import {
   BONE_INVOLVEMENT_OPTIONS,
   CLINICAL_M_OPTIONS,
@@ -17,6 +16,7 @@ import {
   type ClinicalM,
   type ClinicalN,
   type ClinicalT,
+  type EauRiskGroup,
   type LocalInvolvement,
   type OtherDistantMets,
   type PiQualDceSubscore,
@@ -36,185 +36,63 @@ import {
   type ProstateStructuredInput,
 } from "@/lib/prompts/disease-templates/prostate-serializer";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   SegmentedControl,
   toSegmentedOptions,
   type SegmentedControlOption,
 } from "@/components/ui/segmented-control";
+import {
+  ChipToggle,
+  Disclosure,
+  FormSection,
+  InlineField,
+  NumberInput,
+  Readout,
+  Row,
+  compactInputClass,
+} from "@/components/compact-form";
+import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
-// File-local helpers (mirror rcc-study-level-card.tsx for visual rhythm parity)
-// ---------------------------------------------------------------------------
-
-function FieldRow({
-  label,
-  optional,
-  required,
-  children,
-  className,
-}: {
-  label: string;
-  optional?: boolean;
-  /** Marks the field as required for the Generate-report gate. */
-  required?: boolean;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-lg border border-border p-3 flex flex-col gap-2",
-        className
-      )}
-    >
-      <span className="px-1 text-[0.9375rem] font-bold tracking-tight text-foreground">
-        {label}
-        {required && (
-          <>
-            <span
-              aria-hidden="true"
-              className="ml-1 font-bold text-destructive"
-            >
-              *
-            </span>
-            <span className="sr-only"> (required)</span>
-          </>
-        )}
-        {!required && optional && (
-          <span className="ml-1 text-xs font-normal text-muted-foreground">
-            (optional)
-          </span>
-        )}
-      </span>
-      {children}
-    </div>
-  );
-}
-
-function NumberField({
-  id,
-  label,
-  value,
-  onChange,
-  unit,
-  optional = false,
-  required = false,
-  step = "0.1",
-  min,
-  max,
-  className,
-}: {
-  id: string;
-  label: string;
-  value: number | undefined;
-  onChange: (v: number | undefined) => void;
-  unit?: string;
-  optional?: boolean;
-  required?: boolean;
-  step?: string;
-  min?: string;
-  max?: string;
-  className?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-lg border border-border p-3 flex flex-col gap-2",
-        className
-      )}
-    >
-      <label
-        htmlFor={id}
-        className="text-[0.9375rem] font-bold tracking-tight text-foreground"
-      >
-        {label}
-        {required && (
-          <>
-            <span
-              aria-hidden="true"
-              className="ml-1 font-bold text-destructive"
-            >
-              *
-            </span>
-            <span className="sr-only"> (required)</span>
-          </>
-        )}
-        {!required && optional && (
-          <span className="ml-1 text-xs font-normal text-muted-foreground">
-            (optional)
-          </span>
-        )}
-      </label>
-      <div className="flex items-center gap-2">
-        <input
-          id={id}
-          type="number"
-          step={step}
-          min={min}
-          max={max}
-          value={value ?? ""}
-          onChange={(e) => {
-            const v =
-              e.target.value === "" ? undefined : parseFloat(e.target.value);
-            onChange(v);
-          }}
-          className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        />
-        {unit && (
-          <span className="shrink-0 text-sm text-muted-foreground">{unit}</span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Bilingual option labels
+// Option labels — short Korean labels so each group fits one row
 // ---------------------------------------------------------------------------
 
 const SVI_WHOLE_GLAND_LABEL: Record<SviWholeGland, string> = {
-  none: "None · 없음",
-  right: "Right · 우측",
-  left: "Left · 좌측",
-  bilateral: "Bilateral · 양측",
+  none: "없음",
+  right: "우측",
+  left: "좌측",
+  bilateral: "양측",
 };
 
 const LOCAL_INVOLVEMENT_LABEL: Record<LocalInvolvement, string> = {
-  none: "None · 없음",
-  abutment: "Abutment · 인접",
-  invasion: "Invasion · 침범",
+  none: "없음",
+  abutment: "인접",
+  invasion: "침범",
 };
 
 const BONE_INVOLVEMENT_LABEL: Record<BoneInvolvement, string> = {
-  none: "None · 없음",
-  equivocal: "Equivocal · 모호",
-  definite: "Definite · 확실",
+  none: "없음",
+  equivocal: "모호",
+  definite: "확실",
 };
 
 const OTHER_DISTANT_METS_LABEL: Record<OtherDistantMets, string> = {
-  none: "None · 없음",
-  lung: "Lung · 폐",
-  liver: "Liver · 간",
-  other: "Other · 기타",
+  none: "없음",
+  lung: "폐",
+  liver: "간",
+  other: "기타",
 };
 
 const PIQUAL_OVERALL_LABEL: Record<PiQualOverall, string> = {
-  "1_inadequate": "1 · Inadequate",
-  "2_acceptable": "2 · Acceptable",
-  "3_optimal": "3 · Optimal",
-};
-
-const PIQUAL_OVERALL_SUBLABEL: Record<PiQualOverall, string> = {
-  "1_inadequate": "부적합",
-  "2_acceptable": "양호",
-  "3_optimal": "우수",
+  "1_inadequate": "PI-QUAL 1 부적합",
+  "2_acceptable": "PI-QUAL 2 양호",
+  "3_optimal": "PI-QUAL 3 우수",
 };
 
 const PIQUAL_DCE_LABEL: Record<PiQualDceSubscore, string> = {
-  "+": "+ (Adequate)",
-  "-": "- (Inadequate)",
-  not_applicable: "N/A · 미수행",
+  "+": "+",
+  "-": "−",
+  not_applicable: "N/A",
 };
 
 const CLINICAL_M_LABEL: Record<ClinicalM, string> = {
@@ -225,6 +103,15 @@ const CLINICAL_M_LABEL: Record<ClinicalM, string> = {
   M1c: "M1c",
 };
 
+const EAU_LABEL: Record<EauRiskGroup, string> = {
+  low: "low",
+  intermediate_favourable: "intermediate-favourable",
+  intermediate_unfavourable: "intermediate-unfavourable",
+  high: "high",
+  metastatic: "metastatic",
+  not_applicable: "not applicable",
+};
+
 function toLabeledOptions<T extends string>(
   values: ReadonlyArray<T>,
   labels: Record<T, string>
@@ -232,290 +119,174 @@ function toLabeledOptions<T extends string>(
   return values.map((v) => ({ value: v, label: labels[v] }));
 }
 
+/** The four extraprostatic structures sharing the none/abutment/invasion scale. */
+const LOCAL_STRUCTURES = [
+  { key: "bladderNeckInvolvement", label: "방광경부", aria: "Bladder neck involvement" },
+  { key: "externalSphincterInvolvement", label: "외괄약근", aria: "External sphincter involvement" },
+  { key: "rectalInvolvement", label: "직장", aria: "Rectal involvement" },
+  { key: "pelvicSidewallInvolvement", label: "골반측벽", aria: "Pelvic sidewall involvement" },
+] as const;
+
 // ---------------------------------------------------------------------------
 // Bone lesion location chips (S-2)
 // ---------------------------------------------------------------------------
 
 const BONE_LESION_LOCATIONS = [
-  { value: "pelvis", label: "Pelvis · 골반" },
-  { value: "lumbar_spine", label: "Lumbar spine · 요추" },
-  { value: "sacrum", label: "Sacrum · 천골" },
-  { value: "femur_R", label: "Femur (R) · 우측 대퇴" },
-  { value: "femur_L", label: "Femur (L) · 좌측 대퇴" },
-  { value: "other", label: "Other · 기타" },
+  { value: "pelvis", label: "골반" },
+  { value: "lumbar_spine", label: "요추" },
+  { value: "sacrum", label: "천골" },
+  { value: "femur_R", label: "우측 대퇴" },
+  { value: "femur_L", label: "좌측 대퇴" },
+  { value: "other", label: "기타" },
 ] as const;
 
-function BoneLesionLocationsPicker({
-  id,
-  selected,
+// ---------------------------------------------------------------------------
+// Lymph nodes — one line per node
+// ---------------------------------------------------------------------------
+
+function parseFeatures(raw: string): string[] {
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+interface NodeRowProps {
+  idPrefix: string;
+  isRegional: boolean;
+  node: ProstateLymphNode;
+  onChange: (next: ProstateLymphNode) => void;
+  onRemove: () => void;
+  removeLabel: string;
+}
+
+function NodeRow({
+  idPrefix,
+  isRegional,
+  node,
   onChange,
-}: {
-  id: string;
-  selected: string[];
-  onChange: (next: string[]) => void;
-}) {
-  const toggle = (code: string) => {
-    if (selected.includes(code)) {
-      onChange(selected.filter((c) => c !== code));
-    } else {
-      onChange([...selected, code]);
+  onRemove,
+  removeLabel,
+}: NodeRowProps) {
+  // The features box keeps its own text: rebuilding it from the parsed array
+  // on every keystroke dropped a just-typed comma, so a second feature could
+  // never be entered. The draft resyncs only when the stored list changes
+  // from outside (e.g. a node above this one was removed).
+  const stored = node.suspiciousFeatures ?? [];
+  const [draft, setDraft] = React.useState(stored.join(", "));
+  React.useEffect(() => {
+    if (parseFeatures(draft).join("\u0000") !== stored.join("\u0000")) {
+      setDraft(stored.join(", "));
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stored.join("\u0000")]);
+
+  const stationValue = isRegional ? (node.station ?? "") : (node.location ?? "");
 
   return (
-    <fieldset
-      aria-labelledby={`${id}-legend`}
-      className="md:col-span-2 rounded-lg border border-border p-3 flex flex-col gap-2"
-    >
-      <legend
-        id={`${id}-legend`}
-        className="px-1 text-[0.9375rem] font-bold tracking-tight text-foreground"
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-md bg-muted/40 px-2 py-1.5">
+      <input
+        id={`${idPrefix}-station`}
+        type="text"
+        maxLength={80}
+        aria-label={isRegional ? "Station · 위치" : "Location · 위치"}
+        placeholder={isRegional ? "위치 (예: obturator)" : "위치 (예: retroperitoneal)"}
+        value={stationValue}
+        onChange={(e) => {
+          const v = e.target.value || undefined;
+          onChange(isRegional ? { ...node, station: v } : { ...node, location: v });
+        }}
+        className={cn(compactInputClass, "w-40")}
+      />
+      <InlineField label="단축" htmlFor={`${idPrefix}-shortAxis`}>
+        <NumberInput
+          id={`${idPrefix}-shortAxis`}
+          value={node.shortAxisMm}
+          onChange={(v) => onChange({ ...node, shortAxisMm: v ?? 0 })}
+          unit="mm"
+          min="0"
+          max="100"
+          widthClass="w-14"
+          emptyWhenZero
+        />
+      </InlineField>
+      <SegmentedControl<"round" | "oval" | "lobulated">
+        name={`${idPrefix}-morphology`}
+        ariaLabel="Morphology · 형태"
+        size="xs"
+        value={node.morphology}
+        options={[
+          { value: "round", label: "원형" },
+          { value: "oval", label: "타원" },
+          { value: "lobulated", label: "분엽" },
+        ]}
+        onChange={(next) => onChange({ ...node, morphology: next })}
+      />
+      <input
+        id={`${idPrefix}-features`}
+        type="text"
+        maxLength={200}
+        aria-label="Suspicious features · 의심 소견 (comma-separated)"
+        placeholder="의심 소견 (쉼표로 구분)"
+        value={draft}
+        onChange={(e) => {
+          setDraft(e.target.value);
+          const parts = parseFeatures(e.target.value);
+          onChange({
+            ...node,
+            suspiciousFeatures: parts.length > 0 ? parts : undefined,
+          });
+        }}
+        className={cn(compactInputClass, "w-44 min-w-0 flex-1")}
+      />
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7"
+        onClick={onRemove}
+        aria-label={removeLabel}
       >
-        Bone lesion locations · 골 병변 위치
-        <span className="ml-1 text-xs font-normal text-muted-foreground">
-          (≥1 required)
-        </span>
-      </legend>
-      <div className="flex flex-wrap gap-2">
-        {BONE_LESION_LOCATIONS.map((opt) => {
-          const active = selected.includes(opt.value);
-          return (
-            <button
-              key={opt.value}
-              type="button"
-              role="checkbox"
-              aria-checked={active}
-              onClick={() => toggle(opt.value)}
-              className={cn(
-                "rounded-md border px-3 py-1 text-xs font-medium transition-colors",
-                active
-                  ? "bg-primary/15 ring-2 ring-primary/40 border-primary text-foreground"
-                  : "border-border bg-background text-foreground/80 hover:bg-muted/50"
-              )}
-            >
-              {opt.label}
-            </button>
-          );
-        })}
-      </div>
-    </fieldset>
+        <X className="h-3.5 w-3.5" />
+      </Button>
+    </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Lymph-node sub-card (regional + non-regional share the same shape; the
-// `kind` prop swaps the station/location label appropriately).
-// ---------------------------------------------------------------------------
-
-interface LymphNodeSubCardProps {
-  idPrefix: string;
-  kind: "regional" | "non_regional";
-  nodes: ProstateLymphNode[];
-  onChange: (next: ProstateLymphNode[]) => void;
-}
-
-function LymphNodeSubCard({
+function NodeList({
   idPrefix,
   kind,
   nodes,
   onChange,
-}: LymphNodeSubCardProps) {
+}: {
+  idPrefix: string;
+  kind: "regional" | "non_regional";
+  nodes: ProstateLymphNode[];
+  onChange: (next: ProstateLymphNode[]) => void;
+}) {
   const isRegional = kind === "regional";
-  const heading = isRegional
-    ? "Regional lymph nodes · 국소 림프절"
-    : "Non-regional lymph nodes · 비국소 림프절";
-  const stationFieldLabel = isRegional
-    ? "Station · 위치 (e.g. obturator, internal_iliac)"
-    : "Location · 위치 (e.g. retroperitoneal)";
-
-  const handleAdd = () => {
-    onChange([...nodes, { shortAxisMm: 0 }]);
-  };
-
-  const handleRemove = (idx: number) => {
-    onChange(nodes.filter((_, i) => i !== idx));
-  };
-
-  const handleNodeChange = (idx: number, next: ProstateLymphNode) => {
-    onChange(nodes.map((n, i) => (i === idx ? next : n)));
-  };
-
   return (
-    <fieldset
-      aria-labelledby={`${idPrefix}-legend`}
-      className="md:col-span-2 rounded-lg border border-border p-3 flex flex-col gap-3"
-    >
-      <legend
-        id={`${idPrefix}-legend`}
-        className="px-1 text-[0.9375rem] font-bold tracking-tight text-foreground"
+    <div className="flex w-full flex-col gap-1.5">
+      {nodes.map((node, idx) => (
+        <NodeRow
+          key={idx}
+          idPrefix={`${idPrefix}-${idx}`}
+          isRegional={isRegional}
+          node={node}
+          onChange={(next) => onChange(nodes.map((n, i) => (i === idx ? next : n)))}
+          onRemove={() => onChange(nodes.filter((_, i) => i !== idx))}
+          removeLabel={`Remove ${isRegional ? "regional" : "non-regional"} node #${idx + 1}`}
+        />
+      ))}
+      <button
+        type="button"
+        onClick={() => onChange([...nodes, { shortAxisMm: 0 }])}
+        className="inline-flex items-center gap-1 self-start text-xs text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        {heading}
-      </legend>
-
-      {nodes.length === 0 ? (
-        <p className="text-xs text-muted-foreground">
-          {isRegional
-            ? "의심 림프절 없음 — 기본값 N0. 의심 림프절이 보이면 아래 버튼으로 추가하세요."
-            : "비국소 의심 림프절 없음. 발견 시 아래 버튼으로 추가하세요."}
-        </p>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {nodes.map((node, idx) => {
-            const fieldId = (suffix: string) =>
-              `${idPrefix}-${idx}-${suffix}`;
-            const stationValue = isRegional
-              ? (node.station ?? "")
-              : (node.location ?? "");
-            return (
-              <div
-                key={idx}
-                className="rounded-md border border-border/60 bg-muted/20 p-3 flex flex-col gap-3"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-foreground">
-                    Node{" "}
-                    <span className="text-primary font-extrabold">
-                      #{idx + 1}
-                    </span>
-                  </span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleRemove(idx)}
-                    aria-label={`Remove ${
-                      isRegional ? "regional" : "non-regional"
-                    } node #${idx + 1}`}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                <div className="grid gap-x-6 gap-y-3 md:grid-cols-2">
-                  {/* Station / Location free-text */}
-                  <div className="rounded-md border border-border bg-background p-2 flex flex-col gap-1">
-                    <label
-                      htmlFor={fieldId("station")}
-                      className="text-xs font-bold tracking-tight text-foreground"
-                    >
-                      {stationFieldLabel}
-                    </label>
-                    <input
-                      id={fieldId("station")}
-                      type="text"
-                      maxLength={80}
-                      value={stationValue}
-                      onChange={(e) => {
-                        const v = e.target.value || undefined;
-                        if (isRegional) {
-                          handleNodeChange(idx, { ...node, station: v });
-                        } else {
-                          handleNodeChange(idx, { ...node, location: v });
-                        }
-                      }}
-                      className="w-full rounded-md border border-input bg-background px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    />
-                  </div>
-
-                  {/* Short-axis size (mm) */}
-                  <div className="rounded-md border border-border bg-background p-2 flex flex-col gap-1">
-                    <label
-                      htmlFor={fieldId("shortAxis")}
-                      className="text-xs font-bold tracking-tight text-foreground"
-                    >
-                      Short axis · 단축 (mm)
-                    </label>
-                    <input
-                      id={fieldId("shortAxis")}
-                      type="number"
-                      step="1"
-                      min="0"
-                      max="100"
-                      value={node.shortAxisMm}
-                      onChange={(e) => {
-                        const v =
-                          e.target.value === ""
-                            ? 0
-                            : parseFloat(e.target.value);
-                        handleNodeChange(idx, { ...node, shortAxisMm: v });
-                      }}
-                      className="w-full rounded-md border border-input bg-background px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    />
-                  </div>
-
-                  {/* Morphology */}
-                  <div className="rounded-md border border-border bg-background p-2 flex flex-col gap-1 md:col-span-2">
-                    <span className="text-xs font-bold tracking-tight text-foreground">
-                      Morphology · 형태 (optional)
-                    </span>
-                    <SegmentedControl<"round" | "oval" | "lobulated">
-                      name={fieldId("morphology")}
-                      ariaLabel="Morphology"
-                      value={node.morphology}
-                      options={[
-                        { value: "round", label: "Round · 원형" },
-                        { value: "oval", label: "Oval · 타원형" },
-                        { value: "lobulated", label: "Lobulated · 분엽" },
-                      ]}
-                      onChange={(next) =>
-                        handleNodeChange(idx, { ...node, morphology: next })
-                      }
-                    />
-                  </div>
-
-                  {/* Suspicious features — comma-separated free-text */}
-                  <div className="rounded-md border border-border bg-background p-2 flex flex-col gap-1 md:col-span-2">
-                    <label
-                      htmlFor={fieldId("features")}
-                      className="text-xs font-bold tracking-tight text-foreground"
-                    >
-                      Suspicious features · 의심 소견
-                      <span className="ml-1 text-xs font-normal text-muted-foreground">
-                        (comma-separated, optional)
-                      </span>
-                    </label>
-                    <input
-                      id={fieldId("features")}
-                      type="text"
-                      maxLength={200}
-                      value={(node.suspiciousFeatures ?? []).join(", ")}
-                      onChange={(e) => {
-                        const raw = e.target.value;
-                        const parts = raw
-                          .split(",")
-                          .map((s) => s.trim())
-                          .filter((s) => s.length > 0);
-                        handleNodeChange(idx, {
-                          ...node,
-                          suspiciousFeatures: parts.length > 0 ? parts : undefined,
-                        });
-                      }}
-                      placeholder="예) necrosis, irregular_border"
-                      className="w-full rounded-md border border-input bg-background px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    />
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      <div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={handleAdd}
-          className="w-full sm:w-auto"
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          {isRegional
-            ? "Add regional lymph node"
-            : "Add non-regional lymph node"}
-        </Button>
-      </div>
-    </fieldset>
+        <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+        림프절 추가
+      </button>
+    </div>
   );
 }
 
@@ -545,6 +316,10 @@ export function ProstateStudyLevelCard({
     value.prostateAPMm
   );
   const psaDensity = derivePsaDensity(value.psaNgPerMl, value.prostateVolumeMl);
+  const piQualOverall = derivePiQualOverall(
+    value.piQualT2WSubscore,
+    value.piQualDWISubscore
+  );
 
   /**
    * Apply a single dimension change. The new dimensions are run through
@@ -593,25 +368,15 @@ export function ProstateStudyLevelCard({
   }, [overridden, derivedT, derivedN, derivedM]);
 
   const handleStagingOverrideToggle = () => {
-    if (overridden) {
-      // Off: revert to canonical derivation.
-      onChange({
-        ...value,
-        isStagingOverridden: false,
-        clinicalT: derivedT,
-        clinicalN: derivedN,
-        clinicalM: derivedM,
-      });
-    } else {
-      // On: seed override values from current derivation.
-      onChange({
-        ...value,
-        isStagingOverridden: true,
-        clinicalT: derivedT,
-        clinicalN: derivedN,
-        clinicalM: derivedM,
-      });
-    }
+    // Both directions re-seed from the derivation: off reverts to it, on
+    // starts the override from it.
+    onChange({
+      ...value,
+      isStagingOverridden: !overridden,
+      clinicalT: derivedT,
+      clinicalN: derivedN,
+      clinicalM: derivedM,
+    });
   };
 
   // Bone involvement handler — clear `boneLesionLocations` when reverting to
@@ -633,203 +398,206 @@ export function ProstateStudyLevelCard({
   // Negative MRI suppresses AJCC/EAU staging UI per prostate.ts NEGATIVE CASE
   // HANDLING: the serializer emits "AJCC TNM staging: not applicable on
   // negative MRI" and the prompt forces the STAGING section to a single
-  // "Not applicable" line, so the auto-derived T/N/M cards and the EAU risk
-  // badge would only confuse the radiologist.
+  // "Not applicable" line, so the auto-derived T/N/M and the EAU risk group
+  // would only confuse the radiologist.
   const showStaging = !value.noSuspiciousLesion;
 
+  const regionalNodes = value.regionalLymphNodes ?? [];
+  const nonRegionalNodes = value.nonRegionalLymphNodes ?? [];
+
+  // One-line summary of the usually-negative block; anything non-default is
+  // listed so a collapsed block still shows every recorded finding.
+  const abnormal: string[] = [];
+  if (value.seminalVesicleInvasionWholeGland !== "none") {
+    abnormal.push(
+      `정낭 ${SVI_WHOLE_GLAND_LABEL[value.seminalVesicleInvasionWholeGland]}`
+    );
+  }
+  for (const s of LOCAL_STRUCTURES) {
+    if (value[s.key] !== "none") {
+      abnormal.push(`${s.label} ${LOCAL_INVOLVEMENT_LABEL[value[s.key]]}`);
+    }
+  }
+  if (regionalNodes.length > 0) abnormal.push(`국소 림프절 ${regionalNodes.length}`);
+  if (nonRegionalNodes.length > 0)
+    abnormal.push(`비국소 림프절 ${nonRegionalNodes.length}`);
+  if (value.boneInvolvement !== "none") {
+    abnormal.push(`골 ${BONE_INVOLVEMENT_LABEL[value.boneInvolvement]}`);
+  }
+  if (value.otherDistantMetastasis !== "none") {
+    abnormal.push(`원격 ${OTHER_DISTANT_METS_LABEL[value.otherDistantMetastasis]}`);
+  }
+
+  const shownM = overridden ? (value.clinicalM ?? derivedM) : derivedM;
+  const stagingText = overridden
+    ? undefined
+    : `${derivedT} · c${derivedN} · ${
+        derivedM === "not_assessed" ? "cM 평가 안 함" : `c${derivedM}`
+      }`;
+
+  const sectionSummary = [
+    derivedVolumeMl !== undefined && `${derivedVolumeMl} mL`,
+    PIQUAL_OVERALL_LABEL[piQualOverall],
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  const selectClass = cn(compactInputClass, "w-auto pr-6");
+  const boneLocations = value.boneLesionLocations ?? [];
+
   return (
-    <Card className="shadow-sm ring-1 ring-border/50">
-      <CardHeader className="pb-4">
-        <CardTitle className="flex items-center gap-3 text-lg font-bold tracking-tight text-foreground">
-          <span
-            aria-hidden="true"
-            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground shadow-sm"
-          >
-            3
-          </span>
-          Whole-gland &amp; Staging
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid gap-x-6 gap-y-5 md:grid-cols-2">
-          {/* 1. Prostate dimensions (W × H × AP) → ellipsoid-derived volume.
-                Three orthogonal measurements in mm; volume is auto-computed
-                via V = W × H × AP × 0.52 / 1000 (ellipsoid approximation,
-                where 0.52 ≈ π/6) and written back into `prostateVolumeMl`
-                so PSA density and the downstream serializer continue to
-                consume a single canonical value. */}
-          <div className="md:col-span-2 grid gap-x-6 gap-y-5 sm:grid-cols-2 md:grid-cols-3">
-            <NumberField
-              id={id("width")}
-              label="Width (TR) · 좌우"
-              value={value.prostateWidthMm}
-              onChange={(w) =>
-                handleDimensionChange({ prostateWidthMm: w })
-              }
-              unit="mm"
-              min="10"
-              max="100"
-              step="0.1"
-              required
+    <FormSection
+      id="prostate-section-gland"
+      step={3}
+      title="전립선 · 병기"
+      summary={sectionSummary}
+    >
+      {/* Prostate dimensions (W × H × AP) → ellipsoid-derived volume
+          (V = W × H × AP × 0.52 / 1000), written back into
+          `prostateVolumeMl` so PSA density and the serializer consume a
+          single canonical value. */}
+      <Row label="크기" required>
+        <InlineField label="좌우" htmlFor={id("width")}>
+          <NumberInput
+            id={id("width")}
+            value={value.prostateWidthMm}
+            onChange={(w) => handleDimensionChange({ prostateWidthMm: w })}
+            min="10"
+            max="100"
+            step="0.1"
+            widthClass="w-16"
+          />
+        </InlineField>
+        <InlineField label="상하" htmlFor={id("height")}>
+          <NumberInput
+            id={id("height")}
+            value={value.prostateHeightMm}
+            onChange={(h) => handleDimensionChange({ prostateHeightMm: h })}
+            min="10"
+            max="100"
+            step="0.1"
+            widthClass="w-16"
+          />
+        </InlineField>
+        <InlineField label="전후" htmlFor={id("ap")}>
+          <NumberInput
+            id={id("ap")}
+            value={value.prostateAPMm}
+            onChange={(ap) => handleDimensionChange({ prostateAPMm: ap })}
+            unit="mm"
+            min="10"
+            max="100"
+            step="0.1"
+            widthClass="w-16"
+          />
+        </InlineField>
+        <span className="inline-flex flex-wrap gap-1.5">
+          <Readout
+            label="부피"
+            value={derivedVolumeMl !== undefined ? `${derivedVolumeMl} mL` : "—"}
+          />
+          <Readout
+            label="PSAD"
+            value={psaDensity !== undefined ? `${psaDensity.toFixed(2)}` : "—"}
+          />
+        </span>
+      </Row>
+
+      {/* PI-QUAL v2: overall is auto-derived from T2W/DWI (de Rooij 2024) —
+          max ≤ 2 → inadequate; both 4 → optimal; otherwise acceptable. */}
+      <Row label="PI-QUAL" required>
+        <InlineField label="T2W">
+          <SegmentedControl<PiQualT2WDwiSubscore>
+            name={id("piqualT2W")}
+            ariaLabel="PI-QUAL T2W subscore"
+            size="xs"
+            value={value.piQualT2WSubscore}
+            options={toSegmentedOptions(PIQUAL_T2W_DWI_SUBSCORE_OPTIONS)}
+            onChange={(next) =>
+              onChange({
+                ...value,
+                piQualT2WSubscore: next,
+                piQualOverall: derivePiQualOverall(next, value.piQualDWISubscore),
+              })
+            }
+          />
+        </InlineField>
+        <InlineField label="DWI">
+          <SegmentedControl<PiQualT2WDwiSubscore>
+            name={id("piqualDWI")}
+            ariaLabel="PI-QUAL DWI subscore"
+            size="xs"
+            value={value.piQualDWISubscore}
+            options={toSegmentedOptions(PIQUAL_T2W_DWI_SUBSCORE_OPTIONS)}
+            onChange={(next) =>
+              onChange({
+                ...value,
+                piQualDWISubscore: next,
+                piQualOverall: derivePiQualOverall(value.piQualT2WSubscore, next),
+              })
+            }
+          />
+        </InlineField>
+        <InlineField label="DCE">
+          <SegmentedControl<PiQualDceSubscore>
+            name={id("piqualDCE")}
+            ariaLabel="PI-QUAL DCE subscore"
+            size="xs"
+            value={value.piQualDCESubscore}
+            options={toLabeledOptions(PIQUAL_DCE_SUBSCORE_OPTIONS, PIQUAL_DCE_LABEL)}
+            onChange={(next) => onChange({ ...value, piQualDCESubscore: next })}
+          />
+        </InlineField>
+        <span role="status" aria-live="polite">
+          <Readout
+            label="종합"
+            value={PIQUAL_OVERALL_LABEL[piQualOverall]}
+            tone={
+              piQualOverall === "3_optimal"
+                ? "good"
+                : piQualOverall === "2_acceptable"
+                  ? "warn"
+                  : "bad"
+            }
+          />
+        </span>
+      </Row>
+
+      <Disclosure
+        id={id("extent")}
+        label="침범 · 림프절 · 전이"
+        summary={abnormal.length > 0 ? abnormal.join(" · ") : "모두 없음 (기본값)"}
+        forceOpen={abnormal.length > 0}
+      >
+        <Row label="정낭">
+          <SegmentedControl<SviWholeGland>
+            name={id("sviWhole")}
+            ariaLabel="Seminal vesicle invasion (whole gland)"
+            size="xs"
+            value={value.seminalVesicleInvasionWholeGland}
+            options={toLabeledOptions(SVI_WHOLE_GLAND_OPTIONS, SVI_WHOLE_GLAND_LABEL)}
+            onChange={(next) =>
+              onChange({ ...value, seminalVesicleInvasionWholeGland: next })
+            }
+          />
+        </Row>
+        {LOCAL_STRUCTURES.map((s) => (
+          <Row key={s.key} label={s.label}>
+            <SegmentedControl<LocalInvolvement>
+              name={id(s.key)}
+              ariaLabel={s.aria}
+              size="xs"
+              value={value[s.key]}
+              options={toLabeledOptions(LOCAL_INVOLVEMENT_OPTIONS, LOCAL_INVOLVEMENT_LABEL)}
+              onChange={(next) => onChange({ ...value, [s.key]: next })}
             />
-            <NumberField
-              id={id("height")}
-              label="Height (CC) · 상하"
-              value={value.prostateHeightMm}
-              onChange={(h) =>
-                handleDimensionChange({ prostateHeightMm: h })
-              }
-              unit="mm"
-              min="10"
-              max="100"
-              step="0.1"
-              required
-            />
-            <NumberField
-              id={id("ap")}
-              label="AP · 전후"
-              value={value.prostateAPMm}
-              onChange={(ap) =>
-                handleDimensionChange({ prostateAPMm: ap })
-              }
-              unit="mm"
-              min="10"
-              max="100"
-              step="0.1"
-              required
-            />
-          </div>
-
-          <div className="md:col-span-2 grid gap-x-6 gap-y-5 md:grid-cols-2">
-            {/* Prostate volume — auto-derived from W/H/AP, read-only */}
-            <div className="rounded-lg border border-border p-3 flex flex-col gap-1">
-              <span className="text-[0.9375rem] font-bold tracking-tight text-foreground">
-                Prostate volume · 전립선 부피
-                <span className="ml-1 text-xs font-normal text-muted-foreground">
-                  (auto-derived)
-                </span>
-              </span>
-              <p className="text-sm text-card-foreground">
-                {derivedVolumeMl !== undefined ? `${derivedVolumeMl} mL` : "—"}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Ellipsoid approximation: W × H × AP × 0.52 / 1000.
-              </p>
-            </div>
-
-            {/* PSA density — auto-displayed read-only (E-6, N-6) */}
-            <div className="rounded-lg border border-border p-3 flex flex-col gap-1">
-              <span className="text-[0.9375rem] font-bold tracking-tight text-foreground">
-                PSA density · PSA 밀도
-                <span className="ml-1 text-xs font-normal text-muted-foreground">
-                  (auto-derived)
-                </span>
-              </span>
-              <p className="text-sm text-card-foreground">
-                {psaDensity !== undefined
-                  ? `${psaDensity} ng/mL/cc`
-                  : "—"}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                PSA ÷ prostate volume, 1 dp.
-              </p>
-            </div>
-          </div>
-
-          {/* 2. SVI (whole gland) */}
-          <FieldRow
-            label="Seminal vesicle invasion (whole gland) · 정낭 침범"
-            className="md:col-span-2"
-          >
-            <SegmentedControl<SviWholeGland>
-              name={id("sviWhole")}
-              ariaLabel="Seminal vesicle invasion (whole gland)"
-              value={value.seminalVesicleInvasionWholeGland}
-              options={toLabeledOptions(
-                SVI_WHOLE_GLAND_OPTIONS,
-                SVI_WHOLE_GLAND_LABEL
-              )}
-              onChange={(next) =>
-                onChange({ ...value, seminalVesicleInvasionWholeGland: next })
-              }
-            />
-          </FieldRow>
-
-          {/* 4. Local extension (4 fields) — grouped in a single sub-section
-              so the radiologist sees the four organ-level invasion fields as
-              a coherent block (T4 driver). */}
-          <fieldset className="md:col-span-2 rounded-lg border border-border p-3 flex flex-col gap-3">
-            <legend className="px-1 text-[0.9375rem] font-bold tracking-tight text-foreground">
-              Local extension · 국소 침범
-            </legend>
-            <div className="grid gap-x-6 gap-y-5 md:grid-cols-2">
-              <FieldRow label="Bladder neck · 방광경부">
-                <SegmentedControl<LocalInvolvement>
-                  name={id("bladder")}
-                  ariaLabel="Bladder neck involvement"
-                  value={value.bladderNeckInvolvement}
-                  options={toLabeledOptions(
-                    LOCAL_INVOLVEMENT_OPTIONS,
-                    LOCAL_INVOLVEMENT_LABEL
-                  )}
-                  onChange={(next) =>
-                    onChange({ ...value, bladderNeckInvolvement: next })
-                  }
-                />
-              </FieldRow>
-
-              <FieldRow label="External sphincter · 외요도괄약근">
-                <SegmentedControl<LocalInvolvement>
-                  name={id("sphincter")}
-                  ariaLabel="External sphincter involvement"
-                  value={value.externalSphincterInvolvement}
-                  options={toLabeledOptions(
-                    LOCAL_INVOLVEMENT_OPTIONS,
-                    LOCAL_INVOLVEMENT_LABEL
-                  )}
-                  onChange={(next) =>
-                    onChange({ ...value, externalSphincterInvolvement: next })
-                  }
-                />
-              </FieldRow>
-
-              <FieldRow label="Rectum · 직장">
-                <SegmentedControl<LocalInvolvement>
-                  name={id("rectal")}
-                  ariaLabel="Rectal involvement"
-                  value={value.rectalInvolvement}
-                  options={toLabeledOptions(
-                    LOCAL_INVOLVEMENT_OPTIONS,
-                    LOCAL_INVOLVEMENT_LABEL
-                  )}
-                  onChange={(next) =>
-                    onChange({ ...value, rectalInvolvement: next })
-                  }
-                />
-              </FieldRow>
-
-              <FieldRow label="Pelvic sidewall · 골반측벽">
-                <SegmentedControl<LocalInvolvement>
-                  name={id("sidewall")}
-                  ariaLabel="Pelvic sidewall involvement"
-                  value={value.pelvicSidewallInvolvement}
-                  options={toLabeledOptions(
-                    LOCAL_INVOLVEMENT_OPTIONS,
-                    LOCAL_INVOLVEMENT_LABEL
-                  )}
-                  onChange={(next) =>
-                    onChange({ ...value, pelvicSidewallInvolvement: next })
-                  }
-                />
-              </FieldRow>
-            </div>
-          </fieldset>
-
-          {/* 5. Regional lymph nodes — repeatable */}
-          <LymphNodeSubCard
+          </Row>
+        ))}
+        <Row label="국소 림프절" align="start">
+          <NodeList
             idPrefix={id("regionalLN")}
             kind="regional"
-            nodes={value.regionalLymphNodes ?? []}
+            nodes={regionalNodes}
             onChange={(next) =>
               onChange({
                 ...value,
@@ -837,12 +605,12 @@ export function ProstateStudyLevelCard({
               })
             }
           />
-
-          {/* 6. Non-regional lymph nodes — repeatable */}
-          <LymphNodeSubCard
+        </Row>
+        <Row label="비국소 림프절" align="start">
+          <NodeList
             idPrefix={id("nonRegionalLN")}
             kind="non_regional"
-            nodes={value.nonRegionalLymphNodes ?? []}
+            nodes={nonRegionalNodes}
             onChange={(next) =>
               onChange({
                 ...value,
@@ -850,350 +618,130 @@ export function ProstateStudyLevelCard({
               })
             }
           />
-
-          {/* 7. Bone involvement (S-2 conditional) */}
-          <FieldRow label="Bone involvement · 골 침범" className="md:col-span-2">
-            <SegmentedControl<BoneInvolvement>
-              name={id("bone")}
-              ariaLabel="Bone involvement"
-              value={value.boneInvolvement}
-              options={toLabeledOptions(
-                BONE_INVOLVEMENT_OPTIONS,
-                BONE_INVOLVEMENT_LABEL
-              )}
-              onChange={handleBoneInvolvementChange}
-            />
-          </FieldRow>
-
-          {/* 7a. Bone lesion locations — only when bone involvement !== 'none' */}
+        </Row>
+        <Row label="골">
+          <SegmentedControl<BoneInvolvement>
+            name={id("bone")}
+            ariaLabel="Bone involvement"
+            size="xs"
+            value={value.boneInvolvement}
+            options={toLabeledOptions(BONE_INVOLVEMENT_OPTIONS, BONE_INVOLVEMENT_LABEL)}
+            onChange={handleBoneInvolvementChange}
+          />
           {value.boneInvolvement !== "none" && (
-            <BoneLesionLocationsPicker
-              id={id("boneLocations")}
-              selected={value.boneLesionLocations ?? []}
-              onChange={(next) =>
-                onChange({
-                  ...value,
-                  boneLesionLocations: next.length > 0 ? next : undefined,
-                })
-              }
-            />
-          )}
-
-          {/* 8. Other distant metastasis */}
-          <FieldRow
-            label="Other distant metastasis · 기타 원격 전이"
-            className="md:col-span-2"
-          >
-            <SegmentedControl<OtherDistantMets>
-              name={id("otherMets")}
-              ariaLabel="Other distant metastasis"
-              value={value.otherDistantMetastasis}
-              options={toLabeledOptions(
-                OTHER_DISTANT_METS_OPTIONS,
-                OTHER_DISTANT_METS_LABEL
-              )}
-              onChange={(next) =>
-                onChange({ ...value, otherDistantMetastasis: next })
-              }
-            />
-          </FieldRow>
-
-          {/* 9. Auto-derived staging block (cT / cN / cM) with override.
-             Hidden on negative MRI: AJCC categorisation is replaced by the
-             "Not applicable" line in the rendered STAGING section. */}
-          {showStaging && (
-          <fieldset className="md:col-span-2 rounded-lg border border-border p-3 flex flex-col gap-3">
-            <legend
-              id={`${id("staging")}-legend`}
-              className="px-1 text-[0.9375rem] font-bold tracking-tight text-foreground"
+            <div
+              role="group"
+              aria-label="Bone lesion locations · 골 병변 위치"
+              className="flex flex-wrap gap-1"
             >
-              AJCC 8th clinical staging · 임상 병기
-              <span className="ml-1 text-xs font-normal text-muted-foreground">
-                (auto-derived)
-              </span>
-            </legend>
-
-            <div className="grid gap-x-6 gap-y-3 md:grid-cols-3">
-              {!overridden ? (
-                <>
-                  <div className="rounded-md border border-border bg-muted/20 p-2">
-                    <span className="text-xs font-medium text-muted-foreground">
-                      cT
-                    </span>
-                    <p className="text-sm font-semibold text-foreground">
-                      {derivedT}
-                    </p>
-                  </div>
-                  <div className="rounded-md border border-border bg-muted/20 p-2">
-                    <span className="text-xs font-medium text-muted-foreground">
-                      cN
-                    </span>
-                    <p className="text-sm font-semibold text-foreground">
-                      {derivedN}
-                    </p>
-                  </div>
-                  <div className="rounded-md border border-border bg-muted/20 p-2">
-                    <span className="text-xs font-medium text-muted-foreground">
-                      cM
-                    </span>
-                    <p className="text-sm font-semibold text-foreground">
-                      {CLINICAL_M_LABEL[derivedM]}
-                    </p>
-                  </div>
-                </>
-              ) : (
-                <>
-                  {/* Manual override editors */}
-                  <div className="rounded-md border border-border p-2 flex flex-col gap-1">
-                    <label
-                      htmlFor={id("ctOverride")}
-                      className="text-xs font-bold tracking-tight text-foreground"
-                    >
-                      cT (override)
-                    </label>
-                    <select
-                      id={id("ctOverride")}
-                      value={value.clinicalT ?? derivedT}
-                      onChange={(e) =>
-                        onChange({
-                          ...value,
-                          clinicalT: e.target.value as ClinicalT,
-                        })
-                      }
-                      className="w-full rounded-md border border-input bg-background px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      {CLINICAL_T_OPTIONS.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="rounded-md border border-border p-2 flex flex-col gap-1">
-                    <label
-                      htmlFor={id("cnOverride")}
-                      className="text-xs font-bold tracking-tight text-foreground"
-                    >
-                      cN (override)
-                    </label>
-                    <select
-                      id={id("cnOverride")}
-                      value={value.clinicalN ?? derivedN}
-                      onChange={(e) =>
-                        onChange({
-                          ...value,
-                          clinicalN: e.target.value as ClinicalN,
-                        })
-                      }
-                      className="w-full rounded-md border border-input bg-background px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      {CLINICAL_N_OPTIONS.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="rounded-md border border-border p-2 flex flex-col gap-1">
-                    <label
-                      htmlFor={id("cmOverride")}
-                      className="text-xs font-bold tracking-tight text-foreground"
-                    >
-                      cM (override)
-                    </label>
-                    <select
-                      id={id("cmOverride")}
-                      value={value.clinicalM ?? derivedM}
-                      onChange={(e) =>
-                        onChange({
-                          ...value,
-                          clinicalM: e.target.value as ClinicalM,
-                        })
-                      }
-                      className="w-full rounded-md border border-input bg-background px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      {CLINICAL_M_OPTIONS.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {CLINICAL_M_LABEL[opt]}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </>
-              )}
-            </div>
-
-            <div>
-              <Button
-                type="button"
-                variant={overridden ? "default" : "outline"}
-                size="sm"
-                onClick={handleStagingOverrideToggle}
-                aria-pressed={overridden}
-              >
-                {overridden ? "자동값으로 되돌리기" : "수동 override"}
-              </Button>
-            </div>
-          </fieldset>
-          )}
-
-          {/* 10. EAU risk group — only when clinicalIndication = staging_after_diagnosis (S-1).
-             Also suppressed on negative MRI (no measurable disease → no risk
-             stratification). */}
-          {showStaging && showEauRisk && (
-            <div className="md:col-span-2 rounded-lg border border-border p-3 flex flex-col gap-1">
-              <span className="text-[0.9375rem] font-bold tracking-tight text-foreground">
-                EAU risk group · EAU 위험 분류
-                <span className="ml-1 text-xs font-normal text-muted-foreground">
-                  (auto-derived, EAU 2025/2026)
-                </span>
-              </span>
-              <p className="text-sm font-semibold text-foreground">
-                {eauRiskGroup}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Cornford 2025 — staging-after-diagnosis only.
-              </p>
-            </div>
-          )}
-
-          {/* 11. PI-QUAL block (required submission gate, U-7).
-             Per-sequence sub-scores are entered first; the overall PI-QUAL
-             category is auto-derived from T2W/DWI per de Rooij 2024 (1–4
-             sub-score scale → 1–3 overall scale). The radiologist no longer
-             clicks an overall radio — the badge below updates live. */}
-          <fieldset className="md:col-span-2 rounded-lg border border-border p-3 flex flex-col gap-3">
-            <legend className="px-1 text-[0.9375rem] font-bold tracking-tight text-foreground">
-              PI-QUAL v2 · 영상 품질 평가
-            </legend>
-
-            <div className="grid gap-x-6 gap-y-5 md:grid-cols-2">
-              {/* T2W subscore (1–4). onChange also recomputes the auto-derived
-                 overall so the badge below stays synchronised. */}
-              <FieldRow label="T2W subscore" required>
-                <SegmentedControl<PiQualT2WDwiSubscore>
-                  name={id("piqualT2W")}
-                  ariaLabel="PI-QUAL T2W subscore"
-                  value={value.piQualT2WSubscore}
-                  options={toSegmentedOptions(
-                    PIQUAL_T2W_DWI_SUBSCORE_OPTIONS
-                  )}
-                  onChange={(next) =>
+              {BONE_LESION_LOCATIONS.map((opt) => (
+                <ChipToggle
+                  key={opt.value}
+                  active={boneLocations.includes(opt.value)}
+                  onClick={() => {
+                    const next = boneLocations.includes(opt.value)
+                      ? boneLocations.filter((c) => c !== opt.value)
+                      : [...boneLocations, opt.value];
                     onChange({
                       ...value,
-                      piQualT2WSubscore: next,
-                      piQualOverall: derivePiQualOverall(
-                        next,
-                        value.piQualDWISubscore
-                      ),
-                    })
-                  }
-                />
-              </FieldRow>
-
-              {/* DWI subscore (1–4). Same auto-sync as T2W above. */}
-              <FieldRow label="DWI subscore" required>
-                <SegmentedControl<PiQualT2WDwiSubscore>
-                  name={id("piqualDWI")}
-                  ariaLabel="PI-QUAL DWI subscore"
-                  value={value.piQualDWISubscore}
-                  options={toSegmentedOptions(
-                    PIQUAL_T2W_DWI_SUBSCORE_OPTIONS
-                  )}
-                  onChange={(next) =>
-                    onChange({
-                      ...value,
-                      piQualDWISubscore: next,
-                      piQualOverall: derivePiQualOverall(
-                        value.piQualT2WSubscore,
-                        next
-                      ),
-                    })
-                  }
-                />
-              </FieldRow>
-
-              {/* DCE subscore (+ / - / N/A) — optional */}
-              <FieldRow
-                label="DCE subscore · 동적조영 점수"
-                optional
-                className="md:col-span-2"
-              >
-                <SegmentedControl<PiQualDceSubscore>
-                  name={id("piqualDCE")}
-                  ariaLabel="PI-QUAL DCE subscore"
-                  value={value.piQualDCESubscore}
-                  options={toLabeledOptions(
-                    PIQUAL_DCE_SUBSCORE_OPTIONS,
-                    PIQUAL_DCE_LABEL
-                  )}
-                  onChange={(next) =>
-                    onChange({ ...value, piQualDCESubscore: next })
-                  }
-                />
-              </FieldRow>
-
-              {/* Overall — auto-derived read-only summary badge.
-                 Conversion rule: max(T2W,DWI)≤2 → inadequate; T2W=4 AND
-                 DWI=4 → optimal; otherwise acceptable. */}
-              <FieldRow
-                label="PI-QUAL overall · 종합 점수 (자동 산출)"
-                className="md:col-span-2"
-              >
-                {(() => {
-                  const overall = derivePiQualOverall(
-                    value.piQualT2WSubscore,
-                    value.piQualDWISubscore
-                  );
-                  const toneClass =
-                    overall === "3_optimal"
-                      ? "text-emerald-700 dark:text-emerald-300"
-                      : overall === "2_acceptable"
-                        ? "text-amber-700 dark:text-amber-300"
-                        : "text-destructive";
-                  const ringClass =
-                    overall === "3_optimal"
-                      ? "border-emerald-300/60 bg-emerald-50/70 dark:border-emerald-700/40 dark:bg-emerald-950/30"
-                      : overall === "2_acceptable"
-                        ? "border-amber-300/60 bg-amber-50/70 dark:border-amber-700/40 dark:bg-amber-950/30"
-                        : "border-destructive/40 bg-destructive/5";
-                  return (
-                    <div
-                      role="status"
-                      aria-live="polite"
-                      aria-label={`PI-QUAL overall ${PIQUAL_OVERALL_LABEL[overall]}`}
-                      className={cn(
-                        "flex flex-col gap-1 rounded-md border px-3 py-2.5",
-                        ringClass
-                      )}
-                    >
-                      <div className="flex items-baseline gap-2">
-                        <span
-                          className={cn("text-lg font-bold", toneClass)}
-                        >
-                          {PIQUAL_OVERALL_LABEL[overall]}
-                        </span>
-                        <span className="text-sm text-muted-foreground">
-                          {PIQUAL_OVERALL_SUBLABEL[overall]}
-                        </span>
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        T2W {value.piQualT2WSubscore}/4 · DWI{" "}
-                        {value.piQualDWISubscore}/4 → PI-QUAL{" "}
-                        {overall === "1_inadequate"
-                          ? "1"
-                          : overall === "2_acceptable"
-                            ? "2"
-                            : "3"}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </FieldRow>
+                      boneLesionLocations: next.length > 0 ? next : undefined,
+                    });
+                  }}
+                >
+                  {opt.label}
+                </ChipToggle>
+              ))}
             </div>
-          </fieldset>
+          )}
+        </Row>
+        <Row label="원격 전이">
+          <SegmentedControl<OtherDistantMets>
+            name={id("otherMets")}
+            ariaLabel="Other distant metastasis"
+            size="xs"
+            value={value.otherDistantMetastasis}
+            options={toLabeledOptions(OTHER_DISTANT_METS_OPTIONS, OTHER_DISTANT_METS_LABEL)}
+            onChange={(next) => onChange({ ...value, otherDistantMetastasis: next })}
+          />
+        </Row>
+      </Disclosure>
+
+      {/* Auto-derived staging (cT / cN / cM) with override. Hidden on
+          negative MRI: AJCC categorisation is replaced by the "Not
+          applicable" line in the rendered STAGING section. */}
+      {showStaging && (
+        <div className="mt-1 border-t border-border/60 pt-1">
+          <Row label={overridden ? "병기 (수동)" : "병기 (자동)"}>
+            {stagingText && (
+              <span className="text-[13px] font-semibold text-foreground">
+                {stagingText}
+              </span>
+            )}
+            {overridden && (
+              <>
+                <InlineField label="cT" htmlFor={id("ctOverride")}>
+                  <select
+                    id={id("ctOverride")}
+                    value={value.clinicalT ?? derivedT}
+                    onChange={(e) =>
+                      onChange({ ...value, clinicalT: e.target.value as ClinicalT })
+                    }
+                    className={selectClass}
+                  >
+                    {CLINICAL_T_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
+                </InlineField>
+                <InlineField label="cN" htmlFor={id("cnOverride")}>
+                  <select
+                    id={id("cnOverride")}
+                    value={value.clinicalN ?? derivedN}
+                    onChange={(e) =>
+                      onChange({ ...value, clinicalN: e.target.value as ClinicalN })
+                    }
+                    className={selectClass}
+                  >
+                    {CLINICAL_N_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
+                </InlineField>
+                <InlineField label="cM" htmlFor={id("cmOverride")}>
+                  <select
+                    id={id("cmOverride")}
+                    value={shownM}
+                    onChange={(e) =>
+                      onChange({ ...value, clinicalM: e.target.value as ClinicalM })
+                    }
+                    className={selectClass}
+                  >
+                    {CLINICAL_M_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {CLINICAL_M_LABEL[opt]}
+                      </option>
+                    ))}
+                  </select>
+                </InlineField>
+              </>
+            )}
+            {/* EAU risk group — staging_after_diagnosis only (S-1). */}
+            {showEauRisk && <Readout label="EAU" value={EAU_LABEL[eauRiskGroup]} />}
+            <button
+              type="button"
+              onClick={handleStagingOverrideToggle}
+              aria-pressed={overridden}
+              className="text-xs text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {overridden ? "자동값으로 되돌리기" : "수동 수정"}
+            </button>
+          </Row>
         </div>
-      </CardContent>
-    </Card>
+      )}
+    </FormSection>
   );
 }

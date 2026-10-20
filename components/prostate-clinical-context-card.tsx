@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { cn } from "@/lib/utils";
 import {
   CLINICAL_INDICATION_OPTIONS,
   PRIOR_BIOPSY_STATUS_OPTIONS,
@@ -10,242 +9,38 @@ import {
 } from "@/lib/prompts/disease-templates/prostate-fields";
 import type { ProstateStructuredInput } from "@/lib/prompts/disease-templates/prostate-serializer";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
   SegmentedControl,
   type SegmentedControlOption,
 } from "@/components/ui/segmented-control";
+import {
+  DateInput,
+  Disclosure,
+  FormSection,
+  InlineField,
+  NumberInput,
+  Row,
+  compactTextareaClass,
+} from "@/components/compact-form";
 
 // ---------------------------------------------------------------------------
-// File-local helpers — mirror the FieldRow / NumberField / DateInput trio used
-// by rcc-clinical-context-card.tsx and rcc-mass-card.tsx so the prostate form
-// preserves visual rhythm with the RCC form (SPEC-UI-001 typographic parity).
-// ---------------------------------------------------------------------------
-
-function FieldRow({
-  label,
-  optional,
-  required,
-  children,
-  className,
-}: {
-  label: string;
-  optional?: boolean;
-  /**
-   * Marks the field as required for the Generate-report button gate. Surfaces
-   * a red `*` after the label. Mutually exclusive with `optional` — if both
-   * are passed, `required` wins.
-   */
-  required?: boolean;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-lg border border-border p-3 flex flex-col gap-2",
-        className
-      )}
-    >
-      <span className="px-1 text-[0.9375rem] font-bold tracking-tight text-foreground">
-        {label}
-        {required && (
-          <>
-            <span
-              aria-hidden="true"
-              className="ml-1 font-bold text-destructive"
-            >
-              *
-            </span>
-            <span className="sr-only"> (required)</span>
-          </>
-        )}
-        {!required && optional && (
-          <span className="ml-1 text-xs font-normal text-muted-foreground">
-            (optional)
-          </span>
-        )}
-      </span>
-      {children}
-    </div>
-  );
-}
-
-function NumberField({
-  id,
-  label,
-  value,
-  onChange,
-  unit,
-  optional = false,
-  required = false,
-  step = "1",
-  min,
-  max,
-  className,
-}: {
-  id: string;
-  label: string;
-  value: number | undefined;
-  onChange: (v: number | undefined) => void;
-  unit?: string;
-  optional?: boolean;
-  required?: boolean;
-  step?: string;
-  min?: string;
-  max?: string;
-  className?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-lg border border-border p-3 flex flex-col gap-2",
-        className
-      )}
-    >
-      <label
-        htmlFor={id}
-        className="text-[0.9375rem] font-bold tracking-tight text-foreground"
-      >
-        {label}
-        {required && (
-          <>
-            <span
-              aria-hidden="true"
-              className="ml-1 font-bold text-destructive"
-            >
-              *
-            </span>
-            <span className="sr-only"> (required)</span>
-          </>
-        )}
-        {!required && optional && (
-          <span className="ml-1 text-xs font-normal text-muted-foreground">
-            (optional)
-          </span>
-        )}
-      </label>
-      <div className="flex items-center gap-2">
-        <input
-          id={id}
-          type="number"
-          step={step}
-          min={min}
-          max={max}
-          value={value ?? ""}
-          onChange={(e) => {
-            const v =
-              e.target.value === "" ? undefined : parseFloat(e.target.value);
-            onChange(v);
-          }}
-          className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        />
-        {unit && (
-          <span className="shrink-0 text-sm text-muted-foreground">{unit}</span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function DateInput({
-  id,
-  label,
-  value,
-  onChange,
-  optional = false,
-  required = false,
-  className,
-  min,
-  max,
-  disabled = false,
-  helperText,
-}: {
-  id: string;
-  label: string;
-  value: string | undefined;
-  onChange: (v: string | undefined) => void;
-  optional?: boolean;
-  required?: boolean;
-  className?: string;
-  min?: string;
-  max?: string;
-  disabled?: boolean;
-  helperText?: React.ReactNode;
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-lg border border-border p-3 flex flex-col gap-2",
-        className
-      )}
-    >
-      <label
-        htmlFor={id}
-        className="text-[0.9375rem] font-bold tracking-tight text-foreground"
-      >
-        {label}
-        {required && (
-          <>
-            <span
-              aria-hidden="true"
-              className="ml-1 font-bold text-destructive"
-            >
-              *
-            </span>
-            <span className="sr-only"> (required)</span>
-          </>
-        )}
-        {!required && optional && (
-          <span className="ml-1 text-xs font-normal text-muted-foreground">
-            (optional)
-          </span>
-        )}
-      </label>
-      <input
-        id={id}
-        type="date"
-        value={value ?? ""}
-        min={min}
-        max={max}
-        disabled={disabled}
-        onChange={(e) => {
-          const v = e.target.value === "" ? undefined : e.target.value;
-          onChange(v);
-        }}
-        className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
-      />
-      {helperText && (
-        <p className="text-xs text-muted-foreground">{helperText}</p>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Bilingual option labels (Korean primary + English subtitle, RCC parity)
+// Option labels — short Korean labels so each group fits one row
 // ---------------------------------------------------------------------------
 
 const CLINICAL_INDICATION_LABEL: Record<ClinicalIndication, string> = {
-  pre_biopsy_initial: "Pre-biopsy (initial) · 초기 진단",
-  pre_biopsy_repeat_after_negative:
-    "Pre-biopsy (repeat after negative) · 음성 후 재검",
-  staging_after_diagnosis: "Staging after diagnosis · 진단 후 병기설정",
+  pre_biopsy_initial: "생검 전 (초기)",
+  pre_biopsy_repeat_after_negative: "생검 전 (음성 후 재검)",
+  staging_after_diagnosis: "진단 후 병기",
 };
 
 const PRIOR_BIOPSY_STATUS_LABEL: Record<PriorBiopsyStatus, string> = {
-  none: "None · 없음",
-  negative: "Negative · 음성",
-  positive_ISUP1: "Positive ISUP 1",
-  positive_ISUP2: "Positive ISUP 2",
-  positive_ISUP3: "Positive ISUP 3",
-  positive_ISUP4: "Positive ISUP 4",
-  positive_ISUP5: "Positive ISUP 5",
-  unknown: "Unknown · 미상",
+  none: "없음",
+  negative: "음성",
+  positive_ISUP1: "ISUP 1",
+  positive_ISUP2: "ISUP 2",
+  positive_ISUP3: "ISUP 3",
+  positive_ISUP4: "ISUP 4",
+  positive_ISUP5: "ISUP 5",
+  unknown: "미상",
 };
 
 function toLabeledOptions<T extends string>(
@@ -340,81 +135,119 @@ export function ProstateClinicalContextCard({
     onChange({ ...value, psaDateOffsetDays: clamped });
   };
 
+  const psaOffsetNote =
+    value.psaDateOffsetDays === undefined
+      ? undefined
+      : value.psaDateOffsetDays === 0
+        ? "검사일과 같은 날"
+        : `검사 ${value.psaDateOffsetDays}일 전`;
+
+  const notes = value.additionalClinicalNotes?.trim();
+  const extraSummary =
+    [
+      value.priorMRIDate && `이전 MRI ${value.priorMRIDate}`,
+      notes && "임상 메모 있음",
+    ]
+      .filter(Boolean)
+      .join(" · ") || "이전 MRI 날짜 · 임상 메모";
+
   return (
-    <Card className="shadow-sm ring-1 ring-border/50">
-      <CardHeader className="pb-4">
-        <CardTitle className="flex items-center gap-3 text-lg font-bold tracking-tight text-foreground">
-          <span
-            aria-hidden="true"
-            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground shadow-sm"
-          >
-            1
-          </span>
-          Clinical context
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {/* Negative-MRI shortcut. Toggling ON hides Section 2 (lesion list)
-            entirely and clears any existing lesions. The serializer omits
-            LESION blocks while staging defaults pin to cT1c / N0 / M0. */}
-        <div className="mb-5 flex items-start gap-3 rounded-lg border border-border bg-muted/30 p-3">
-          <input
-            type="checkbox"
-            id={id("noSuspiciousLesion")}
-            checked={value.noSuspiciousLesion}
-            onChange={(e) => {
-              const checked = e.target.checked;
-              onChange({
-                ...value,
-                noSuspiciousLesion: checked,
-                lesions: checked ? [] : value.lesions,
-              });
-            }}
-            className="mt-0.5 h-4 w-4 cursor-pointer rounded border-border text-primary focus:ring-2 focus:ring-primary"
-          />
-          <label
-            htmlFor={id("noSuspiciousLesion")}
-            className="cursor-pointer select-none text-sm font-medium text-foreground"
-          >
-            No suspicious lesion · 의심 병변 없음 (PI-RADS ≤ 2)
-            <p className="mt-1 text-xs font-normal text-muted-foreground">
-              체크 시 병변 입력 섹션이 숨겨지고, 보고서는 음성 MRI 양식으로
-              생성됩니다.
-            </p>
-          </label>
-        </div>
-
-        <div className="grid gap-x-6 gap-y-5 md:grid-cols-2">
-          {/* 1. Study date — required, ISO YYYY-MM-DD */}
-          <DateInput
-            id={id("studyDate")}
-            label="Study date · 검사일"
-            value={value.studyDate || undefined}
-            onChange={(v) =>
-              onChange({ ...value, studyDate: v ?? "" })
-            }
-            required
-          />
-
-          {/* 2. Patient age (years) — optional, 40–100 */}
-          <NumberField
+    <FormSection id="prostate-section-clinical" step={1} title="임상 정보">
+      <Row label="검사일" required htmlFor={id("studyDate")}>
+        <DateInput
+          id={id("studyDate")}
+          value={value.studyDate || undefined}
+          onChange={(v) => onChange({ ...value, studyDate: v ?? "" })}
+        />
+        <InlineField label="나이" htmlFor={id("age")}>
+          <NumberInput
             id={id("age")}
-            label="Patient age · 환자 나이"
             value={value.patientAgeYears}
             onChange={(v) => onChange({ ...value, patientAgeYears: v })}
-            unit="years"
-            optional
+            unit="세"
             min="40"
             max="100"
-            step="1"
+            widthClass="w-16"
           />
+        </InlineField>
+      </Row>
 
-          {/* 3. Prior MRI date — optional. Clearing this also clears each
-              lesion's `priorMRIComparison` (E-1) — handled at form-orchestrator
-              level by `prostate-structured-form.tsx`. */}
+      <Row label="PSA" required htmlFor={id("psa")}>
+        <NumberInput
+          id={id("psa")}
+          value={value.psaNgPerMl}
+          onChange={(v) => onChange({ ...value, psaNgPerMl: v ?? 0 })}
+          unit="ng/mL"
+          min="0"
+          max="500"
+          step="0.1"
+          emptyWhenZero
+        />
+        {/* PSA measurement date — restricted to [studyDate − 365, studyDate];
+            disabled until a study date is entered. */}
+        <InlineField label="측정일" htmlFor={id("psaDate")}>
+          <DateInput
+            id={id("psaDate")}
+            value={derivedPsaMeasurementDate}
+            onChange={handlePsaMeasurementDateChange}
+            min={psaDateMin}
+            max={value.studyDate || undefined}
+            disabled={!value.studyDate}
+          />
+          {psaOffsetNote && (
+            <span className="text-xs text-muted-foreground">
+              {psaOffsetNote}
+            </span>
+          )}
+        </InlineField>
+      </Row>
+
+      <Row label="적응증" labelId={id("indication-label")}>
+        <SegmentedControl<ClinicalIndication>
+          name={id("indication")}
+          ariaLabel="임상 적응증 (Clinical indication)"
+          size="xs"
+          value={value.clinicalIndication}
+          options={toLabeledOptions(
+            CLINICAL_INDICATION_OPTIONS,
+            CLINICAL_INDICATION_LABEL
+          )}
+          onChange={(next) => onChange({ ...value, clinicalIndication: next })}
+        />
+      </Row>
+
+      <Row label="이전 생검" labelId={id("biopsy-label")}>
+        <SegmentedControl<PriorBiopsyStatus>
+          name={id("priorBiopsyStatus")}
+          ariaLabel="이전 생검 결과 (Prior biopsy status)"
+          size="xs"
+          value={value.priorBiopsyStatus}
+          options={toLabeledOptions(
+            PRIOR_BIOPSY_STATUS_OPTIONS,
+            PRIOR_BIOPSY_STATUS_LABEL
+          )}
+          onChange={handlePriorBiopsyStatusChange}
+        />
+        {value.priorBiopsyStatus !== "none" && (
+          <InlineField label="생검일" htmlFor={id("priorBiopsyDate")}>
+            <DateInput
+              id={id("priorBiopsyDate")}
+              value={value.priorBiopsyDate}
+              onChange={(v) => onChange({ ...value, priorBiopsyDate: v })}
+            />
+          </InlineField>
+        )}
+      </Row>
+
+      <Disclosure
+        id={id("extra")}
+        label="추가 정보"
+        summary={extraSummary}
+        forceOpen={Boolean(value.priorMRIDate || notes)}
+      >
+        <Row label="이전 MRI" htmlFor={id("priorMRIDate")}>
           <DateInput
             id={id("priorMRIDate")}
-            label="Prior MRI date · 이전 MRI 날짜"
             value={value.priorMRIDate}
             onChange={(v) => {
               if (v === undefined) {
@@ -432,131 +265,28 @@ export function ProstateClinicalContextCard({
                 onChange({ ...value, priorMRIDate: v });
               }
             }}
-            optional
           />
-
-          {/* 4. Clinical indication — required. Only 3 enum values exposed
-              per N-2 (the field type still admits all 3 declared options). */}
-          <FieldRow
-            label="Clinical indication · 임상 적응증"
-            className="md:col-span-2"
-          >
-            <SegmentedControl<ClinicalIndication>
-              name={id("indication")}
-              ariaLabel="Clinical indication"
-              value={value.clinicalIndication}
-              options={toLabeledOptions(
-                CLINICAL_INDICATION_OPTIONS,
-                CLINICAL_INDICATION_LABEL
-              )}
-              onChange={(next) =>
-                onChange({ ...value, clinicalIndication: next })
-              }
-            />
-          </FieldRow>
-
-          {/* 5. PSA (ng/mL) — required, 0–500, 1 dp */}
-          <NumberField
-            id={id("psa")}
-            label="PSA"
-            value={value.psaNgPerMl}
-            onChange={(v) =>
-              onChange({ ...value, psaNgPerMl: v ?? 0 })
+          <span className="text-xs text-muted-foreground">
+            입력하면 병변별 이전 MRI 비교 항목이 열립니다.
+          </span>
+        </Row>
+        <Row label="임상 메모" htmlFor={id("notes")} align="start">
+          <textarea
+            id={id("notes")}
+            rows={2}
+            maxLength={500}
+            value={value.additionalClinicalNotes ?? ""}
+            onChange={(e) =>
+              onChange({
+                ...value,
+                additionalClinicalNotes: e.target.value || undefined,
+              })
             }
-            unit="ng/mL"
-            min="0"
-            max="500"
-            step="0.1"
-            required
+            placeholder="예) Family history, prior radiation therapy, anticoagulation"
+            className={compactTextareaClass}
           />
-
-          {/* 6. PSA measurement date — optional. The structured input keeps
-              the offset (days from study date) as the canonical field, but
-              the UI presents a date picker and converts on the fly so the
-              radiologist never has to count days manually. Restricted to
-              [studyDate − 365, studyDate]; clearing the date drops the
-              offset. Disabled until a study date is entered. */}
-          <DateInput
-            id={id("psaDate")}
-            label="PSA measurement date · PSA 측정일"
-            value={derivedPsaMeasurementDate}
-            onChange={handlePsaMeasurementDateChange}
-            optional
-            min={psaDateMin}
-            max={value.studyDate || undefined}
-            disabled={!value.studyDate}
-            helperText={
-              !value.studyDate
-                ? "검사일을 먼저 입력하면 PSA 측정일을 선택할 수 있습니다."
-                : value.psaDateOffsetDays === undefined
-                  ? "선택 시 검사일과의 차이가 자동 계산됩니다."
-                  : value.psaDateOffsetDays === 0
-                    ? "검사일과 동일 (0 days)"
-                    : `검사일 ${value.psaDateOffsetDays}일 전`
-            }
-          />
-
-          {/* 7. Prior biopsy status — required (8 values).
-              Spans both columns so the long enum labels (e.g. "Positive
-              ISUP 1") are not crushed onto multiple lines. */}
-          <FieldRow
-            label="Prior biopsy status · 이전 생검 결과"
-            className="md:col-span-2"
-          >
-            <SegmentedControl<PriorBiopsyStatus>
-              name={id("priorBiopsyStatus")}
-              ariaLabel="Prior biopsy status"
-              value={value.priorBiopsyStatus}
-              options={toLabeledOptions(
-                PRIOR_BIOPSY_STATUS_OPTIONS,
-                PRIOR_BIOPSY_STATUS_LABEL
-              )}
-              onChange={handlePriorBiopsyStatusChange}
-            />
-          </FieldRow>
-
-          {/* 8. Prior biopsy date — conditional on priorBiopsyStatus !== 'none'
-              (E-2). Cleared automatically when status reverts to 'none' via
-              `handlePriorBiopsyStatusChange` above. */}
-          {value.priorBiopsyStatus !== "none" && (
-            <DateInput
-              id={id("priorBiopsyDate")}
-              label="Prior biopsy date · 이전 생검일"
-              value={value.priorBiopsyDate}
-              onChange={(v) => onChange({ ...value, priorBiopsyDate: v })}
-              optional
-              className="md:col-span-2"
-            />
-          )}
-
-          {/* 9. Additional clinical notes — optional, ≤500 chars */}
-          <div className="rounded-lg border border-border p-3 flex flex-col gap-2 md:col-span-2">
-            <label
-              htmlFor={id("notes")}
-              className="text-[0.9375rem] font-bold tracking-tight text-foreground"
-            >
-              Additional clinical notes · 추가 임상 정보
-              <span className="ml-1 text-xs font-normal text-muted-foreground">
-                (optional)
-              </span>
-            </label>
-            <textarea
-              id={id("notes")}
-              rows={3}
-              maxLength={500}
-              value={value.additionalClinicalNotes ?? ""}
-              onChange={(e) =>
-                onChange({
-                  ...value,
-                  additionalClinicalNotes: e.target.value || undefined,
-                })
-              }
-              placeholder="예) Family history, prior radiation therapy, anticoagulation"
-              className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-y"
-            />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+        </Row>
+      </Disclosure>
+    </FormSection>
   );
 }

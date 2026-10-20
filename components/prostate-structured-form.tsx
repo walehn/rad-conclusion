@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Info, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import {
   createEmptyProstateLesion,
   type ProstateLesion,
@@ -12,6 +12,7 @@ import { ProstateClinicalContextCard } from "@/components/prostate-clinical-cont
 import { ProstateLesionCard } from "@/components/prostate-lesion-card";
 import { ProstateStudyLevelCard } from "@/components/prostate-study-level-card";
 import { ProstateOtherFindingsCard } from "@/components/prostate-other-findings-card";
+import { FormSection } from "@/components/compact-form";
 
 // Re-export the initial-state factories from the serializer module so callers
 // only need to import from this orchestrator file when wiring the form.
@@ -84,47 +85,25 @@ export function ProstateStructuredForm({
     });
   };
 
+  const negative = value.noSuspiciousLesion;
+
   return (
-    <div className="flex flex-col gap-6">
-      {/*
-        SPEC-UI-001 R3 disclaimer banner — identical wording to the RCC form.
-        Color-coded radio cards (EPE risk, PI-QUAL overall, soft warnings) are
-        visual aids only; clinical decisions remain the radiologist's
-        responsibility.
-      */}
-      <div
-        role="note"
-        className="flex items-start gap-2 rounded-md border border-border/50 bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
-      >
-        <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-        <div className="flex flex-col gap-0.5">
-          <p>
-            <span
-              aria-hidden="true"
-              className="font-bold text-destructive"
-            >
-              *
-            </span>
-            <span className="ml-1">
-              가 표시된 항목은 보고서 생성을 위한 필수 입력입니다. (optional)
-              표시 항목은 비워두어도 됩니다.
-            </span>
-            <span className="sr-only">
-              Fields marked with an asterisk are required to generate the
-              report. Fields tagged (optional) may be left blank.
-            </span>
-          </p>
-          <p>
-            색상 표기는 시각 보조이며, 진단·치료 결정은 영상의학 전문의의
-            판단을 따릅니다.
-            <span className="sr-only">
-              {" "}
-              Color coding is a visual aid; clinical decisions are the
-              radiologist&apos;s responsibility.
-            </span>
-          </p>
-        </div>
-      </div>
+    <div className="flex flex-col gap-3">
+      {/* SPEC-UI-001 R3 disclaimer, kept to one line: colour coding is a
+          visual aid only; clinical decisions remain the radiologist's. */}
+      <p role="note" className="text-xs text-muted-foreground">
+        <span aria-hidden="true" className="font-bold text-destructive">
+          *
+        </span>{" "}
+        필수 항목 · 색상 표기는 시각 보조이며 진단·치료 결정은 영상의학
+        전문의의 판단을 따릅니다.
+        <span className="sr-only">
+          {" "}
+          Fields marked with an asterisk are required. Color coding is a
+          visual aid; clinical decisions are the radiologist&apos;s
+          responsibility.
+        </span>
+      </p>
 
       {error && (
         <p
@@ -138,55 +117,81 @@ export function ProstateStructuredForm({
       {/* Section 1 */}
       <ProstateClinicalContextCard value={value} onChange={onChange} />
 
-      {/* Section 2 — repeatable lesion cards. Hidden entirely when the
-          "No suspicious lesion" toggle in Section 1 is checked: the form
-          treats the study as a negative MRI and only collects whole-gland
-          / PI-QUAL data downstream. */}
-      {!value.noSuspiciousLesion && (
-        <>
-          <div className="flex flex-col gap-6">
-            {value.lesions.length === 0 ? (
-              <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
-                아직 등록된 병변이 없습니다. 아래 &quot;Add lesion&quot;
-                버튼을 눌러 PI-RADS v2.1 병변을 추가하세요. 의심 병변이
-                전혀 없다면 Section 1의 &quot;No suspicious lesion&quot;
-                토글을 체크하세요.
-              </div>
-            ) : (
-              value.lesions.map((lesion, idx) => (
-                <ProstateLesionCard
-                  key={idx}
-                  lesion={lesion}
-                  index={idx}
-                  onChange={(next) => handleLesionChange(idx, next)}
-                  onRemove={() => handleLesionRemove(idx)}
-                  parentPriorMRIDate={value.priorMRIDate}
-                />
-              ))
+      {/* Section 2 — repeatable lesion cards. The "no suspicious lesion"
+          toggle lives here, next to what it replaces: checking it treats the
+          study as a negative MRI, clears the lesions and only collects
+          whole-gland / PI-QUAL data downstream. */}
+      <FormSection
+        id="prostate-section-lesions"
+        step={2}
+        title="병변"
+        summary={
+          negative ? "음성 MRI" : `${lesionCount}/${MAX_LESIONS}`
+        }
+        actions={
+          <>
+            <label className="inline-flex cursor-pointer items-center gap-1.5 text-[13px] text-foreground/80">
+              <input
+                type="checkbox"
+                id="prostate-clinical-noSuspiciousLesion"
+                checked={negative}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  onChange({
+                    ...value,
+                    noSuspiciousLesion: checked,
+                    lesions: checked ? [] : value.lesions,
+                  });
+                }}
+                className="h-4 w-4 accent-[var(--color-primary)]"
+              />
+              의심 병변 없음 (PI-RADS ≤ 2)
+            </label>
+            {!negative && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={handleAddLesion}
+                disabled={!canAddLesion}
+                aria-label={
+                  canAddLesion
+                    ? "Add lesion"
+                    : `Maximum ${MAX_LESIONS} lesions reached`
+                }
+              >
+                <Plus className="mr-1 h-3.5 w-3.5" />
+                병변 추가
+              </Button>
             )}
+          </>
+        }
+      >
+        {negative ? (
+          <p className="py-1 text-xs text-muted-foreground">
+            음성 MRI 양식으로 작성됩니다. 병변 입력과 병기는 생략됩니다.
+          </p>
+        ) : value.lesions.length === 0 ? (
+          <p className="py-1 text-xs text-muted-foreground">
+            병변을 추가하세요. 의심 병변이 없으면 &lsquo;의심 병변 없음&rsquo;을
+            체크합니다.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-2 pt-1">
+            {value.lesions.map((lesion, idx) => (
+              <ProstateLesionCard
+                key={idx}
+                lesion={lesion}
+                index={idx}
+                onChange={(next) => handleLesionChange(idx, next)}
+                onRemove={() => handleLesionRemove(idx)}
+                parentPriorMRIDate={value.priorMRIDate}
+              />
+            ))}
           </div>
-
-          <div>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleAddLesion}
-              disabled={!canAddLesion}
-              className="w-full sm:w-auto"
-              aria-label={
-                canAddLesion
-                  ? "Add lesion"
-                  : `Maximum ${MAX_LESIONS} lesions reached`
-              }
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              {canAddLesion
-                ? `Add lesion (${lesionCount}/${MAX_LESIONS})`
-                : `Max ${MAX_LESIONS} lesions reached`}
-            </Button>
-          </div>
-        </>
-      )}
+        )}
+      </FormSection>
 
       {/* Section 3 */}
       <ProstateStudyLevelCard value={value} onChange={onChange} />

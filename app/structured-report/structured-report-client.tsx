@@ -25,8 +25,6 @@ import {
   useNotionPalette,
   SidebarSection,
   SidebarItem,
-  Block,
-  CalloutBlock,
   OutputBlock,
   PageProperties,
   EmojiPickerTrigger,
@@ -234,6 +232,44 @@ function getMinimumFieldsErrorMessage(disease: DiseaseCategory): string {
     case "UterineMyoma":
       return "Please complete the structured input (location, layer, FIGO type and size are required for each myoma).";
   }
+}
+
+/**
+ * One missing required field in the status bar, shortened to its name.
+ * Messages that start with "Section N — " (prostate) scroll to that section.
+ */
+function MissingFieldChip({ label }: { label: string }) {
+  const { c } = useNotionPalette();
+  const section = /^Section (\d+) — /.exec(label)?.[1];
+  const short =
+    label
+      .replace(/^Section \d+ — /, "")
+      .replace(/\s*\([^)]*\)\s*$/, "")
+      .trim() || label;
+  const style = { background: c.warningTint, color: c.warningText };
+  const className = "rounded px-1.5 py-0.5 text-xs";
+  if (!section) {
+    return (
+      <span title={label} className={className} style={style}>
+        {short}
+      </span>
+    );
+  }
+  return (
+    <button
+      type="button"
+      title={label}
+      onClick={() =>
+        document
+          .querySelector(`[data-section-step="${section}"]`)
+          ?.scrollIntoView({ behavior: "smooth", block: "start" })
+      }
+      className={`${className} hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
+      style={style}
+    >
+      {short}
+    </button>
+  );
 }
 
 export function StructuredReportClient({ disease }: { disease: DiseaseCategory }) {
@@ -803,53 +839,48 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
             />
 
             {/* ── Workspace 2-column layout ──────────────────── */}
-            <div className="grid gap-x-8 gap-y-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            {/* The form gets the wider column: it is where the work is, and
+                the output column is empty until a report streams in. */}
+            <div className="grid gap-x-6 gap-y-0 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
               {/* LEFT: input column */}
               <div className="flex min-w-0 flex-col">
-                <Block
-                  label="Configuration"
-                  hint="Provider, modality hint, output language."
+                {/* Configuration — one dense row. */}
+                <section
+                  aria-label="Configuration"
+                  className="rounded-lg border px-3 py-2"
+                  style={{ borderColor: c.hairline, background: c.card }}
                 >
-                  <div className="flex flex-col gap-4 pt-2">
+                  <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
                     <ModelSelector
+                      compact
                       providers={providers}
                       selectedProvider={provider}
                       selectedModel={model}
                       onProviderChange={setProvider}
                       onModelChange={setModel}
                     />
-
-                    <div>
-                      <label
-                        className="mb-1.5 block text-[13px] font-medium"
+                    <div title="Auto: 입력 텍스트에서 modality를 자동 유추합니다. 구체적인 modality를 선택하면 프롬프트에 hint로 전달됩니다.">
+                      <span
                         id="modality-hint-label"
-                        htmlFor="modality-hint-control"
-                        style={{ color: c.charcoal }}
+                        className="mb-1 block text-xs font-medium"
+                        style={{ color: c.slate }}
                       >
                         Modality hint
-                      </label>
+                      </span>
                       <SegmentedControl
                         name="modality-hint-control"
                         ariaLabel="Modality hint"
-                        size="sm"
+                        size="xs"
                         value={modality}
                         options={toSegmentedOptions(MODALITY_OPTIONS)}
                         onChange={(opt) => setModality(opt)}
                       />
-                      <p
-                        className="mt-1.5 text-[12px]"
-                        style={{ color: c.steel }}
-                      >
-                        Auto: 입력 텍스트에서 modality를 자동 유추합니다.
-                        구체적인 modality를 선택하면 프롬프트에 hint로
-                        전달됩니다.
-                      </p>
                     </div>
-
-                    <div className="min-w-[200px]">
+                    <div className="w-28">
                       <Select
                         id="lang"
                         label="Output language"
+                        compact
                         value={lang}
                         onChange={(e) =>
                           setLang(e.target.value as RccReportLang)
@@ -863,118 +894,62 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
                       </Select>
                     </div>
                   </div>
-                </Block>
+                </section>
 
-                <CalloutBlock
-                  label="Findings"
-                  hint={`${meta.displayNameKo} structured input`}
-                  note="Fill the structured fields below. Required cells are marked; the report won't generate until they are complete."
-                >
-                  <div className="flex flex-col gap-4">
-                    {formState.kind === "RCC" && (
-                      <RccStructuredForm
-                        value={formState.input}
-                        onChange={(next) => {
-                          setFormState({ kind: "RCC", input: next });
-                          if (inputError) setInputError("");
-                        }}
-                        error={inputError}
-                      />
-                    )}
-                    {formState.kind === "ProstateCancer" && (
-                      <ProstateStructuredForm
-                        value={formState.input}
-                        onChange={(next) => {
-                          setFormState({
-                            kind: "ProstateCancer",
-                            input: next,
-                          });
-                          if (inputError) setInputError("");
-                        }}
-                        error={inputError}
-                      />
-                    )}
-                    {formState.kind === "UterineMyoma" && (
-                      <MyomaStructuredForm
-                        value={formState.input}
-                        onChange={(next) => {
-                          setFormState({
-                            kind: "UterineMyoma",
-                            input: next,
-                          });
-                          if (inputError) setInputError("");
-                        }}
-                        error={inputError}
-                      />
-                    )}
-
-                    {!isStreaming && missingFields.length > 0 && (
-                      <div
-                        role="status"
-                        aria-live="polite"
-                        className="rounded-md border px-3 py-2.5 text-[13px]"
-                        style={{
-                          borderColor: c.warningBorder,
-                          background: c.warningTint,
-                          color: c.warningText,
-                        }}
-                      >
-                        <p className="font-medium">
-                          필수 입력란이 비어 있습니다
-                          <span
-                            className="ml-1 font-normal"
-                            style={{ color: c.warningBar }}
-                          >
-                            ({missingFields.length}개 항목 누락)
-                          </span>
-                        </p>
-                        <ul className="mt-1.5 ml-4 list-disc space-y-0.5 text-[12px] leading-relaxed">
-                          {missingFields.map((label) => (
-                            <li key={label}>{label}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                </CalloutBlock>
-
-                {/* Generate / Cancel CTA frame */}
+                {/* Status + Generate bar. Sticky so what is still missing and
+                    the button stay in view however far the form scrolls. */}
                 <div
-                  className="mt-6 flex flex-col gap-3 rounded-xl p-5 sm:flex-row sm:items-center sm:justify-between"
+                  className="sticky z-20 mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border px-3 py-2 shadow-sm"
                   style={{
-                    background: c.cardLavender,
-                    border: `1px solid ${c.accentBg}`,
+                    top: 64,
+                    background: c.card,
+                    borderColor:
+                      !isStreaming && missingFields.length > 0
+                        ? c.warningBorder
+                        : c.hairline,
                   }}
                 >
-                  <div className="min-w-0">
-                    <div
-                      className="text-[14px] font-medium"
-                      style={{ color: c.charcoal }}
-                    >
-                      {isStreaming
-                        ? "Generating report…"
-                        : "Ready to generate?"}
-                    </div>
-                    <div
-                      className="text-[13px]"
-                      style={{ color: c.slate, marginTop: 2 }}
-                    >
-                      {isStreaming
-                        ? "Cancel anytime to keep the partial output."
-                        : "A 6-section structured report will stream into the right column."}
-                    </div>
+                  <div
+                    role="status"
+                    aria-live="polite"
+                    className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 text-[13px]"
+                  >
+                    {isStreaming ? (
+                      <span style={{ color: c.slate }}>
+                        생성 중… 취소해도 지금까지의 출력은 남습니다.
+                      </span>
+                    ) : missingFields.length > 0 ? (
+                      <>
+                        <span
+                          className="font-medium"
+                          style={{ color: c.warningText }}
+                        >
+                          필수 입력 {missingFields.length}개 남음
+                        </span>
+                        {missingFields.map((label) => (
+                          <MissingFieldChip key={label} label={label} />
+                        ))}
+                      </>
+                    ) : (
+                      <span
+                        className="font-medium"
+                        style={{ color: c.successText }}
+                      >
+                        ✓ 필수 입력 완료 — 생성할 수 있습니다
+                      </span>
+                    )}
                   </div>
                   {isStreaming ? (
                     <Button
                       onClick={handleCancel}
                       variant="outline"
-                      size="lg"
+                      size="sm"
                       style={{
                         borderColor: c.hairline,
                         color: c.charcoal,
                         borderRadius: 9999,
-                        padding: "0 22px",
-                        height: 44,
+                        padding: "0 16px",
+                        height: 36,
                       }}
                     >
                       <Square className="mr-2 h-4 w-4" />
@@ -984,14 +959,14 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
                     <Button
                       onClick={handleGenerate}
                       disabled={!hasMinimumFormFields(formState)}
-                      size="lg"
+                      size="sm"
                       className="font-medium"
                       style={{
                         background: c.primary,
                         color: c.primaryForeground,
                         borderRadius: 9999,
-                        padding: "0 22px",
-                        height: 44,
+                        padding: "0 16px",
+                        height: 36,
                       }}
                     >
                       <Send className="mr-2 h-4 w-4" />
@@ -1000,12 +975,51 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
                     </Button>
                   )}
                 </div>
+
+                <div className="mt-3 flex flex-col gap-4">
+                  {formState.kind === "RCC" && (
+                    <RccStructuredForm
+                      value={formState.input}
+                      onChange={(next) => {
+                        setFormState({ kind: "RCC", input: next });
+                        if (inputError) setInputError("");
+                      }}
+                      error={inputError}
+                    />
+                  )}
+                  {formState.kind === "ProstateCancer" && (
+                    <ProstateStructuredForm
+                      value={formState.input}
+                      onChange={(next) => {
+                        setFormState({
+                          kind: "ProstateCancer",
+                          input: next,
+                        });
+                        if (inputError) setInputError("");
+                      }}
+                      error={inputError}
+                    />
+                  )}
+                  {formState.kind === "UterineMyoma" && (
+                    <MyomaStructuredForm
+                      value={formState.input}
+                      onChange={(next) => {
+                        setFormState({
+                          kind: "UterineMyoma",
+                          input: next,
+                        });
+                        if (inputError) setInputError("");
+                      }}
+                      error={inputError}
+                    />
+                  )}
+                </div>
               </div>
 
               {/* RIGHT: streaming output (sticky on desktop) */}
               <div
-                className="mt-10 flex min-w-0 flex-col lg:mt-7 lg:sticky lg:self-start"
-                style={{ top: 80 }}
+                className="mt-8 flex min-w-0 flex-col lg:mt-0 lg:sticky lg:self-start"
+                style={{ top: 64 }}
               >
                 <OutputBlock
                   label="Output"
