@@ -1,6 +1,6 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createGoogle } from "@ai-sdk/google";
 import type { ProviderName, ProviderInfo } from "./types";
 import {
   LOCAL_MODELS,
@@ -44,7 +44,7 @@ function resolveLocalEntry(modelId?: string): LocalModelConfig {
   return resolveLocalModel(modelId || process.env.RAD_LOCAL_MODEL);
 }
 
-// Serving stacks need per-model chat-template flags that @ai-sdk/openai 1.3
+// Serving stacks need per-model chat-template flags that @ai-sdk/openai
 // does not expose (Qwen drops all content when its <think> channel exhausts
 // max_tokens; DeepSeek-V4 streams reasoning on a channel the SDK ignores).
 // Inject the catalog's `chat_template_kwargs` via a fetch middleware.
@@ -103,7 +103,9 @@ function createLocalModel(modelId?: string, deepReasoning = false) {
     apiKey: "not-needed",
     fetch: createLocalFetch(entry, deepReasoning),
   });
-  return local(entry.id);
+  // Chat Completions explicitly: since AI SDK 5 the default is the Responses
+  // API, which vLLM's chat template path does not go through.
+  return local.chat(entry.id);
 }
 
 /** Per-call generation options that are not part of the model identity. */
@@ -153,7 +155,7 @@ export function getModel(
       const openai = createOpenAI({
         apiKey: process.env.OPENAI_API_KEY,
       });
-      return openai(modelId || DEFAULT_MODEL_BY_PROVIDER.openai);
+      return openai.chat(modelId || DEFAULT_MODEL_BY_PROVIDER.openai);
     }
     case "anthropic": {
       const anthropic = createAnthropic({
@@ -162,7 +164,7 @@ export function getModel(
       return anthropic(modelId || DEFAULT_MODEL_BY_PROVIDER.anthropic);
     }
     case "google": {
-      const google = createGoogleGenerativeAI({
+      const google = createGoogle({
         apiKey: process.env.GOOGLE_AI_API_KEY,
       });
       return google(modelId || DEFAULT_MODEL_BY_PROVIDER.google);
@@ -191,7 +193,7 @@ export function getModelWithKey(
       const openai = createOpenAI({
         apiKey: apiKey ?? process.env.OPENAI_API_KEY,
       });
-      return openai(modelId || DEFAULT_MODEL_BY_PROVIDER.openai);
+      return openai.chat(modelId || DEFAULT_MODEL_BY_PROVIDER.openai);
     }
     case "anthropic": {
       const anthropic = createAnthropic({
@@ -200,7 +202,7 @@ export function getModelWithKey(
       return anthropic(modelId || DEFAULT_MODEL_BY_PROVIDER.anthropic);
     }
     case "google": {
-      const google = createGoogleGenerativeAI({
+      const google = createGoogle({
         apiKey: apiKey ?? process.env.GOOGLE_AI_API_KEY,
       });
       return google(modelId || DEFAULT_MODEL_BY_PROVIDER.google);

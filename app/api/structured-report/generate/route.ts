@@ -25,7 +25,7 @@ const MAX_FORM_STATE_CHARS = 100_000;
 /** Fixed sample input so the prompt hash tracks prompt text, not findings. */
 const SAMPLE_FINDINGS = "SAMPLE FINDINGS";
 
-import { streamText } from "ai";
+import { createTextStreamResponse, streamText } from "ai";
 import { z } from "zod";
 import { getModelWithKey, resolvedModelId } from "@/lib/providers/registry";
 import type { ProviderName } from "@/lib/providers/types";
@@ -170,11 +170,11 @@ export async function POST(req: Request) {
 
     const result = streamText({
       model: llmModel,
-      system: systemPrompt,
+      instructions: systemPrompt,
       prompt: userPrompt,
       temperature: 0.3,
       topP: 0.9,
-      maxTokens: maxTokensConfig,
+      maxOutputTokens: maxTokensConfig,
       onChunk: ({ chunk }) => {
         if (firstTokenLogged) return;
         if (chunk.type !== "text-delta") return;
@@ -192,7 +192,7 @@ export async function POST(req: Request) {
           /* observability must never break the stream */
         }
       },
-      onFinish: ({ text, usage, finishReason }) => {
+      onEnd: ({ text, usage, finishReason }) => {
         const totalMs = performance.now() - tLLMStart;
 
         // Durable history row. Written here rather than from the browser so a
@@ -209,14 +209,14 @@ export async function POST(req: Request) {
           provider,
           model: modelId,
           finishReason,
-          promptTokens: usage?.promptTokens ?? null,
-          completionTokens: usage?.completionTokens ?? null,
+          promptTokens: usage?.inputTokens ?? null,
+          completionTokens: usage?.outputTokens ?? null,
           ttftMs,
           totalMs: Math.round(totalMs),
         });
 
         try {
-          const completion = usage?.completionTokens ?? 0;
+          const completion = usage?.outputTokens ?? 0;
           const tps =
             totalMs > 0 ? (completion / (totalMs / 1000)) : 0;
           perfLog({
@@ -224,7 +224,7 @@ export async function POST(req: Request) {
             stage: "finish",
             ...baseTags,
             totalMs: Math.round(totalMs),
-            promptTokens: usage?.promptTokens ?? null,
+            promptTokens: usage?.inputTokens ?? null,
             completionTokens: completion,
             tps: Number(tps.toFixed(1)),
             finishReason,
@@ -242,12 +242,9 @@ export async function POST(req: Request) {
       },
     });
 
-    return result.toDataStreamResponse({
-      getErrorMessage: (error) => {
-        if (error instanceof Error) return error.message;
-        return "Unknown streaming error";
-      },
-    });
+    // Plain text stream: the client appends decoded chunks as they arrive.
+    // Mid-stream failures are logged by onError above and end the stream.
+    return createTextStreamResponse({ stream: result.textStream });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Internal server error";

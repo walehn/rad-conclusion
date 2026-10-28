@@ -10,8 +10,8 @@
 // show up as a quality trend that the generator never caused.
 
 import { createOpenAI } from "@ai-sdk/openai";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { generateText, type LanguageModelV1 } from "ai";
+import { createGoogle } from "@ai-sdk/google";
+import { generateText, type LanguageModel } from "ai";
 import { LOCAL_MODELS } from "@/lib/providers/local-config";
 import { deidentify } from "./deidentify";
 import {
@@ -26,15 +26,15 @@ export interface JudgeSpec {
   id: string;
   /** Whether input leaves this machine. */
   external: boolean;
-  createModel: () => LanguageModelV1;
+  createModel: () => LanguageModel;
   temperature?: number;
-  maxTokens: number;
+  maxOutputTokens: number;
 }
 
 const LOCAL_JUDGE_MODEL = "deepseek-v4-flash-0731";
 const GEMINI_JUDGE_MODEL = "gemini-3.1-pro-preview";
 
-function localJudgeModel(): LanguageModelV1 {
+function localJudgeModel(): LanguageModel {
   const entry = LOCAL_MODELS.find((m) => m.id === LOCAL_JUDGE_MODEL);
   if (!entry) throw new Error(`${LOCAL_JUDGE_MODEL} is not in LOCAL_MODELS`);
   const host = process.env[entry.hostEnvVar] || entry.host;
@@ -52,15 +52,14 @@ function localJudgeModel(): LanguageModelV1 {
   return createOpenAI({
     baseURL: host + "/v1",
     apiKey: "not-needed",
-    compatibility: "compatible",
     fetch: withThinking,
-  })(entry.id);
+  }).chat(entry.id);
 }
 
-function geminiJudgeModel(): LanguageModelV1 {
+function geminiJudgeModel(): LanguageModel {
   const apiKey = process.env.GOOGLE_AI_API_KEY;
   if (!apiKey) throw new Error("GOOGLE_AI_API_KEY is not set");
-  return createGoogleGenerativeAI({ apiKey })(GEMINI_JUDGE_MODEL);
+  return createGoogle({ apiKey })(GEMINI_JUDGE_MODEL);
 }
 
 export const JUDGES: Record<string, JudgeSpec> = {
@@ -69,15 +68,18 @@ export const JUDGES: Record<string, JudgeSpec> = {
     external: false,
     createModel: localJudgeModel,
     temperature: 0,
-    maxTokens: 16000,
+    maxOutputTokens: 16000,
   },
-  // Gemini 3 is tuned for its default temperature; lowering it is documented
-  // to cause looping, so none is set.
+  // Gemini 3 is tuned for its default temperature and lowering it is
+  // documented to cause looping. AI SDK 4 nevertheless sent 0 when none was
+  // set, so every stored Gemini judgment was graded at 0; it stays explicit
+  // to keep judgments comparable now that the SDK leaves it unset.
   gemini: {
     id: `google:${GEMINI_JUDGE_MODEL}`,
     external: true,
     createModel: geminiJudgeModel,
-    maxTokens: 16000,
+    temperature: 0,
+    maxOutputTokens: 16000,
   },
 };
 
@@ -113,10 +115,10 @@ export async function runJudge(
   const t0 = performance.now();
   const res = await generateText({
     model: spec.createModel(),
-    system,
+    instructions: system,
     prompt,
     temperature: spec.temperature,
-    maxTokens: spec.maxTokens,
+    maxOutputTokens: spec.maxOutputTokens,
     maxRetries: 2,
     abortSignal: AbortSignal.timeout(timeoutMs),
   });
@@ -126,8 +128,8 @@ export async function runJudge(
       judgment: parseJudgment(res.text),
       raw: res.text,
       latencyMs,
-      inputTokens: res.usage?.promptTokens ?? null,
-      outputTokens: res.usage?.completionTokens ?? null,
+      inputTokens: res.usage?.inputTokens ?? null,
+      outputTokens: res.usage?.outputTokens ?? null,
     };
   } catch (error) {
     throw new JudgeParseError(

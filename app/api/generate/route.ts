@@ -1,5 +1,9 @@
 import crypto from "node:crypto";
-import { streamText } from "ai";
+import {
+  createUIMessageStreamResponse,
+  streamText,
+  toUIMessageStream,
+} from "ai";
 import { z } from "zod";
 import {
   getModelWithKey,
@@ -21,7 +25,9 @@ const requestSchema = z.object({
   findings: z
     .string()
     .min(1, "Findings text is required")
-    .refine((f) => findingsProblem(f) === null, (f) => ({ message: findingsProblem(f) ?? "" })),
+    .refine((f) => findingsProblem(f) === null, {
+      error: (issue) => findingsProblem(String(issue.input)) ?? "",
+    }),
   style: z.enum(["numbered", "short", "urgent-first"]).default("numbered"),
   lang: z.enum(["ko", "en", "mixed"]).default("en"),
   title: z.string().default("Conclusion"),
@@ -51,13 +57,19 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    // Extract findings from useChat messages format
+    // Extract findings from useChat messages format (UI messages carry text
+    // in `parts`; plain `content` is still accepted from non-browser callers)
     if (!body.findings && Array.isArray(body.messages)) {
       const lastUserMsg = [...body.messages].reverse().find(
         (m: { role: string }) => m.role === "user"
       );
       if (lastUserMsg) {
-        body.findings = lastUserMsg.content;
+        body.findings = Array.isArray(lastUserMsg.parts)
+          ? lastUserMsg.parts
+              .filter((p: { type: string }) => p.type === "text")
+              .map((p: { text: string }) => p.text)
+              .join("")
+          : lastUserMsg.content;
       }
     }
 
@@ -127,7 +139,7 @@ export async function POST(req: Request) {
 
     const result = streamText({
       model: llmModel,
-      system: systemPrompt,
+      instructions: systemPrompt,
       prompt: userPrompt,
       temperature: 0.3,
       topP: 0.9,
@@ -153,7 +165,7 @@ export async function POST(req: Request) {
           /* observability must never break the stream */
         }
       },
-      onFinish: ({ text, usage, finishReason }) => {
+      onEnd: ({ text, usage, finishReason }) => {
         const totalMs = performance.now() - tLLMStart;
 
         // Durable history row. Written here rather than from the browser so a
@@ -171,14 +183,14 @@ export async function POST(req: Request) {
           provider,
           model: modelId,
           finishReason,
-          promptTokens: usage?.promptTokens ?? null,
-          completionTokens: usage?.completionTokens ?? null,
+          promptTokens: usage?.inputTokens ?? null,
+          completionTokens: usage?.outputTokens ?? null,
           ttftMs,
           totalMs: Math.round(totalMs),
         });
 
         try {
-          const completion = usage?.completionTokens ?? 0;
+          const completion = usage?.outputTokens ?? 0;
           const tps =
             totalMs > 0 ? (completion / (totalMs / 1000)) : 0;
           perfLog({
@@ -186,7 +198,7 @@ export async function POST(req: Request) {
             stage: "finish",
             ...baseTags,
             totalMs: Math.round(totalMs),
-            promptTokens: usage?.promptTokens ?? null,
+            promptTokens: usage?.inputTokens ?? null,
             completionTokens: completion,
             tps: Number(tps.toFixed(1)),
             finishReason,
@@ -200,11 +212,16 @@ export async function POST(req: Request) {
       },
     });
 
-    return result.toDataStreamResponse({
-      getErrorMessage: (error) => {
-        if (error instanceof Error) return error.message;
-        return "Unknown streaming error";
-      },
+    return createUIMessageStreamResponse({
+      stream: toUIMessageStream({
+        stream: result.stream,
+        // The UI renders text parts only; reasoning stays server-side.
+        sendReasoning: false,
+        onError: (error) => {
+          if (error instanceof Error) return error.message;
+          return "Unknown streaming error";
+        },
+      }),
     });
   } catch (error) {
     const message =

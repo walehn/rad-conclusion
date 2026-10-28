@@ -15,7 +15,7 @@
 
 import { createHash } from "node:crypto";
 import { createOpenAI } from "@ai-sdk/openai";
-import { generateText, type LanguageModelV1 } from "ai";
+import { generateText, type LanguageModel } from "ai";
 import { postProcess } from "@/lib/post-process";
 import { LOCAL_MODELS } from "@/lib/providers/local-config";
 import { getModel, supportsReasoningEffort } from "@/lib/providers/registry";
@@ -96,7 +96,7 @@ export interface ReplayOutput {
 }
 
 /** The local replay model with thinking forced on through the chat template. */
-export function thinkingModel(): LanguageModelV1 {
+export function thinkingModel(): LanguageModel {
   const entry = LOCAL_MODELS.find((m) => m.id === REPLAY_MODEL);
   if (!entry) throw new Error(`${REPLAY_MODEL} is not in LOCAL_MODELS`);
   const host = process.env[entry.hostEnvVar] || entry.host;
@@ -108,9 +108,7 @@ export function thinkingModel(): LanguageModelV1 {
     }
     return fetch(input, init);
   };
-  return createOpenAI({ baseURL: host + "/v1", apiKey: "not-needed", compatibility: "compatible", fetch: withThinking })(
-    entry.id
-  );
+  return createOpenAI({ baseURL: host + "/v1", apiKey: "not-needed", fetch: withThinking }).chat(entry.id);
 }
 
 /** One generation, with the parameters /api/generate uses for a local model. */
@@ -119,7 +117,7 @@ export async function generateForCase(c: PromptCandidate, findings: string, time
   const reasoningEffort = c.deepReasoning ? "medium" : "low";
   const res = await generateText({
     model: c.thinking ? thinkingModel() : getModel("local", REPLAY_MODEL, { deepReasoning: c.deepReasoning }),
-    system: c.buildSystem({ style: STYLE, lang: LANG, title: TITLE }),
+    instructions: c.buildSystem({ style: STYLE, lang: LANG, title: TITLE }),
     prompt: c.buildUser(findings, TITLE),
     temperature: 0.3,
     topP: 0.9,

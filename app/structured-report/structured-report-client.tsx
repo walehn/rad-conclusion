@@ -117,29 +117,6 @@ function getCsrfToken(): string {
 }
 
 /**
- * Parse an AI SDK v4 data-stream line such as `0:"hello"` and append the
- * decoded text chunk to the accumulator. Non-text prefixes (1/2/3/8/9/d/e)
- * carry tool-call, step, and finish metadata that the structured report UI
- * does not need to render inline. Error prefixes surface via the error
- * channel returned from the fetch response itself (non-200 status).
- */
-function appendStreamChunk(accumulated: string, rawLine: string): string {
-  if (!rawLine) return accumulated;
-  const colonIdx = rawLine.indexOf(":");
-  if (colonIdx <= 0) return accumulated;
-  const prefix = rawLine.slice(0, colonIdx);
-  const payload = rawLine.slice(colonIdx + 1);
-  if (prefix !== "0") return accumulated;
-  try {
-    const decoded = JSON.parse(payload);
-    if (typeof decoded === "string") return accumulated + decoded;
-  } catch {
-    // Malformed payload — skip silently; subsequent chunks may still be valid.
-  }
-  return accumulated;
-}
-
-/**
  * Discriminated union of per-disease form state.
  *
  * The route renders one disease at a time (per `[disease]` slug), so the
@@ -432,26 +409,22 @@ export function StructuredReportClient({ disease }: { disease: DiseaseCategory }
         throw new Error("Empty response body from stream endpoint");
       }
 
+      // The endpoint streams plain text, so decoded chunks are appended as-is.
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-      let buffer = "";
       let accumulated = "";
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        for (const line of lines) {
-          accumulated = appendStreamChunk(accumulated, line);
-        }
+        accumulated += decoder.decode(value, { stream: true });
         setContent(accumulated);
       }
 
-      // Drain any trailing partial line.
-      if (buffer) {
-        accumulated = appendStreamChunk(accumulated, buffer);
+      // Flush any multi-byte sequence held back by the streaming decoder.
+      const tail = decoder.decode();
+      if (tail) {
+        accumulated += tail;
         setContent(accumulated);
       }
 

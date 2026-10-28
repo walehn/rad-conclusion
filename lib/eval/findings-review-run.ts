@@ -59,10 +59,10 @@ export async function reviewForCase(v: ReviewVariant, findings: string, timeoutM
   const t0 = performance.now();
   const res = await generateText({
     model: v.thinking ? thinkingModel() : getModel("local", REPLAY_MODEL, { deepReasoning: false }),
-    system: FINDINGS_REVIEW_SYSTEM,
+    instructions: FINDINGS_REVIEW_SYSTEM,
     prompt: buildFindingsReviewPrompt(findings),
     temperature: 0,
-    maxTokens: v.thinking ? 6000 : 1200,
+    maxOutputTokens: v.thinking ? 6000 : 1200,
     maxRetries: 2,
     abortSignal: AbortSignal.timeout(timeoutMs),
   });

@@ -19,6 +19,9 @@ exports[`upstream LLM request payloads > /api/generate v1 Qwen/Qwen3.6-35B-A3B-F
       ],
       "model": "Qwen/Qwen3.6-35B-A3B-FP8",
       "stream": true,
+      "stream_options": {
+        "include_usage": true,
+      },
       "temperature": 0.3,
       "top_p": 0.9,
     },
@@ -55,6 +58,9 @@ exports[`upstream LLM request payloads > /api/generate v1 deepseek-v4-flash-0731
       ],
       "model": "deepseek-v4-flash-0731",
       "stream": true,
+      "stream_options": {
+        "include_usage": true,
+      },
       "temperature": 0.3,
       "top_p": 0.9,
     },
@@ -91,6 +97,9 @@ exports[`upstream LLM request payloads > /api/generate v2 Qwen/Qwen3.6-35B-A3B-F
       ],
       "model": "Qwen/Qwen3.6-35B-A3B-FP8",
       "stream": true,
+      "stream_options": {
+        "include_usage": true,
+      },
       "temperature": 0.3,
       "top_p": 0.9,
     },
@@ -127,6 +136,9 @@ exports[`upstream LLM request payloads > /api/generate v2 deepseek-v4-flash-0731
       ],
       "model": "deepseek-v4-flash-0731",
       "stream": true,
+      "stream_options": {
+        "include_usage": true,
+      },
       "temperature": 0.3,
       "top_p": 0.9,
     },

@@ -34,13 +34,14 @@ vi.mock('@/lib/structured-reports/record', () => ({
 }));
 
 vi.mock('ai', () => ({
-  streamText: vi.fn(() => ({
-    toDataStreamResponse: () =>
+  streamText: vi.fn(() => ({ textStream: new ReadableStream<string>() })),
+  createTextStreamResponse: vi.fn(
+    () =>
       new Response('mock-stream', {
         status: 200,
-        headers: { 'Content-Type': 'text/event-stream' },
-      }),
-  })),
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      })
+  ),
 }));
 
 import { createCookieStore } from '../../helpers/mock-next-cookies';
@@ -156,11 +157,11 @@ describe('POST /api/structured-report/generate', () => {
     expect(res.status).toBe(200);
 
     const opts = vi.mocked(streamText).mock.calls[0][0] as unknown as {
-      onFinish: (e: unknown) => void;
+      onEnd: (e: unknown) => void;
     };
-    opts.onFinish({
+    opts.onEnd({
       text: 'IMPRESSION: PI-RADS 4',
-      usage: { promptTokens: 100, completionTokens: 20 },
+      usage: { inputTokens: 100, outputTokens: 20 },
       finishReason: 'stop',
     });
 
@@ -189,9 +190,9 @@ describe('POST /api/structured-report/generate', () => {
     await POST(makeReportRequest(validBody));
 
     const opts = vi.mocked(streamText).mock.calls[0][0] as unknown as {
-      onFinish: (e: unknown) => void;
+      onEnd: (e: unknown) => void;
     };
-    opts.onFinish({ text: 'report', usage: undefined, finishReason: 'stop' });
+    opts.onEnd({ text: 'report', usage: undefined, finishReason: 'stop' });
 
     expect(vi.mocked(recordStructuredReport).mock.calls[0][0]).toMatchObject({
       formState: null,

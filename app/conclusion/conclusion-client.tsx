@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport, type ChatStatus, type UIMessage } from "ai";
 import {
   Stethoscope,
   Send,
@@ -53,6 +54,19 @@ function getCsrfToken(): string {
     ?.split("=")[1] ?? "";
 }
 
+// One stateless transport serves all three chat hooks; headers and body are
+// passed with each sendMessage call so they reflect the state at click time.
+const generateTransport = new DefaultChatTransport<UIMessage>({ api: "/api/generate" });
+
+const isBusy = (status: ChatStatus) => status === "submitted" || status === "streaming";
+
+/** Text of the latest assistant message (UI messages carry text in parts). */
+function lastAssistantText(messages: UIMessage[]): string {
+  const last = messages.filter((m) => m.role === "assistant").pop();
+  if (!last) return "";
+  return last.parts.flatMap((p) => (p.type === "text" ? [p.text] : [])).join("");
+}
+
 export function ConclusionClient() {
   const { c, tokens } = useNotionPalette();
   const router = useRouter();
@@ -83,7 +97,7 @@ export function ConclusionClient() {
   const startTimeV1Ref = React.useRef<number | null>(null);
   const startTimeV2Ref = React.useRef<number | null>(null);
   // Ties the v1/v2 rows of one A/B click together in the generation history.
-  // Read by /api/generate through the `body` of each useChat hook.
+  // Read by /api/generate through the body of each sendMessage request.
   const batchIdRef = React.useRef<string>("");
 
   // ── Notion-style UX state (sidebar collapse, page emoji) ──────
@@ -166,19 +180,8 @@ export function ConclusionClient() {
     (s) => s.id === provider && s.enabled
   );
 
-  const { messages, isLoading, append, setMessages } = useChat({
-    api: "/api/generate",
-    headers: { "x-csrf-token": getCsrfToken() },
-    body: {
-      style,
-      lang,
-      provider,
-      model,
-      promptVersion: "v1",
-      get batchId() {
-        return batchIdRef.current;
-      },
-    },
+  const { messages, status, sendMessage, setMessages } = useChat({
+    transport: generateTransport,
     onFinish: () => {
       if (startTimeRef.current) {
         setElapsedTime((performance.now() - startTimeRef.current) / 1000);
@@ -195,18 +198,7 @@ export function ConclusionClient() {
   // A/B Compare mode hooks (always declared to satisfy React rules of hooks)
   const chatV1 = useChat({
     id: "chat-v1",
-    api: "/api/generate",
-    headers: { "x-csrf-token": getCsrfToken() },
-    body: {
-      style,
-      lang,
-      provider,
-      model,
-      promptVersion: "v1",
-      get batchId() {
-        return batchIdRef.current;
-      },
-    },
+    transport: generateTransport,
     onFinish: () => {
       if (startTimeV1Ref.current) {
         setElapsedTimeV1((performance.now() - startTimeV1Ref.current) / 1000);
@@ -222,18 +214,7 @@ export function ConclusionClient() {
 
   const chatV2 = useChat({
     id: "chat-v2",
-    api: "/api/generate",
-    headers: { "x-csrf-token": getCsrfToken() },
-    body: {
-      style,
-      lang,
-      provider,
-      model,
-      promptVersion: "v2",
-      get batchId() {
-        return batchIdRef.current;
-      },
-    },
+    transport: generateTransport,
     onFinish: () => {
       if (startTimeV2Ref.current) {
         setElapsedTimeV2((performance.now() - startTimeV2Ref.current) / 1000);
@@ -245,6 +226,16 @@ export function ConclusionClient() {
         setElapsedTimeV2((performance.now() - startTimeV2Ref.current) / 1000);
       }
     },
+  });
+
+  const isLoading = isBusy(status);
+  const isLoadingV1 = isBusy(chatV1.status);
+  const isLoadingV2 = isBusy(chatV2.status);
+
+  // Body fields read by /api/generate next to the chat messages.
+  const generateRequest = (promptVersion: "v1" | "v2") => ({
+    headers: { "x-csrf-token": getCsrfToken() },
+    body: { style, lang, provider, model, promptVersion, batchId: batchIdRef.current },
   });
 
   const handleVote = async (vote: "v1" | "v2" | "tie") => {
@@ -293,34 +284,31 @@ export function ConclusionClient() {
       startTimeV1Ref.current = now;
       startTimeV2Ref.current = now;
 
-      chatV1.append({ role: "user", content: trimmed });
-      chatV2.append({ role: "user", content: trimmed });
+      chatV1.sendMessage({ text: trimmed }, generateRequest("v1"));
+      chatV2.sendMessage({ text: trimmed }, generateRequest("v2"));
     } else {
       // Normal mode: single generation
       setElapsedTime(null);
       setMessages([]);
       startTimeRef.current = performance.now();
 
-      append({ role: "user", content: trimmed });
+      sendMessage({ text: trimmed }, generateRequest("v1"));
     }
   };
 
   // Extract the assistant's latest message content and post-process it
-  const rawContent =
-    messages.filter((m) => m.role === "assistant").pop()?.content || "";
+  const rawContent = lastAssistantText(messages);
   const processedContent = rawContent ? postProcess(rawContent, "Conclusion") : "";
 
   // A/B Compare mode: extract content from V1 and V2
-  const rawV1 =
-    chatV1.messages.filter((m) => m.role === "assistant").pop()?.content || "";
+  const rawV1 = lastAssistantText(chatV1.messages);
   const processedV1 = rawV1 ? postProcess(rawV1, "Conclusion") : "";
 
-  const rawV2 =
-    chatV2.messages.filter((m) => m.role === "assistant").pop()?.content || "";
+  const rawV2 = lastAssistantText(chatV2.messages);
   const processedV2 = rawV2 ? postProcess(rawV2, "Conclusion") : "";
 
   const isAnyLoading = compareMode
-    ? chatV1.isLoading || chatV2.isLoading
+    ? isLoadingV1 || isLoadingV2
     : isLoading;
 
   const findingsChanged =
@@ -713,11 +701,11 @@ export function ConclusionClient() {
                     >
                       <ConclusionOutput
                         content={processedV1}
-                        isLoading={chatV1.isLoading}
+                        isLoading={isLoadingV1}
                         elapsedTime={elapsedTimeV1}
                         error={apiErrorV1}
                       />
-                      {!chatV1.isLoading && lastRun && (
+                      {!isLoadingV1 && lastRun && (
                         <ConclusionChecks
                           findings={lastRun.findings}
                           conclusion={processedV1}
@@ -739,11 +727,11 @@ export function ConclusionClient() {
                     >
                       <ConclusionOutput
                         content={processedV2}
-                        isLoading={chatV2.isLoading}
+                        isLoading={isLoadingV2}
                         elapsedTime={elapsedTimeV2}
                         error={apiErrorV2}
                       />
-                      {!chatV2.isLoading && lastRun && (
+                      {!isLoadingV2 && lastRun && (
                         <ConclusionChecks
                           findings={lastRun.findings}
                           conclusion={processedV2}
@@ -753,8 +741,8 @@ export function ConclusionClient() {
                       )}
                     </OutputBlock>
 
-                    {!chatV1.isLoading &&
-                      !chatV2.isLoading &&
+                    {!isLoadingV1 &&
+                      !isLoadingV2 &&
                       processedV1 &&
                       processedV2 && (
                         <div
