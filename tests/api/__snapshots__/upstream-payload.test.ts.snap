@@ -1,0 +1,377 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`upstream LLM request payloads > /api/generate v1 Qwen/Qwen3.6-35B-A3B-FP8 1`] = `
+[
+  {
+    "body": {
+      "chat_template_kwargs": {
+        "enable_thinking": false,
+      },
+      "messages": [
+        {
+          "content": "<sha:e6921916a1fd len:3166>",
+          "role": "system",
+        },
+        {
+          "content": "<sha:ebccf9357d44 len:97>",
+          "role": "user",
+        },
+      ],
+      "model": "Qwen/Qwen3.6-35B-A3B-FP8",
+      "stream": true,
+      "temperature": 0.3,
+      "top_p": 0.9,
+    },
+    "path": "qwen.test/v1/chat/completions",
+  },
+]
+`;
+
+exports[`upstream LLM request payloads > /api/generate v1 Qwen/Qwen3.6-35B-A3B-FP8 2`] = `
+{
+  "completionTokens": 7,
+  "conclusion": "1. Left renal mass, suspicious for RCC.",
+  "finishReason": "stop",
+  "promptTokens": 11,
+}
+`;
+
+exports[`upstream LLM request payloads > /api/generate v1 deepseek-v4-flash-0731 1`] = `
+[
+  {
+    "body": {
+      "chat_template_kwargs": {
+        "thinking": false,
+      },
+      "messages": [
+        {
+          "content": "<sha:e6921916a1fd len:3166>",
+          "role": "system",
+        },
+        {
+          "content": "<sha:ebccf9357d44 len:97>",
+          "role": "user",
+        },
+      ],
+      "model": "deepseek-v4-flash-0731",
+      "stream": true,
+      "temperature": 0.3,
+      "top_p": 0.9,
+    },
+    "path": "vllm.test/v1/chat/completions",
+  },
+]
+`;
+
+exports[`upstream LLM request payloads > /api/generate v1 deepseek-v4-flash-0731 2`] = `
+{
+  "completionTokens": 7,
+  "conclusion": "1. Left renal mass, suspicious for RCC.",
+  "finishReason": "stop",
+  "promptTokens": 11,
+}
+`;
+
+exports[`upstream LLM request payloads > /api/generate v2 Qwen/Qwen3.6-35B-A3B-FP8 1`] = `
+[
+  {
+    "body": {
+      "chat_template_kwargs": {
+        "enable_thinking": true,
+      },
+      "messages": [
+        {
+          "content": "<sha:071d3eeb8a04 len:6156>",
+          "role": "system",
+        },
+        {
+          "content": "<sha:ebccf9357d44 len:97>",
+          "role": "user",
+        },
+      ],
+      "model": "Qwen/Qwen3.6-35B-A3B-FP8",
+      "stream": true,
+      "temperature": 0.3,
+      "top_p": 0.9,
+    },
+    "path": "qwen.test/v1/chat/completions",
+  },
+]
+`;
+
+exports[`upstream LLM request payloads > /api/generate v2 Qwen/Qwen3.6-35B-A3B-FP8 2`] = `
+{
+  "completionTokens": 7,
+  "conclusion": "1. Left renal mass, suspicious for RCC.",
+  "finishReason": "stop",
+  "promptTokens": 11,
+}
+`;
+
+exports[`upstream LLM request payloads > /api/generate v2 deepseek-v4-flash-0731 1`] = `
+[
+  {
+    "body": {
+      "chat_template_kwargs": {
+        "thinking": false,
+      },
+      "messages": [
+        {
+          "content": "<sha:071d3eeb8a04 len:6156>",
+          "role": "system",
+        },
+        {
+          "content": "<sha:ebccf9357d44 len:97>",
+          "role": "user",
+        },
+      ],
+      "model": "deepseek-v4-flash-0731",
+      "stream": true,
+      "temperature": 0.3,
+      "top_p": 0.9,
+    },
+    "path": "vllm.test/v1/chat/completions",
+  },
+]
+`;
+
+exports[`upstream LLM request payloads > /api/generate v2 deepseek-v4-flash-0731 2`] = `
+{
+  "completionTokens": 7,
+  "conclusion": "1. Left renal mass, suspicious for RCC.",
+  "finishReason": "stop",
+  "promptTokens": 11,
+}
+`;
+
+exports[`upstream LLM request payloads > findings review (both variants) 1`] = `
+[
+  {
+    "body": {
+      "chat_template_kwargs": {
+        "thinking": false,
+      },
+      "max_tokens": 1200,
+      "messages": [
+        {
+          "content": "<sha:3f1f1231c2b7 len:2046>",
+          "role": "system",
+        },
+        {
+          "content": "Findings:
+Left 3 cm renal mass with heterogeneous enhancement.",
+          "role": "user",
+        },
+      ],
+      "model": "deepseek-v4-flash-0731",
+      "temperature": 0,
+    },
+    "path": "vllm.test/v1/chat/completions",
+  },
+  {
+    "body": {
+      "chat_template_kwargs": {
+        "thinking": true,
+      },
+      "max_tokens": 6000,
+      "messages": [
+        {
+          "content": "<sha:3f1f1231c2b7 len:2046>",
+          "role": "system",
+        },
+        {
+          "content": "Findings:
+Left 3 cm renal mass with heterogeneous enhancement.",
+          "role": "user",
+        },
+      ],
+      "model": "deepseek-v4-flash-0731",
+      "temperature": 0,
+    },
+    "path": "vllm.test/v1/chat/completions",
+  },
+]
+`;
+
+exports[`upstream LLM request payloads > judges (local and gemini) 1`] = `
+[
+  {
+    "body": {
+      "chat_template_kwargs": {
+        "thinking": true,
+      },
+      "max_tokens": 16000,
+      "messages": [
+        {
+          "content": "<sha:39620f1e6707 len:3458>",
+          "role": "system",
+        },
+        {
+          "content": "<sha:13e82000464c len:129>",
+          "role": "user",
+        },
+      ],
+      "model": "deepseek-v4-flash-0731",
+      "temperature": 0,
+    },
+    "path": "vllm.test/v1/chat/completions",
+  },
+  {
+    "body": {
+      "contents": [
+        {
+          "parts": [
+            {
+              "text": "<sha:13e82000464c len:129>",
+            },
+          ],
+          "role": "user",
+        },
+      ],
+      "generationConfig": {
+        "maxOutputTokens": 16000,
+        "temperature": 0,
+      },
+      "systemInstruction": {
+        "parts": [
+          {
+            "text": "<sha:39620f1e6707 len:3458>",
+          },
+        ],
+      },
+    },
+    "path": "generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent",
+  },
+]
+`;
+
+exports[`upstream LLM request payloads > replay generateForCase (every candidate) 1`] = `
+[
+  {
+    "body": {
+      "chat_template_kwargs": {
+        "thinking": false,
+      },
+      "messages": [
+        {
+          "content": "<sha:e6921916a1fd len:3166>",
+          "role": "system",
+        },
+        {
+          "content": "<sha:ebccf9357d44 len:97>",
+          "role": "user",
+        },
+      ],
+      "model": "deepseek-v4-flash-0731",
+      "temperature": 0.3,
+      "top_p": 0.9,
+    },
+    "path": "vllm.test/v1/chat/completions",
+  },
+  {
+    "body": {
+      "chat_template_kwargs": {
+        "thinking": false,
+      },
+      "messages": [
+        {
+          "content": "<sha:071d3eeb8a04 len:6156>",
+          "role": "system",
+        },
+        {
+          "content": "<sha:ebccf9357d44 len:97>",
+          "role": "user",
+        },
+      ],
+      "model": "deepseek-v4-flash-0731",
+      "temperature": 0.3,
+      "top_p": 0.9,
+    },
+    "path": "vllm.test/v1/chat/completions",
+  },
+  {
+    "body": {
+      "chat_template_kwargs": {
+        "thinking": false,
+      },
+      "messages": [
+        {
+          "content": "<sha:1a41674b18a4 len:3318>",
+          "role": "system",
+        },
+        {
+          "content": "<sha:ebccf9357d44 len:97>",
+          "role": "user",
+        },
+      ],
+      "model": "deepseek-v4-flash-0731",
+      "temperature": 0.3,
+      "top_p": 0.9,
+    },
+    "path": "vllm.test/v1/chat/completions",
+  },
+  {
+    "body": {
+      "chat_template_kwargs": {
+        "thinking": true,
+      },
+      "messages": [
+        {
+          "content": "<sha:e6921916a1fd len:3166>",
+          "role": "system",
+        },
+        {
+          "content": "<sha:ebccf9357d44 len:97>",
+          "role": "user",
+        },
+      ],
+      "model": "deepseek-v4-flash-0731",
+      "temperature": 0.3,
+      "top_p": 0.9,
+    },
+    "path": "vllm.test/v1/chat/completions",
+  },
+  {
+    "body": {
+      "chat_template_kwargs": {
+        "thinking": true,
+      },
+      "messages": [
+        {
+          "content": "<sha:071d3eeb8a04 len:6156>",
+          "role": "system",
+        },
+        {
+          "content": "<sha:ebccf9357d44 len:97>",
+          "role": "user",
+        },
+      ],
+      "model": "deepseek-v4-flash-0731",
+      "temperature": 0.3,
+      "top_p": 0.9,
+    },
+    "path": "vllm.test/v1/chat/completions",
+  },
+  {
+    "body": {
+      "chat_template_kwargs": {
+        "thinking": false,
+      },
+      "messages": [
+        {
+          "content": "<sha:e6921916a1fd len:3166>",
+          "role": "system",
+        },
+        {
+          "content": "<sha:ebccf9357d44 len:97>",
+          "role": "user",
+        },
+      ],
+      "model": "deepseek-v4-flash-0731",
+      "temperature": 0.3,
+      "top_p": 0.9,
+    },
+    "path": "vllm.test/v1/chat/completions",
+  },
+]
+`;
