@@ -3,7 +3,8 @@ import { z } from 'zod';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db/index';
 import { userApiKeys } from '@/lib/db/schema';
-import { requireApiSession } from '@/lib/auth/guard';
+import { forbiddenResponse, requireApiSession } from '@/lib/auth/guard';
+import { canManageProviders } from '@/lib/auth/roles';
 import { validateCsrfOrFail } from '@/lib/auth/csrf';
 import { decryptApiKey, encryptApiKey, maskApiKey } from '@/lib/crypto/api-key-crypto';
 
@@ -21,6 +22,8 @@ const upsertSchema = z.object({
 export async function GET() {
   const { session, response } = await requireApiSession();
   if (response) return response;
+  // Stored keys let findings reach hosted providers: admin only.
+  if (!canManageProviders(session.role)) return forbiddenResponse();
 
   const rows = await db
     .select()
@@ -44,6 +47,8 @@ export async function GET() {
 export async function POST(req: Request) {
   const { session, response } = await requireApiSession();
   if (response) return response;
+  // Stored keys let findings reach hosted providers: admin only.
+  if (!canManageProviders(session.role)) return forbiddenResponse();
 
   const csrfFailure = await validateCsrfOrFail(req);
   if (csrfFailure) return csrfFailure;

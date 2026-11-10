@@ -6,13 +6,20 @@ import type { CookieStore } from '../../helpers/mock-next-cookies';
 // factories run before top-level imports).
 // ---------------------------------------------------------------------------
 
-const { cookieStoreRef } = vi.hoisted(() => ({
+const { cookieStoreRef, roleRef } = vi.hoisted(() => ({
   cookieStoreRef: { current: null as CookieStore | null },
+  roleRef: { current: 'admin' as 'admin' | 'restricted' | null },
 }));
 
 vi.mock('next/headers', () => ({
   cookies: async () => cookieStoreRef.current!.jar,
   headers: async () => new Headers(),
+}));
+
+// The guard reads the account's role from the database; stub it so these
+// tests never open data/auth.sqlite.
+vi.mock('@/lib/auth/user-role', () => ({
+  getUserRole: vi.fn(async () => roleRef.current),
 }));
 
 // Mock the LLM layer entirely — we don't want to talk to real providers from tests.
@@ -98,7 +105,38 @@ const validBody = {
 describe('POST /api/structured-report/generate', () => {
   beforeEach(() => {
     cookieStoreRef.current = createCookieStore();
+    roleRef.current = 'admin';
     vi.clearAllMocks();
+  });
+
+  it('returns 403 for a restricted account asking for a hosted provider', async () => {
+    roleRef.current = 'restricted';
+    await authenticate();
+    setCsrfCookie();
+    const res = await POST(makeReportRequest(validBody));
+    expect(res.status).toBe(403);
+    expect(streamText).not.toHaveBeenCalled();
+    expect(recordStructuredReport).not.toHaveBeenCalled();
+  });
+
+  it('lets a restricted account use the local model', async () => {
+    roleRef.current = 'restricted';
+    await authenticate();
+    setCsrfCookie();
+    const res = await POST(
+      makeReportRequest({ ...validBody, provider: 'local', model: 'deepseek-v4-flash-0731' })
+    );
+    expect(res.status).toBe(200);
+    expect(streamText).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns 401 when the session belongs to a deleted account', async () => {
+    roleRef.current = null;
+    await authenticate();
+    setCsrfCookie();
+    const res = await POST(makeReportRequest(validBody));
+    expect(res.status).toBe(401);
+    expect(streamText).not.toHaveBeenCalled();
   });
 
   afterEach(() => {

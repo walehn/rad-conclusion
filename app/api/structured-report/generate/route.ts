@@ -34,6 +34,7 @@ import {
   buildReportUserPrompt,
 } from "@/lib/prompts/structured-report-prompt";
 import { requireApiSession } from "@/lib/auth/guard";
+import { canUseProvider } from "@/lib/auth/roles";
 import { validateCsrfOrFail } from "@/lib/auth/csrf";
 import { resolveApiKey } from "@/lib/api-keys/resolve";
 import { perfLog } from "@/lib/perf-log";
@@ -114,6 +115,15 @@ export async function POST(req: Request) {
       model,
       formState,
     } = parsed.data;
+
+    // Restricted accounts may only use the on-host model; checked before any
+    // key lookup so their findings never reach a hosted provider.
+    if (!canUseProvider(session.role, provider as ProviderName)) {
+      return new Response(
+        JSON.stringify({ error: "This account may only use the local model" }),
+        { status: 403, headers: { "Content-Type": "application/json" } }
+      );
+    }
 
     // Privacy: log metadata only. The raw findings text is NEVER serialized.
     const requestMeta = {

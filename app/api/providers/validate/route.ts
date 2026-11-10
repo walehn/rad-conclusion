@@ -1,7 +1,8 @@
 import { z } from "zod";
 import type { ProviderName } from "@/lib/providers/types";
 import { resolveLocalModel } from "@/lib/providers/local-config";
-import { requireApiSession } from "@/lib/auth/guard";
+import { forbiddenResponse, requireApiSession } from "@/lib/auth/guard";
+import { canManageProviders } from "@/lib/auth/roles";
 import { validateCsrfOrFail } from "@/lib/auth/csrf";
 
 const validateSchema = z.object({
@@ -100,8 +101,10 @@ const validators: Record<
 };
 
 export async function POST(req: Request) {
-  const { response } = await requireApiSession();
+  const { session, response } = await requireApiSession();
   if (response) return response;
+  // Makes the server fetch caller-supplied URLs and keys: admin only.
+  if (!canManageProviders(session.role)) return forbiddenResponse();
 
   const csrfFailure = await validateCsrfOrFail(req);
   if (csrfFailure) return csrfFailure;

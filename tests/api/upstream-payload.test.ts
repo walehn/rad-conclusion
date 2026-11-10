@@ -6,13 +6,20 @@ import type { CookieStore } from '../helpers/mock-next-cookies';
 // An SDK upgrade must not change what vLLM receives while the prompt A/B test
 // is running, so every upstream request is captured and snapshotted.
 
-const { cookieStoreRef } = vi.hoisted(() => ({
+const { cookieStoreRef, roleRef } = vi.hoisted(() => ({
   cookieStoreRef: { current: null as CookieStore | null },
+  roleRef: { current: 'admin' as 'admin' | 'restricted' | null },
 }));
 
 vi.mock('next/headers', () => ({
   cookies: async () => cookieStoreRef.current!.jar,
   headers: async () => new Headers(),
+}));
+
+// The guard reads the account's role from the database; stub it so these
+// tests never open data/auth.sqlite.
+vi.mock('@/lib/auth/user-role', () => ({
+  getUserRole: vi.fn(async () => roleRef.current),
 }));
 
 vi.mock('@/lib/api-keys/resolve', () => ({
@@ -128,6 +135,7 @@ describe('upstream LLM request payloads', () => {
   beforeEach(() => {
     captured = [];
     cookieStoreRef.current = createCookieStore();
+    roleRef.current = 'admin';
     vi.clearAllMocks();
     vi.stubGlobal('fetch', fakeFetch);
     vi.stubEnv('RAD_LOCAL_DEEPSEEK_HOST', 'http://vllm.test');
@@ -164,6 +172,41 @@ describe('upstream LLM request payloads', () => {
       });
     }
   }
+
+  it('restricted account: local request body is identical to an admin one', async () => {
+    const send = async () => {
+      await issueSession(1, 'tester@example.com');
+      cookieStoreRef.current!.jar.set({ name: CSRF_COOKIE_NAME, value: 'test-csrf-token' });
+      const res = await POST(
+        makeGenerateRequest({
+          findings: FINDINGS,
+          provider: 'local',
+          model: 'deepseek-v4-flash-0731',
+          promptVersion: 'v1',
+        })
+      );
+      expect(res.status).toBe(200);
+      await res.text();
+    };
+    await send();
+    const asAdmin = captured;
+    captured = [];
+    roleRef.current = 'restricted';
+    await send();
+    expect(captured).toEqual(asAdmin);
+  });
+
+  it('restricted account: hosted provider is refused before any upstream request', async () => {
+    roleRef.current = 'restricted';
+    await issueSession(1, 'tester@example.com');
+    cookieStoreRef.current!.jar.set({ name: CSRF_COOKIE_NAME, value: 'test-csrf-token' });
+    const res = await POST(
+      makeGenerateRequest({ findings: FINDINGS, provider: 'google', promptVersion: 'v1' })
+    );
+    expect(res.status).toBe(403);
+    expect(captured).toEqual([]);
+    expect(recordGeneration).not.toHaveBeenCalled();
+  });
 
   it('replay generateForCase (every candidate)', async () => {
     for (const c of Object.values(PROMPT_CANDIDATES)) {

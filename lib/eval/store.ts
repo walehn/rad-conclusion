@@ -35,6 +35,21 @@ export interface LoadFilter {
   /** Inclusive lower bound on created_at. */
   since?: Date;
   ids?: number[];
+  /**
+   * Include rows from accounts that do not count toward evaluation
+   * (restricted accounts, and rows whose account was deleted). Off by
+   * default: those rows are recorded but left out of the current evaluation.
+   */
+  includeNonEvaluated?: boolean;
+}
+
+/** True once migration 0005 has added users.role to the source database. */
+function hasUserRoles(src: Database.Database): boolean {
+  return (
+    src
+      .prepare("SELECT 1 FROM pragma_table_info('users') WHERE name = 'role'")
+      .get() !== undefined
+  );
 }
 
 export function dataDir(): string {
@@ -61,6 +76,12 @@ export function loadGenerations(
   if (filter.ids?.length) {
     where.push(`id IN (${filter.ids.map(() => "?").join(",")})`);
     params.push(...filter.ids);
+  }
+  // Before roles existed every account was an admin, so an unmigrated
+  // database needs no filter. Keep in step with countsInEvaluation() in
+  // lib/auth/roles.ts.
+  if (!filter.includeNonEvaluated && hasUserRoles(src)) {
+    where.push("user_id IN (SELECT id FROM users WHERE role = 'admin')");
   }
   const rows = src
     .prepare(

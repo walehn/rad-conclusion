@@ -15,6 +15,7 @@ import { resolveActivePromptRevision } from "@/lib/prompts/fingerprint";
 import type { ProviderName } from "@/lib/providers/types";
 import type { ConclusionStyle, ConclusionLang, PromptVersion } from "@/lib/prompts/system-prompt";
 import { requireApiSession } from "@/lib/auth/guard";
+import { canUseProvider } from "@/lib/auth/roles";
 import { validateCsrfOrFail } from "@/lib/auth/csrf";
 import { resolveApiKey } from "@/lib/api-keys/resolve";
 import { perfLog } from "@/lib/perf-log";
@@ -84,6 +85,15 @@ export async function POST(req: Request) {
 
     const { findings, style, lang, title, provider, model, promptVersion, batchId } =
       parsed.data;
+
+    // Restricted accounts may only use the on-host model; checked before any
+    // key lookup so their findings never reach a hosted provider.
+    if (!canUseProvider(session.role, provider as ProviderName)) {
+      return new Response(
+        JSON.stringify({ error: "This account may only use the local model" }),
+        { status: 403, headers: { "Content-Type": "application/json" } }
+      );
+    }
 
     // v2 is the "think harder" prompt path. Hosted providers express that via
     // reasoning_effort below; local endpoints via their chat template.

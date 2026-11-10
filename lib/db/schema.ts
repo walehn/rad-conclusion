@@ -1,13 +1,21 @@
 import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 /**
- * Users table — stores admin-provisioned accounts with argon2id-hashed passwords.
+ * Users table — stores admin-provisioned accounts with argon2id-hashed passwords
+ * and the account's role.
  * Email is stored lowercase/trimmed for case-insensitive uniqueness (enforced at app layer).
  */
 export const users = sqliteTable('users', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   email: text('email').notNull().unique(),
   passwordHash: text('password_hash').notNull(),
+  /**
+   * Access level; see lib/auth/roles.ts for what each role may do.
+   * Defaults to the least-privileged role so an account created without an
+   * explicit role never gains admin rights. Migration 0005 promoted the
+   * accounts that existed before roles were introduced to 'admin'.
+   */
+  role: text('role', { enum: ['admin', 'restricted'] }).notNull().default('restricted'),
   createdAt: integer('created_at', { mode: 'timestamp' })
     .notNull()
     .$defaultFn(() => new Date()),

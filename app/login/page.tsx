@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { getCurrentUser } from "@/lib/auth/session";
+import { getAuthedUser } from "@/lib/auth/guard";
 import { LoginForm } from "./login-form";
 
 // Pages that depend on cookies must not be statically cached.
@@ -26,8 +26,10 @@ export default async function LoginPage({
   const params = await searchParams;
   const nextPath = sanitizeNext(params.next);
 
-  // If already authenticated, go straight to the destination.
-  const user = await getCurrentUser();
+  // If already authenticated, go straight to the destination. Uses the same
+  // check as the page guards, so a cookie for a deleted account shows the form
+  // instead of bouncing between here and the guarded page.
+  const user = await getAuthedUser();
   if (user) {
     redirect(nextPath);
   }

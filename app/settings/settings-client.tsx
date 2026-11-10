@@ -69,7 +69,18 @@ interface StoredKeyInfo {
 
 const LOCAL_STORAGE_KEY = "rad-conclusion-provider-settings";
 
-export default function SettingsClient() {
+interface SettingsClientProps {
+  /**
+   * False for roles that may not store API keys or validate providers; the
+   * provider section is hidden and its API (which would answer 403) never
+   * called. Only the password form remains.
+   */
+  canManageProviders?: boolean;
+}
+
+export default function SettingsClient({
+  canManageProviders = true,
+}: SettingsClientProps = {}) {
   const router = useRouter();
   const { c, tokens } = useNotionPalette();
   const [settings, setSettings] = React.useState<ProviderSettings[]>([]);
@@ -125,6 +136,10 @@ export default function SettingsClient() {
 
   // Load server-side stored keys and check for migration opportunity
   React.useEffect(() => {
+    if (!canManageProviders) {
+      setLoading(false);
+      return;
+    }
     async function initialize() {
       try {
         // Fetch server-stored keys
@@ -153,7 +168,7 @@ export default function SettingsClient() {
       }
     }
     initialize();
-  }, []);
+  }, [canManageProviders]);
 
   const handleProviderChange = (updated: ProviderSettings) => {
     setSettings((prev) =>
@@ -539,7 +554,7 @@ export default function SettingsClient() {
               </div>
             ) : (
               <>
-                {showMigrationBanner && (
+                {canManageProviders && showMigrationBanner && (
                   <CalloutBlock
                     label="Migration available"
                     note="브라우저에 저장된 API 키를 서버로 마이그레이션하면 모든 기기에서 사용할 수 있습니다."
@@ -573,53 +588,57 @@ export default function SettingsClient() {
                   </CalloutBlock>
                 )}
 
-                <Block
-                  label="Providers"
-                  hint={`${settings.length} configured`}
-                >
-                  <div className="grid gap-4">
-                    {settings.map((provider) => {
-                      const storedInfo = getStoredKeyInfo(provider.id);
-                      return (
-                        <ProviderCard
-                          key={provider.id}
-                          settings={provider}
-                          onChange={(updated) => {
-                            handleProviderChange(updated);
-                            if (
-                              updated.id !== "local" &&
-                              !updated.apiKey &&
-                              storedInfo?.hasKey
-                            ) {
-                              deleteApiKeyFromServer(
-                                updated.id as ProviderName,
-                              ).catch(console.error);
-                            }
-                            if (updated.id !== "local" && updated.apiKey) {
-                              handleApiKeySave(
-                                updated.id as ProviderName,
-                                updated.apiKey,
-                              ).catch(console.error);
-                            }
-                          }}
-                          onValidate={handleValidate}
-                          hasStoredKey={storedInfo?.hasKey ?? false}
-                        />
-                      );
-                    })}
-                  </div>
-                </Block>
+                {canManageProviders && (
+                  <>
+                    <Block
+                      label="Providers"
+                      hint={`${settings.length} configured`}
+                    >
+                      <div className="grid gap-4">
+                        {settings.map((provider) => {
+                          const storedInfo = getStoredKeyInfo(provider.id);
+                          return (
+                            <ProviderCard
+                              key={provider.id}
+                              settings={provider}
+                              onChange={(updated) => {
+                                handleProviderChange(updated);
+                                if (
+                                  updated.id !== "local" &&
+                                  !updated.apiKey &&
+                                  storedInfo?.hasKey
+                                ) {
+                                  deleteApiKeyFromServer(
+                                    updated.id as ProviderName,
+                                  ).catch(console.error);
+                                }
+                                if (updated.id !== "local" && updated.apiKey) {
+                                  handleApiKeySave(
+                                    updated.id as ProviderName,
+                                    updated.apiKey,
+                                  ).catch(console.error);
+                                }
+                              }}
+                              onValidate={handleValidate}
+                              hasStoredKey={storedInfo?.hasKey ?? false}
+                            />
+                          );
+                        })}
+                      </div>
+                    </Block>
 
-                <Block label="Security" hint="How API keys are stored">
-                  <p
-                    className="text-[13px]"
-                    style={{ color: c.slate, lineHeight: 1.55 }}
-                  >
-                    API 키는 서버에 암호화되어 저장되며 모든 기기에서 사용할 수
-                    있습니다. 키는 LLM 제공자 API에 직접 전달되며 평문으로
-                    저장되지 않습니다.
-                  </p>
-                </Block>
+                    <Block label="Security" hint="How API keys are stored">
+                      <p
+                        className="text-[13px]"
+                        style={{ color: c.slate, lineHeight: 1.55 }}
+                      >
+                        API 키는 서버에 암호화되어 저장되며 모든 기기에서 사용할 수
+                        있습니다. 키는 LLM 제공자 API에 직접 전달되며 평문으로
+                        저장되지 않습니다.
+                      </p>
+                    </Block>
+                  </>
+                )}
 
                 <Block label="Password" hint="Change your account password">
                   <PasswordChangeForm />

@@ -5,6 +5,15 @@ import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import * as schema from '@/lib/db/schema';
 
+// Opening this module from a test would touch the live data/auth.sqlite of
+// whatever checkout the tests run from. Tests must vi.mock('@/lib/db') with an
+// in-memory database instead (see tests/helpers/test-db.ts).
+if (process.env.VITEST) {
+  throw new Error(
+    "@/lib/db was imported unmocked under Vitest; mock it with an in-memory database"
+  );
+}
+
 const dataDir = path.resolve(process.cwd(), 'data');
 const dbPath = path.resolve(dataDir, 'auth.sqlite');
 

@@ -143,7 +143,15 @@ function PromptHistory(): React.ReactElement {
   );
 }
 
-export function ReviewClient(): React.ReactElement {
+interface ReviewClientProps {
+  /**
+   * True for roles that only see their own history. The API already limits
+   * the rows; this hides the "mine only" toggle, which would do nothing.
+   */
+  ownOnly?: boolean;
+}
+
+export function ReviewClient({ ownOnly = false }: ReviewClientProps = {}): React.ReactElement {
   const [batches, setBatches] = React.useState<GenerationBatch[]>([]);
   const [total, setTotal] = React.useState(0);
   const [offset, setOffset] = React.useState(0);
@@ -320,18 +328,22 @@ export function ReviewClient(): React.ReactElement {
           <option value="unregistered">미등록 프롬프트</option>
         </select>
 
-        <label className="flex items-center gap-2 text-sm text-muted-foreground">
-          <input
-            type="checkbox"
-            checked={mineOnly}
-            onChange={(e) => {
-              setOffset(0);
-              setMineOnly(e.target.checked);
-            }}
-            className="h-4 w-4 rounded border-border"
-          />
-          내 기록만
-        </label>
+        {ownOnly ? (
+          <span className="text-sm text-muted-foreground">내 기록만 표시됩니다</span>
+        ) : (
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={mineOnly}
+              onChange={(e) => {
+                setOffset(0);
+                setMineOnly(e.target.checked);
+              }}
+              className="h-4 w-4 rounded border-border"
+            />
+            내 기록만
+          </label>
+        )}
       </div>
 
       {/* States */}

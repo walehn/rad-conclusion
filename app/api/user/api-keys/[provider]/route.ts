@@ -2,7 +2,8 @@ import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db/index';
 import { userApiKeys } from '@/lib/db/schema';
-import { requireApiSession } from '@/lib/auth/guard';
+import { forbiddenResponse, requireApiSession } from '@/lib/auth/guard';
+import { canManageProviders } from '@/lib/auth/roles';
 import { validateCsrfOrFail } from '@/lib/auth/csrf';
 import type { ProviderName } from '@/lib/providers/types';
 
@@ -19,6 +20,8 @@ export async function DELETE(
 ) {
   const { session, response } = await requireApiSession();
   if (response) return response;
+  // Stored keys let findings reach hosted providers: admin only.
+  if (!canManageProviders(session.role)) return forbiddenResponse();
 
   const csrfFailure = await validateCsrfOrFail(req);
   if (csrfFailure) return csrfFailure;

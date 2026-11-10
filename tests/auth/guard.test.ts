@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { CookieStore } from '../helpers/mock-next-cookies';
 
-const { cookieStoreRef, RedirectError } = vi.hoisted(() => {
+const { cookieStoreRef, RedirectError, roleRef } = vi.hoisted(() => {
   class RedirectError extends Error {
     constructor(public url: string) {
       super('REDIRECT');
@@ -11,8 +11,14 @@ const { cookieStoreRef, RedirectError } = vi.hoisted(() => {
   return {
     cookieStoreRef: { current: null as CookieStore | null },
     RedirectError,
+    roleRef: { current: 'admin' as 'admin' | 'restricted' | null },
   };
 });
+
+// Role lookup hits the database; stub it (null = the account no longer exists).
+vi.mock('@/lib/auth/user-role', () => ({
+  getUserRole: vi.fn(async () => roleRef.current),
+}));
 
 vi.mock('next/headers', () => ({
   cookies: async () => cookieStoreRef.current!.jar,
@@ -32,12 +38,50 @@ import { createCookieStore } from '../helpers/mock-next-cookies';
 cookieStoreRef.current = createCookieStore();
 
 // Now import the modules under test.
-import { requireSession, requireApiSession } from '@/lib/auth/guard';
+import {
+  forbiddenResponse,
+  getAuthedUser,
+  requireApiSession,
+  requireSession,
+} from '@/lib/auth/guard';
 import { issueSession, destroySession } from '@/lib/auth/session';
 
 describe('lib/auth/guard', () => {
   beforeEach(() => {
     cookieStoreRef.current = createCookieStore();
+    roleRef.current = 'admin';
+  });
+
+  describe('getAuthedUser', () => {
+    it('returns null without a session', async () => {
+      expect(await getAuthedUser()).toBeNull();
+    });
+
+    it('attaches the role read from the database', async () => {
+      roleRef.current = 'restricted';
+      await issueSession(5, 'eve@example.com');
+      expect(await getAuthedUser()).toMatchObject({
+        userId: 5,
+        email: 'eve@example.com',
+        role: 'restricted',
+      });
+      await destroySession();
+    });
+
+    it('returns null when the session outlived its account', async () => {
+      roleRef.current = null;
+      await issueSession(5, 'eve@example.com');
+      expect(await getAuthedUser()).toBeNull();
+      await destroySession();
+    });
+  });
+
+  describe('forbiddenResponse', () => {
+    it('is a 403 with a JSON error body', async () => {
+      const res = forbiddenResponse();
+      expect(res.status).toBe(403);
+      expect(await res.json()).toEqual({ error: 'Forbidden' });
+    });
   });
 
   describe('requireApiSession', () => {
@@ -54,7 +98,20 @@ describe('lib/auth/guard', () => {
       await issueSession(7, 'carol@example.com');
       const result = await requireApiSession();
       expect(result.response).toBeNull();
-      expect(result.session).toMatchObject({ userId: 7, email: 'carol@example.com' });
+      expect(result.session).toMatchObject({
+        userId: 7,
+        email: 'carol@example.com',
+        role: 'admin',
+      });
+      await destroySession();
+    });
+
+    it('returns 401 when the session belongs to a deleted account', async () => {
+      roleRef.current = null;
+      await issueSession(7, 'carol@example.com');
+      const result = await requireApiSession();
+      expect(result.session).toBeNull();
+      expect(result.response?.status).toBe(401);
       await destroySession();
     });
   });
@@ -70,7 +127,16 @@ describe('lib/auth/guard', () => {
     it('returns the session payload when a session exists', async () => {
       await issueSession(11, 'dan@example.com');
       const user = await requireSession('/settings');
-      expect(user).toMatchObject({ userId: 11, email: 'dan@example.com' });
+      expect(user).toMatchObject({ userId: 11, email: 'dan@example.com', role: 'admin' });
+      await destroySession();
+    });
+
+    it('redirects to /login when the session belongs to a deleted account', async () => {
+      roleRef.current = null;
+      await issueSession(11, 'dan@example.com');
+      await expect(requireSession('/review')).rejects.toMatchObject({
+        url: '/login?next=%2Freview',
+      });
       await destroySession();
     });
 

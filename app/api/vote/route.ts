@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 import { requireApiSession } from "@/lib/auth/guard";
+import { countsInEvaluation, isRole } from "@/lib/auth/roles";
 import { validateCsrfOrFail } from "@/lib/auth/csrf";
 
 const VOTES_DIR = path.join(process.cwd(), "data");
@@ -20,6 +21,16 @@ function ensureDataDir() {
   fs.mkdirSync(VOTES_DIR, { recursive: true });
 }
 
+/**
+ * Whether a stored vote counts toward the tally. Votes written before roles
+ * existed carry no role and all came from admin accounts; restricted
+ * accounts' votes are kept in the file but left out of the evaluation.
+ */
+function countsInTally(entry: { role?: unknown }): boolean {
+  if (entry.role === undefined) return true;
+  return isRole(entry.role) && countsInEvaluation(entry.role);
+}
+
 function countVotes(): { v1: number; v2: number; tie: number } {
   const totals = { v1: 0, v2: 0, tie: 0 };
 
@@ -33,6 +44,7 @@ function countVotes(): { v1: number; v2: number; tie: number } {
   for (const line of lines) {
     try {
       const entry = JSON.parse(line);
+      if (!countsInTally(entry)) continue;
       if (entry.vote === "v1") totals.v1++;
       else if (entry.vote === "v2") totals.v2++;
       else if (entry.vote === "tie") totals.tie++;
@@ -45,7 +57,7 @@ function countVotes(): { v1: number; v2: number; tie: number } {
 }
 
 export async function POST(request: NextRequest) {
-  const { response } = await requireApiSession();
+  const { session, response } = await requireApiSession();
   if (response) return response;
 
   const csrfFailure = await validateCsrfOrFail(request);
@@ -69,6 +81,9 @@ export async function POST(request: NextRequest) {
       lang: parsed.data.lang,
       model: parsed.data.model,
       findingsLength: parsed.data.findingsLength,
+      // Who voted, so votes can be split by account or role later.
+      userId: session.userId,
+      role: session.role,
     };
 
     ensureDataDir();

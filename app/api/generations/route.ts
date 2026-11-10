@@ -3,6 +3,7 @@ import { and, desc, eq, inArray, like, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { generations } from "@/lib/db/schema";
 import { requireApiSession } from "@/lib/auth/guard";
+import { canViewAllGenerations } from "@/lib/auth/roles";
 
 // Reads the live SQLite file; never serve a cached snapshot.
 export const dynamic = "force-dynamic";
@@ -20,7 +21,8 @@ export const dynamic = "force-dynamic";
  *   promptVersion  'v1' | 'v2' — keeps batches that contain that version
  *   promptRevision  prompt revision id ('r1', ...) — same batch-keeping rule
  *   provider, model  exact match
- *   mine   '1' to restrict to the caller's own generations
+ *   mine   '1' to restrict to the caller's own generations. Always on for
+ *          roles that may not read other accounts' history.
  */
 export async function GET(request: NextRequest) {
   const { session, response } = await requireApiSession();
@@ -43,7 +45,9 @@ export async function GET(request: NextRequest) {
     const promptRevision = searchParams.get("promptRevision");
     const provider = searchParams.get("provider");
     const model = searchParams.get("model");
-    const mine = searchParams.get("mine") === "1";
+    // Enforced here, not in the UI: such accounts only ever see their own rows.
+    const ownOnly = !canViewAllGenerations(session.role);
+    const mine = ownOnly || searchParams.get("mine") === "1";
 
     const filters = [];
     if (q) {
@@ -94,12 +98,19 @@ export async function GET(request: NextRequest) {
     const batchIds = batchPage.map((b) => b.batchId);
 
     // Fetch every row of the matched batches — including the sibling version
-    // that the filter itself did not match, so comparisons stay intact.
+    // that the filter itself did not match, so comparisons stay intact. The
+    // batch id comes from the client, so own-only accounts must not pull in
+    // another account's row that happens to share it.
+    const inBatches = inArray(generations.batchId, batchIds);
     const rows = batchIds.length
       ? db
           .select()
           .from(generations)
-          .where(inArray(generations.batchId, batchIds))
+          .where(
+            ownOnly
+              ? and(inBatches, eq(generations.userId, session.userId))
+              : inBatches
+          )
           .orderBy(generations.promptVersion, generations.id)
           .all()
       : [];
