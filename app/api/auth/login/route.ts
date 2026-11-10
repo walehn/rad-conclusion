@@ -93,7 +93,9 @@ export async function POST(request: Request): Promise<Response> {
   const hashToCheck = user?.passwordHash ?? DUMMY_HASH;
   const passwordMatches = await verifyPassword(password, hashToCheck);
 
-  if (user && passwordMatches) {
+  // A suspended account fails exactly like a wrong password, so the response
+  // never reveals that the account exists.
+  if (user && passwordMatches && !user.disabledAt) {
     // Success: issue session, update last_login_at, clear rate-limit state.
     await issueSession(user.id, user.email);
     await db

@@ -8,7 +8,7 @@ import type { ProviderName } from '@/lib/providers/types';
  * - restricted: generates conclusions and structured reports with the local
  *   model only, sees only its own history, may vote in the A/B test, and may
  *   change its own password. It cannot send findings to hosted providers,
- *   store API keys, or probe provider endpoints.
+ *   store API keys, probe provider endpoints, or manage accounts.
  */
 export const ROLES = ['admin', 'restricted'] as const;
 export type Role = (typeof ROLES)[number];
@@ -35,6 +35,11 @@ export function canViewAllGenerations(role: Role): boolean {
 
 /** Whether the account may store API keys and validate provider endpoints. */
 export function canManageProviders(role: Role): boolean {
+  return role === 'admin';
+}
+
+/** Whether the account may invite, suspend and reset other accounts. */
+export function canManageAccounts(role: Role): boolean {
   return role === 'admin';
 }
 

@@ -15,6 +15,11 @@ export const WINDOW_MS = 15 * 60 * 1000;
 export const ipAttempts = new LRUCache<string, Entry>({ max: 10000, ttl: WINDOW_MS });
 /** Per-email failure counter. Keys are normalized (lowercase+trimmed) emails. */
 export const emailAttempts = new LRUCache<string, Entry>({ max: 10000, ttl: WINDOW_MS });
+/**
+ * Per-IP counter of invalid account-link tokens (invite / reset pages), kept
+ * apart from login so one cannot lock the other out.
+ */
+export const linkAttempts = new LRUCache<string, Entry>({ max: 10000, ttl: WINDOW_MS });
 
 /**
  * Records a failed attempt against the given cache. Resets the window when the
@@ -71,11 +76,12 @@ export function resetOnSuccess(key: string, cache: LRUCache<string, Entry>): voi
   cache.delete(key);
 }
 
-/** Test-only helper that wipes both caches. Guarded by NODE_ENV==='test'. */
+/** Test-only helper that wipes every cache. Guarded by NODE_ENV==='test'. */
 export function resetAllForTesting(): void {
   if (process.env.NODE_ENV === 'test') {
     ipAttempts.clear();
     emailAttempts.clear();
+    linkAttempts.clear();
   }
 }
 

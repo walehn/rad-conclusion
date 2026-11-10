@@ -4,16 +4,15 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
 import { hashPassword, verifyPassword } from '@/lib/auth/password';
-import { getCurrentUser } from '@/lib/auth/session';
+import { issueSession } from '@/lib/auth/session';
+import { getAuthedUser } from '@/lib/auth/guard';
 import { validateCsrfOrFail } from '@/lib/auth/csrf';
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from '@/lib/auth/account-rules';
 
 // Native modules (@node-rs/argon2, better-sqlite3) forbid Edge runtime.
 export const runtime = 'nodejs';
 // Mutating endpoint must never be cached.
 export const dynamic = 'force-dynamic';
-
-const MIN_PASSWORD_LENGTH = 8;
-const MAX_PASSWORD_LENGTH = 1024;
 
 const schema = z.object({
   currentPassword: z.string().min(1).max(MAX_PASSWORD_LENGTH),
@@ -23,8 +22,9 @@ const schema = z.object({
 export async function POST(request: Request): Promise<Response> {
   // 1. Session gate. Unlike /login this endpoint is protected by an existing
   //    session, so we can attribute the request to a specific user_id without
-  //    trusting any field in the request body.
-  const session = await getCurrentUser();
+  //    trusting any field in the request body. Suspended accounts and
+  //    sessions ended by a password reset are refused here too.
+  const session = await getAuthedUser();
   if (!session) {
     return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 });
   }
@@ -84,14 +84,16 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  // 6. Hash and persist the new password. Session cookie stays valid — the
-  //    iron-session payload does not carry the password and the existing
-  //    cookie is still authentic for this user_id.
+  // 6. Hash and persist the new password, and end every other session of the
+  //    account (e.g. a device where the old password was used). This browser
+  //    gets a fresh session so the user stays signed in here.
   const newHash = await hashPassword(newPassword);
+  const changedAt = new Date();
   await db
     .update(users)
-    .set({ passwordHash: newHash })
+    .set({ passwordHash: newHash, sessionsValidAfter: changedAt })
     .where(eq(users.id, user.id));
+  await issueSession(user.id, user.email);
 
   return NextResponse.json({ ok: true });
 }

@@ -20,6 +20,13 @@ export const users = sqliteTable('users', {
     .notNull()
     .$defaultFn(() => new Date()),
   lastLoginAt: integer('last_login_at', { mode: 'timestamp' }),
+  /** Set while the account is suspended; the guard and login refuse it. */
+  disabledAt: integer('disabled_at', { mode: 'timestamp' }),
+  /**
+   * Sessions issued before this instant are rejected (password reset or
+   * change). Millisecond precision to compare with SessionData.issuedAt.
+   */
+  sessionsValidAfter: integer('sessions_valid_after', { mode: 'timestamp_ms' }),
 });
 
 export type User = typeof users.$inferSelect;
@@ -155,3 +162,38 @@ export const structuredReports = sqliteTable(
 
 export type StructuredReport = typeof structuredReports.$inferSelect;
 export type NewStructuredReport = typeof structuredReports.$inferInsert;
+
+/**
+ * One-time account links an admin hands out: an invite creates a new account,
+ * a reset sets a new password on an existing one. Only the sha256 of the
+ * token is stored, so a leaked database cannot be turned back into links.
+ */
+export const accountLinks = sqliteTable(
+  'account_links',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    kind: text('kind', { enum: ['invite', 'reset'] }).notNull(),
+    tokenHash: text('token_hash').notNull().unique(),
+    /** Invite only: the role the new account gets. */
+    role: text('role', { enum: ['admin', 'restricted'] }),
+    /** Invite only: who the link is meant for, as typed by the admin. */
+    note: text('note'),
+    /** Reset only: the account whose password the link sets. */
+    targetUserId: integer('target_user_id').references(() => users.id, { onDelete: 'cascade' }),
+    /** Invite only: the account created with the link. */
+    usedByUserId: integer('used_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+    createdBy: integer('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: integer('created_at', { mode: 'timestamp' })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+    usedAt: integer('used_at', { mode: 'timestamp' }),
+    revokedAt: integer('revoked_at', { mode: 'timestamp' }),
+  },
+  (t) => ({
+    targetIdx: index('account_links_target_idx').on(t.targetUserId),
+  })
+);
+
+export type AccountLink = typeof accountLinks.$inferSelect;
+export type NewAccountLink = typeof accountLinks.$inferInsert;

@@ -76,10 +76,13 @@ interface SettingsClientProps {
    * called. Only the password form remains.
    */
   canManageProviders?: boolean;
+  /** True for roles that may invite, suspend and reset accounts. */
+  canManageAccounts?: boolean;
 }
 
 export default function SettingsClient({
   canManageProviders = true,
+  canManageAccounts = false,
 }: SettingsClientProps = {}) {
   const router = useRouter();
   const { c, tokens } = useNotionPalette();
@@ -638,6 +641,18 @@ export default function SettingsClient({
                       </p>
                     </Block>
                   </>
+                )}
+
+                {canManageAccounts && (
+                  <Block label="Accounts" hint="Invite, reset and suspend accounts">
+                    <a
+                      href="/admin/accounts"
+                      className="text-[13px] font-medium underline underline-offset-4"
+                      style={{ color: c.primary }}
+                    >
+                      계정 관리 열기 →
+                    </a>
+                  </Block>
                 )}
 
                 <Block label="Password" hint="Change your account password">

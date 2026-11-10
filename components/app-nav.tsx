@@ -27,8 +27,8 @@ interface AppNavProps {
 export function AppNav({ userEmail }: AppNavProps): React.ReactElement | null {
   const pathname = usePathname();
 
-  // REQ-NAV-UW1: Hide nav on auth pages and API routes.
-  if (pathname === "/login" || pathname.startsWith("/api/")) {
+  // REQ-NAV-UW1: Hide nav on auth pages (login, invite / reset link) and API routes.
+  if (pathname === "/login" || pathname === "/account/setup" || pathname.startsWith("/api/")) {
     return null;
   }
 

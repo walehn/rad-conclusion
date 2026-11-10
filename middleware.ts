@@ -34,9 +34,9 @@ export function middleware(request: NextRequest) {
     return new NextResponse("Forbidden", { status: 403 });
   }
 
-  // For the login page: ensure CSRF cookie exists and forward the token via
-  // a request header so the Server Component can embed it in the form.
-  if (path === "/login") {
+  // For the login and account-link pages: ensure the CSRF cookie exists and
+  // forward the token via a request header so the page can use it.
+  if (path === "/login" || path === "/account/setup") {
     const existingToken = request.cookies.get("csrf_token")?.value;
     const token = existingToken ?? generateCsrfToken();
 

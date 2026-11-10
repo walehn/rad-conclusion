@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { NextResponse } from 'next/server';
 import { getCurrentUser, type SessionData } from '@/lib/auth/session';
-import type { Role } from '@/lib/auth/roles';
+import { canManageAccounts, type Role } from '@/lib/auth/roles';
 import { getUserRole } from '@/lib/auth/user-role';
 
 /** Session payload plus the account's current role from the database. */
@@ -11,13 +11,13 @@ export interface AuthedUser extends SessionData {
 
 /**
  * Returns the signed-in account with its role, or null when there is no
- * valid session or the account no longer exists (a cookie outliving a
- * deleted account must not keep working).
+ * valid session, or the account was deleted, suspended, or had its password
+ * reset after this session was issued (such cookies must stop working).
  */
 export async function getAuthedUser(): Promise<AuthedUser | null> {
   const user = await getCurrentUser();
   if (!user) return null;
-  const role = await getUserRole(user.userId);
+  const role = await getUserRole(user.userId, user.issuedAt);
   if (!role) return null;
   return { ...user, role };
 }
@@ -50,6 +50,19 @@ export async function requireApiSession(): Promise<
     };
   }
   return { session: user, response: null };
+}
+
+/**
+ * API-route guard for account administration: 401 without a session, 403 for
+ * roles that may not manage accounts.
+ */
+export async function requireAccountAdminApi(): Promise<
+  { session: AuthedUser; response: null } | { session: null; response: NextResponse }
+> {
+  const result = await requireApiSession();
+  if (result.response) return result;
+  if (!canManageAccounts(result.session.role)) return { session: null, response: forbiddenResponse() };
+  return result;
 }
 
 /** 403 response for an authenticated account whose role does not allow the action. */
