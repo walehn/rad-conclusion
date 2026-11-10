@@ -10,7 +10,7 @@ import type { NextRequest } from 'next/server';
  */
 
 // The whitelist baked into middleware.ts at time of test authoring.
-const CURRENT_WHITELIST = ['61.78.110.80', '116.35.186.20', '127.0.0.1', '::1'];
+const CURRENT_WHITELIST = ['61.78.110.80', '61.78.110.90', '116.35.186.20', '127.0.0.1', '::1'];
 
 // Minimal NextRequest shim — middleware only uses headers, method,
 // nextUrl.pathname, and user-agent.
@@ -34,6 +34,13 @@ describe('middleware (characterization)', () => {
       const res = middleware(makeNextRequest({ 'cf-connecting-ip': ip }));
       // NextResponse.next() produces a response with no 403 status.
       expect(res.status).not.toBe(403);
+    }
+  });
+
+  it('allows exactly the listed addresses, not their neighbours', () => {
+    for (const ip of ['61.78.110.79', '61.78.110.81', '61.78.110.89', '61.78.110.91', '10.10.1.1']) {
+      const res = middleware(makeNextRequest({ 'cf-connecting-ip': ip }));
+      expect(res.status).toBe(403);
     }
   });
 

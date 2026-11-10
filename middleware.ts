@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 
 const ALLOWED_IPS = new Set([
   "61.78.110.80",
+  "61.78.110.90",
   "116.35.186.20",
   "127.0.0.1",
   "::1",

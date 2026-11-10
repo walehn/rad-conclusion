@@ -42,6 +42,7 @@ import { genClientId } from "@/lib/utils";
 import { loadProviderSettings } from "@/lib/storage/settings-store";
 import type { ConclusionStyle, ConclusionLang } from "@/lib/prompts/system-prompt";
 import type { ProviderInfo, ProviderName, ProviderSettings } from "@/lib/providers/types";
+import { BUILD_INFO, formatBuildDate } from "@/lib/build-info";
 import { LOCAL_PROVIDER_DEFAULTS } from "@/lib/providers/local-config";
 import { findingsProblem } from "@/lib/findings-check";
 import { ConclusionChecks } from "@/components/conclusion-checks";
@@ -66,6 +67,9 @@ function lastAssistantText(messages: UIMessage[]): string {
   if (!last) return "";
   return last.parts.flatMap((p) => (p.type === "text" ? [p.text] : [])).join("");
 }
+
+// Stamped at build time, so it changes with every deploy.
+const buildDate = formatBuildDate(BUILD_INFO.builtAt);
 
 export function ConclusionClient() {
   const { c, tokens } = useNotionPalette();
@@ -843,11 +847,16 @@ export function ConclusionClient() {
               style={{ borderColor: c.hairlineSoft, color: c.steel }}
             >
               <span>
-                Rad Conclusion v0.2.0 — Clinical radiology report assistant.
+                Rad Conclusion{BUILD_INFO.version ? ` v${BUILD_INFO.version}` : ""} — Clinical radiology report assistant.
                 For professional use only.
               </span>
               <div className="flex items-center gap-3">
-                <span>Updated 2026-04-24</span>
+                {buildDate && (
+                  <span data-testid="build-stamp">
+                    Updated {buildDate}
+                    {BUILD_INFO.commit ? ` · ${BUILD_INFO.commit}` : ""}
+                  </span>
+                )}
                 <a
                   href="https://github.com/walehn/rad-conclusion"
                   target="_blank"
