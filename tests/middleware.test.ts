@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { middleware } from '@/middleware';
 import type { NextRequest } from 'next/server';
 
@@ -37,10 +37,65 @@ describe('middleware (characterization)', () => {
     }
   });
 
-  it('allows exactly the listed addresses, not their neighbours', () => {
-    for (const ip of ['61.78.110.68', '61.78.110.70', '61.78.110.79', '61.78.110.81', '61.78.110.89', '61.78.110.91', '10.10.1.1']) {
+  it('blocks addresses outside the exact list and the temporary range', () => {
+    for (const ip of [
+      '61.78.109.255', // just below 61.78.110.0/24
+      '61.78.111.0', // just above it
+      '61.78.11.1',
+      '61.79.110.5',
+      '161.78.110.5',
+      '116.35.186.19', // neighbours of an exact entry
+      '116.35.186.21',
+      '10.10.1.1',
+    ]) {
       const res = middleware(makeNextRequest({ 'cf-connecting-ip': ip }));
-      expect(res.status).toBe(403);
+      expect(res.status, ip).toBe(403);
+    }
+  });
+
+  it('temporary range: allows every address in 61.78.110.0/24', () => {
+    for (const ip of ['61.78.110.0', '61.78.110.1', '61.78.110.68', '61.78.110.70', '61.78.110.128', '61.78.110.255']) {
+      const res = middleware(makeNextRequest({ 'cf-connecting-ip': ip }));
+      expect(res.status, ip).not.toBe(403);
+    }
+  });
+
+  it('temporary range: refuses malformed or disguised addresses', () => {
+    for (const ip of [
+      '61.78.110.256',
+      '61.78.110',
+      '61.78.110.5.1',
+      '061.78.110.5',
+      '61.78.110.05',
+      '61.78.110.+5',
+      '61.78.110.-1',
+      '61.78.110.0x5',
+      '61.78.110.5/24',
+      '::ffff:61.78.110.5',
+    ]) {
+      const res = middleware(makeNextRequest({ 'cf-connecting-ip': ip }));
+      expect(res.status, ip).toBe(403);
+    }
+  });
+
+  it('temporary range: logs [wide] only for addresses the exact list does not cover', () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      middleware(makeNextRequest({ 'cf-connecting-ip': '61.78.110.80' }));
+      expect(log.mock.calls.some(([line]) => String(line).startsWith('[wide]'))).toBe(false);
+
+      middleware(makeNextRequest({ 'cf-connecting-ip': '61.78.110.68' }, '/review'));
+      const wide = log.mock.calls.map(([line]) => String(line)).filter((line) => line.startsWith('[wide]'));
+      expect(wide).toHaveLength(1);
+      expect(wide[0]).toMatch(/^\[wide\] \S+ 61\.78\.110\.68 GET \/review$/);
+
+      log.mockClear();
+      middleware(makeNextRequest({ 'cf-connecting-ip': '61.78.111.1' }));
+      const lines = log.mock.calls.map(([line]) => String(line));
+      expect(lines.some((line) => line.startsWith('[wide]'))).toBe(false);
+      expect(lines.some((line) => line.startsWith('[blocked]'))).toBe(true);
+    } finally {
+      log.mockRestore();
     }
   });
 
