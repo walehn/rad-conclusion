@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const ALLOWED_IPS = new Set([
+  "61.78.110.69",
   "61.78.110.80",
   "61.78.110.90",
   "116.35.186.20",
