@@ -27,7 +27,8 @@ import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from '@/lib/auth/csrf';
 import { issueSession } from '@/lib/auth/session';
 import { getAuthedUser } from '@/lib/auth/guard';
 import { hashPassword, verifyPassword } from '@/lib/auth/password';
-import { createInvite, createResetLink } from '@/lib/auth/account-links';
+import { createInvite, createResetLink, LINK_TTL_MS, revokeLink } from '@/lib/auth/account-links';
+import { INVALID_LINK_ERROR } from '@/lib/auth/link-request';
 import { MAX_ATTEMPTS, resetAllForTesting } from '@/lib/auth/rate-limit';
 import { POST as inspect } from '@/app/api/account-links/inspect/route';
 import { POST as redeem } from '@/app/api/account-links/redeem/route';
@@ -163,5 +164,66 @@ describe('suspended accounts and password changes', () => {
 
     cookieStoreRef.current = otherDevice;
     expect(await getAuthedUser()).toBeNull();
+  });
+});
+
+describe('a link that cannot be used says why', () => {
+  async function inspectBody(token: string) {
+    const res = await inspect(req('/api/account-links/inspect', { token }));
+    return { status: res.status, body: (await res.json()) as { error: string; reason: string } };
+  }
+
+  it('used invite: points the person to the login page', async () => {
+    const { token } = createInvite({ createdBy: ADMIN, note: null });
+    expect((await redeem(req('/api/account-links/redeem', { token, username: 'first', password: NEW_PASSWORD }))).status).toBe(200);
+
+    const { status, body } = await inspectBody(token);
+    expect(status).toBe(404);
+    expect(body.reason).toBe('used');
+    expect(body.error).toContain('이미 가입에 사용된 링크입니다');
+    expect(body.error).toContain('로그인');
+
+    const again = await redeem(req('/api/account-links/redeem', { token, username: 'second', password: NEW_PASSWORD }));
+    expect(again.status).toBe(404);
+    expect(await again.json()).toMatchObject({ reason: 'used' });
+    expect(db.select().from(users).where(eq(users.email, 'second')).get()).toBeUndefined();
+  });
+
+  it('used reset link: says the password was already set', async () => {
+    const link = createResetLink({ createdBy: ADMIN, userId: MEMBER });
+    if (!link.ok) throw new Error('expected a link');
+    expect((await redeem(req('/api/account-links/redeem', { token: link.token, password: NEW_PASSWORD }))).status).toBe(200);
+    const { body } = await inspectBody(link.token);
+    expect(body).toMatchObject({ reason: 'used' });
+    expect(body.error).toContain('이미 사용된 비밀번호 재설정 링크입니다');
+  });
+
+  it('expired and revoked links ask for a new link', async () => {
+    const expired = createInvite({ createdBy: ADMIN, note: null, now: new Date(Date.now() - LINK_TTL_MS - 1000) });
+    const e = await inspectBody(expired.token);
+    expect(e.body.reason).toBe('expired');
+    expect(e.body.error).toContain('기한(48시간)이 지난 링크입니다');
+
+    const revoked = createInvite({ createdBy: ADMIN, note: null });
+    revokeLink(revoked.id);
+    const r = await inspectBody(revoked.token);
+    expect(r.body.reason).toBe('revoked');
+    expect(r.body.error).toContain('취소된 링크입니다');
+  });
+
+  it('an unknown token keeps the generic answer', async () => {
+    const { status, body } = await inspectBody('no-such-token');
+    expect(status).toBe(404);
+    expect(body).toEqual({ error: INVALID_LINK_ERROR, reason: 'invalid' });
+  });
+
+  it('still counts toward the per-IP limit, as before', async () => {
+    const { token } = createInvite({ createdBy: ADMIN, note: null });
+    const revoked = createInvite({ createdBy: ADMIN, note: null });
+    revokeLink(revoked.id);
+    for (let i = 0; i < MAX_ATTEMPTS; i++) {
+      expect((await inspect(req('/api/account-links/inspect', { token: revoked.token }))).status).toBe(404);
+    }
+    expect((await inspect(req('/api/account-links/inspect', { token }))).status).toBe(429);
   });
 });

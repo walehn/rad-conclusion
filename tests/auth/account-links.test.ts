@@ -10,6 +10,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { accountLinks, users } from '@/lib/db/schema';
 import {
+  checkLink,
   createInvite,
   createResetLink,
   hashLinkToken,
@@ -154,5 +155,52 @@ describe('password resets', () => {
   it('hashLinkToken is deterministic', () => {
     expect(hashLinkToken('abc')).toBe(hashLinkToken('abc'));
     expect(hashLinkToken('abc')).not.toBe(hashLinkToken('abd'));
+  });
+});
+
+describe('checkLink: why a link cannot be used', () => {
+  const later = new Date(T0.getTime() + LINK_TTL_MS + 1);
+
+  it('says invalid, and nothing about kind, for an unknown token', () => {
+    expect(checkLink('not-a-token', T0)).toEqual({ ok: false, reason: 'invalid', kind: null });
+  });
+
+  it('returns the same description as inspectLink for a usable link', () => {
+    const { token } = createInvite({ createdBy: ADMIN, note: null, now: T0 });
+    expect(checkLink(token, T0)).toEqual({ ok: true, info: inspectLink(token, T0) });
+  });
+
+  it('tells used, expired and revoked invites apart', () => {
+    const used = createInvite({ createdBy: ADMIN, note: null, now: T0 });
+    redeemInvite({ token: used.token, username: 'first', passwordHash: 'h', now: T0 });
+    expect(checkLink(used.token, T0)).toEqual({ ok: false, reason: 'used', kind: 'invite' });
+
+    const expired = createInvite({ createdBy: ADMIN, note: null, now: T0 });
+    expect(checkLink(expired.token, later)).toEqual({ ok: false, reason: 'expired', kind: 'invite' });
+
+    const revoked = createInvite({ createdBy: ADMIN, note: null, now: T0 });
+    revokeLink(revoked.id, T0);
+    expect(checkLink(revoked.token, T0)).toEqual({ ok: false, reason: 'revoked', kind: 'invite' });
+  });
+
+  it('reports a used link as used even after its 48 hours are over', () => {
+    const { token } = createInvite({ createdBy: ADMIN, note: null, now: T0 });
+    redeemInvite({ token, username: 'first', passwordHash: 'h', now: T0 });
+    expect(checkLink(token, later)).toMatchObject({ reason: 'used' });
+  });
+
+  it('covers reset links: used, replaced by a newer one, or for a suspended account', () => {
+    const used = createResetLink({ createdBy: ADMIN, userId: MEMBER, now: T0 });
+    if (!used.ok) throw new Error('expected a link');
+    redeemReset({ token: used.token, passwordHash: 'new', now: T0 });
+    expect(checkLink(used.token, T0)).toEqual({ ok: false, reason: 'used', kind: 'reset' });
+
+    const replaced = createResetLink({ createdBy: ADMIN, userId: MEMBER, now: T0 });
+    const newest = createResetLink({ createdBy: ADMIN, userId: MEMBER, now: T0 });
+    if (!replaced.ok || !newest.ok) throw new Error('expected links');
+    expect(checkLink(replaced.token, T0)).toEqual({ ok: false, reason: 'revoked', kind: 'reset' });
+
+    db.update(users).set({ disabledAt: T0 }).where(eq(users.id, MEMBER)).run();
+    expect(checkLink(newest.token, T0)).toEqual({ ok: false, reason: 'invalid', kind: 'reset' });
   });
 });

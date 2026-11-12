@@ -2,14 +2,14 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { validateCsrfOrFail } from '@/lib/auth/csrf';
 import { hashPassword } from '@/lib/auth/password';
-import { inspectLink, redeemInvite, redeemReset } from '@/lib/auth/account-links';
+import { checkLink, redeemInvite, redeemReset } from '@/lib/auth/account-links';
 import {
   isValidUsername,
   MAX_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH,
   normalizeUsername,
 } from '@/lib/auth/account-rules';
-import { invalidLink, linkRateLimited } from '@/lib/auth/link-request';
+import { invalidLink, linkRateLimited, unusableLink } from '@/lib/auth/link-request';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -27,6 +27,12 @@ const schema = z.object({
  * Reset: sets the new password and ends the account's other sessions.
  * Either way the link is used up; the caller then signs in normally.
  */
+/** The link stopped being usable after the first check (e.g. used in another tab). */
+function lostRace(req: Request, token: string): NextResponse {
+  const check = checkLink(token);
+  return check.ok ? invalidLink(req) : unusableLink(req, check.reason, check.kind);
+}
+
 export async function POST(req: Request) {
   const limited = linkRateLimited(req);
   if (limited) return limited;
@@ -45,8 +51,9 @@ export async function POST(req: Request) {
   const { token, password } = parsed.data;
 
   // Cheap check first so a bad token never costs an argon2 hash.
-  const info = inspectLink(token);
-  if (!info) return invalidLink(req);
+  const check = checkLink(token);
+  if (!check.ok) return unusableLink(req, check.reason, check.kind);
+  const { info } = check;
 
   if (password.length < MIN_PASSWORD_LENGTH || password.length > MAX_PASSWORD_LENGTH) {
     return NextResponse.json(
@@ -68,12 +75,12 @@ export async function POST(req: Request) {
       if (result.reason === 'taken') {
         return NextResponse.json({ error: '이미 쓰고 있는 아이디입니다' }, { status: 409 });
       }
-      return invalidLink(req);
+      return lostRace(req, token);
     }
     return NextResponse.json({ ok: true, kind: 'invite', username: result.username });
   }
 
   const result = redeemReset({ token, passwordHash: await hashPassword(password) });
-  if (!result.ok) return invalidLink(req);
+  if (!result.ok) return lostRace(req, token);
   return NextResponse.json({ ok: true, kind: 'reset', username: result.username });
 }

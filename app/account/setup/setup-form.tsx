@@ -14,7 +14,7 @@ type LinkInfo = { kind: "invite" | "reset"; expiresAt: string; username: string 
 
 type State =
   | { step: "checking" }
-  | { step: "invalid"; message: string }
+  | { step: "invalid"; message: string; reason?: string }
   | { step: "form"; token: string; info: LinkInfo }
   | { step: "done"; kind: "invite" | "reset"; username: string };
 
@@ -64,7 +64,7 @@ export function SetupForm({ csrfToken }: SetupFormProps): React.ReactElement {
       .then(async (res) => {
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          setState({ step: "invalid", message: data.error ?? "유효하지 않거나 만료된 링크입니다" });
+          setState({ step: "invalid", message: data.error ?? "유효하지 않거나 만료된 링크입니다", reason: data.reason });
           return;
         }
         setState({ step: "form", token, info: data as LinkInfo });
@@ -90,7 +90,7 @@ export function SetupForm({ csrfToken }: SetupFormProps): React.ReactElement {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         if (res.status === 404) {
-          setState({ step: "invalid", message: data.error ?? "유효하지 않거나 만료된 링크입니다" });
+          setState({ step: "invalid", message: data.error ?? "유효하지 않거나 만료된 링크입니다", reason: data.reason });
         } else {
           setError(data.error ?? "처리하지 못했습니다");
         }
@@ -144,9 +144,24 @@ export function SetupForm({ csrfToken }: SetupFormProps): React.ReactElement {
               >
                 {state.message}
               </div>
-              <p className="text-sm" style={{ color: c.slate }}>
-                링크는 한 번만 쓸 수 있고 48시간 뒤 만료됩니다. 새 링크는 관리자에게 요청해 주세요.
-              </p>
+              {state.reason === "used" ? (
+                <>
+                  <p className="text-sm" style={{ color: c.slate }}>
+                    직접 사용하지 않았는데 이 안내가 나온다면 관리자에게 알려 주세요.
+                  </p>
+                  <Link
+                    href="/login"
+                    className="inline-flex h-11 w-full items-center justify-center text-sm font-medium"
+                    style={{ background: c.primary, color: c.primaryForeground, borderRadius: 9999 }}
+                  >
+                    로그인하러 가기
+                  </Link>
+                </>
+              ) : (
+                <p className="text-sm" style={{ color: c.slate }}>
+                  링크는 한 번만 쓸 수 있고 48시간 뒤 만료됩니다. 새 링크는 관리자에게 요청해 주세요.
+                </p>
+              )}
             </div>
           )}
 

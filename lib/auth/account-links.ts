@@ -129,15 +129,31 @@ export interface LinkInfo {
   username: string | null;
 }
 
-/** Describes a usable link, or null for an unknown, used, revoked or expired one. */
-export function inspectLink(token: string, now: Date = new Date()): LinkInfo | null {
+/**
+ * Why a link cannot be used. Telling used / expired / revoked apart is safe:
+ * only someone holding a real 256-bit token can get one of those answers, and
+ * it is the one thing that helps them (log in instead, or ask for a new link).
+ * Unknown tokens and resets for a missing or suspended account stay 'invalid'.
+ */
+export type UnusableReason = 'used' | 'expired' | 'revoked' | 'invalid';
+
+export type LinkCheck =
+  | { ok: true; info: LinkInfo }
+  | { ok: false; reason: UnusableReason; kind: LinkKind | null };
+
+/** Describes a link: what it is for if usable, otherwise why not. */
+export function checkLink(token: string, now: Date = new Date()): LinkCheck {
   const link = db
     .select()
     .from(accountLinks)
     .where(eq(accountLinks.tokenHash, hashLinkToken(token)))
     .get();
-  if (!link || linkStatus(link, now) !== 'pending') return null;
-  if (link.kind === 'invite') return { kind: 'invite', expiresAt: link.expiresAt, username: null };
+  if (!link) return { ok: false, reason: 'invalid', kind: null };
+  const status = linkStatus(link, now);
+  if (status !== 'pending') return { ok: false, reason: status, kind: link.kind };
+  if (link.kind === 'invite') {
+    return { ok: true, info: { kind: 'invite', expiresAt: link.expiresAt, username: null } };
+  }
 
   const target = link.targetUserId
     ? db
@@ -146,8 +162,14 @@ export function inspectLink(token: string, now: Date = new Date()): LinkInfo | n
         .where(eq(users.id, link.targetUserId))
         .get()
     : undefined;
-  if (!target || target.disabledAt) return null;
-  return { kind: 'reset', expiresAt: link.expiresAt, username: target.email };
+  if (!target || target.disabledAt) return { ok: false, reason: 'invalid', kind: 'reset' };
+  return { ok: true, info: { kind: 'reset', expiresAt: link.expiresAt, username: target.email } };
+}
+
+/** Describes a usable link, or null for an unknown, used, revoked or expired one. */
+export function inspectLink(token: string, now: Date = new Date()): LinkInfo | null {
+  const check = checkLink(token, now);
+  return check.ok ? check.info : null;
 }
 
 export type RedeemResult =

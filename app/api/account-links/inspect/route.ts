@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { validateCsrfOrFail } from '@/lib/auth/csrf';
-import { inspectLink } from '@/lib/auth/account-links';
-import { invalidLink, linkRateLimited } from '@/lib/auth/link-request';
+import { checkLink } from '@/lib/auth/account-links';
+import { invalidLink, linkRateLimited, unusableLink } from '@/lib/auth/link-request';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -30,8 +30,9 @@ export async function POST(req: Request) {
   const parsed = schema.safeParse(body);
   if (!parsed.success) return invalidLink(req);
 
-  const info = inspectLink(parsed.data.token);
-  if (!info) return invalidLink(req);
+  const check = checkLink(parsed.data.token);
+  if (!check.ok) return unusableLink(req, check.reason, check.kind);
+  const { info } = check;
   return NextResponse.json({
     kind: info.kind,
     expiresAt: info.expiresAt.toISOString(),
