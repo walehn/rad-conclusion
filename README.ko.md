@@ -14,7 +14,7 @@
   <a href="https://react.dev"><img src="https://img.shields.io/badge/React-19-61DAFB?style=flat&logo=react&logoColor=white" alt="React"></a>
   <a href="https://tailwindcss.com"><img src="https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?style=flat&logo=tailwindcss&logoColor=white" alt="Tailwind CSS"></a>
   <a href="https://ai-sdk.dev"><img src="https://img.shields.io/badge/AI_SDK-7-000?style=flat&logo=vercel" alt="AI SDK"></a>
-  <a href="#라이선스"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT"></a>
 </p>
 
 ---
@@ -122,9 +122,9 @@ RAD_LOCAL_HOST=http://localhost:8080            # Qwen3.6 35B
 npm run db:migrate   # data/auth.sqlite를 만들고 drizzle/의 변경 사항을 적용
 ```
 
-계정은 `npm run seed:user -- <아이디> --role admin`으로 만듭니다. 비밀번호는 화면에서 직접 입력하고, 역할을 빼면 `restricted`입니다. 그다음 계정은 `/admin/accounts`의 초대 링크로 만들면 됩니다.
+첫 계정은 `npm run seed:user -- <아이디> --role admin`으로 만듭니다. 아직 적용하지 않은 데이터베이스 변경도 이 명령이 먼저 적용합니다. 비밀번호는 터미널에서 직접 입력하며, 입력한 글자는 화면에 보이지 않습니다. 역할을 빼면 `restricted`입니다. 그다음 계정은 `/admin/accounts`의 초대 링크로 만들면 됩니다.
 
-> `scripts/` 폴더(계정 만들기, 컨테이너의 데이터베이스 변경 적용, 프롬프트 판 도우미, 로컬 분석 도구)와 `Dockerfile`, `docker-compose.yml`, `.dockerignore`는 이 저장소에 넣지 않았습니다.
+> `scripts/` 폴더에서는 `seed-user.ts`(계정 만들기)와 `migrate.js`(컨테이너가 `entrypoint.sh`에서 실행하는 데이터베이스 변경 적용)만 이 저장소에 있습니다. 프롬프트 판 도우미, 로컬 분석 도구, `Dockerfile`, `docker-compose.yml`, `.dockerignore`는 넣지 않았습니다.
 
 ### 개발
 
@@ -140,7 +140,7 @@ npm run build
 npm run start -- --hostname 127.0.0.1   # http://127.0.0.1:3957
 ```
 
-`next.config.ts`가 독립 실행 서버(`output: "standalone"`)로 빌드하기 때문에, `next start`를 쓰면 Next.js가 경고를 한 줄 띄웁니다. 서버는 그대로 돌아가고, 저장소 폴더의 `data/`를 씁니다. 컨테이너 배포에서는 `.next/standalone/server.js`를 실행합니다. 이 서버는 시작할 때 자기 폴더로 옮겨 가므로, `data/`와 `drizzle/`도 그 옆에 있어야 합니다.
+`next.config.ts`가 독립 실행 서버(`output: "standalone"`)로 빌드하기 때문에, `next start`를 쓰면 Next.js가 경고를 한 줄 띄웁니다. 서버는 그대로 돌아가고, 저장소 폴더의 `data/`를 씁니다. 컨테이너 배포에서는 `.next/standalone/server.js`를 실행합니다. 이 서버는 시작할 때 자기 폴더로 옮겨 가므로, `data/`와 `drizzle/`도 그 옆에 있어야 합니다. 서버를 띄우기 전에 `entrypoint.sh`가 `scripts/migrate.js`로 데이터베이스 변경을 적용합니다.
 
 화면 아래에는 `v<package.json 버전>`과 `Updated <빌드 날짜> · <커밋>`이 나옵니다. 커밋은 `BUILD_COMMIT` 환경변수에서 읽고, 없으면 빌드하는 곳의 `git`에서 읽습니다.
 
@@ -172,7 +172,7 @@ npm run start -- --hostname 127.0.0.1   # http://127.0.0.1:3957
 - `lib/prompts/revisions.ts`가 변경 기록입니다. `r1`(2026-08-25)은 기준 프롬프트이고, `r2`(2026-10-14)에서 v1을 판독문 문체 프롬프트로 바꿨습니다.
 - 판마다 짧은 sha256 값으로 구별합니다. 이 값은 코드가 만들 수 있는 모든 프롬프트(두 판, 모든 언어와 형식 조합)로 계산합니다.
 - 생성할 때마다 `generations.prompt_revision`과 `generations.prompt_hash`를 함께 저장합니다.
-- `lib/prompts/system-prompt.ts`를 고치고 기록을 추가하지 않으면 `npm test`가 실패하고, 새 값을 알려 줍니다. `scripts/`가 있으면 `npm run prompt:revision`이 바로 붙여 넣을 기록을 만들어 줍니다.
+- `lib/prompts/system-prompt.ts`를 고치고 기록을 추가하지 않으면 `npm test`가 실패하고, 새 값을 알려 줍니다. `npm run prompt:revision`은 바로 붙여 넣을 기록을 만들어 줍니다. 다만 이 스크립트는 로컬에만 있고 이 저장소에는 없습니다.
 
 ## 평가
 
@@ -250,4 +250,4 @@ rad-conclusion/
 
 ## 라이선스
 
-MIT
+MIT. 자세한 내용은 [LICENSE](./LICENSE)를 보세요.

@@ -198,5 +198,9 @@ docker-compose.yml
 CLAUDE.md
 .mcp.json
 data/
-scripts/
+# Local tools stay out; only the account seeder and the container's
+# migration runner are published.
+scripts/*
+!scripts/seed-user.ts
+!scripts/migrate.js
 lib/prompts/system-prompt.ts.bak

@@ -14,7 +14,7 @@
   <a href="https://react.dev"><img src="https://img.shields.io/badge/React-19-61DAFB?style=flat&logo=react&logoColor=white" alt="React"></a>
   <a href="https://tailwindcss.com"><img src="https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?style=flat&logo=tailwindcss&logoColor=white" alt="Tailwind CSS"></a>
   <a href="https://ai-sdk.dev"><img src="https://img.shields.io/badge/AI_SDK-7-000?style=flat&logo=vercel" alt="AI SDK"></a>
-  <a href="#license"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT"></a>
 </p>
 
 ---
@@ -119,9 +119,9 @@ RAD_LOCAL_HOST=http://localhost:8080            # Qwen3.6 35B
 npm run db:migrate   # creates data/auth.sqlite and applies drizzle/ migrations
 ```
 
-Accounts are created with `npm run seed:user -- <id> --role admin` (the password is typed at a prompt; the default role is `restricted`). After that, further accounts come from invite links on `/admin/accounts`.
+Create the first account with `npm run seed:user -- <id> --role admin`. It applies pending migrations itself and asks for the password in the terminal, without echoing it; the default role is `restricted`. After that, further accounts come from invite links on `/admin/accounts`.
 
-> The `scripts/` folder (account seeding, the container's migration runner, prompt-revision helper and local analysis tools), `Dockerfile`, `docker-compose.yml` and `.dockerignore` are kept out of this repository.
+> Of `scripts/`, only `seed-user.ts` (account seeding) and `migrate.js` (the migration runner a container calls from `entrypoint.sh`) are in this repository. The prompt-revision helper, local analysis tools, `Dockerfile`, `docker-compose.yml` and `.dockerignore` are kept out.
 
 ### Development
 
@@ -137,7 +137,7 @@ npm run build
 npm run start -- --hostname 127.0.0.1   # http://127.0.0.1:3957
 ```
 
-Next.js warns that `next start` does not match the `output: "standalone"` setting in `next.config.ts`; the server still runs, using `data/` in the repository folder. A container deployment runs `.next/standalone/server.js` instead, which changes into its own folder, so `data/` and `drizzle/` must sit next to it there.
+Next.js warns that `next start` does not match the `output: "standalone"` setting in `next.config.ts`; the server still runs, using `data/` in the repository folder. A container deployment runs `.next/standalone/server.js` instead, which changes into its own folder, so `data/` and `drizzle/` must sit next to it there; `entrypoint.sh` runs `scripts/migrate.js` before starting it.
 
 The footer shows `v<package.json version>` and `Updated <build date> · <commit>`. The commit comes from `BUILD_COMMIT`, or from `git` when the build runs inside a checkout.
 
@@ -167,7 +167,7 @@ Every generated conclusion records which prompt text produced it, so history sta
 - `lib/prompts/revisions.ts` is the change log: `r1` (2026-08-25) is the base prompt; `r2` (2026-10-14) replaced v1 with the house-style prompt.
 - Each revision is identified by a short sha256 over every prompt the code can render (both versions, all language/style combinations).
 - `generations.prompt_revision` and `generations.prompt_hash` are stamped on each row at generation time.
-- `npm test` fails when `lib/prompts/system-prompt.ts` changes without a new registry entry; the failing test prints the new fingerprint. `npm run prompt:revision` prints a ready-to-paste entry when `scripts/` is present.
+- `npm test` fails when `lib/prompts/system-prompt.ts` changes without a new registry entry; the failing test prints the new fingerprint. `npm run prompt:revision` prints a ready-to-paste entry; its script is local-only and not in this repository.
 
 ## Offline evaluation
 
@@ -245,4 +245,4 @@ This project was built using [Claude Code](https://claude.ai/claude-code) and [M
 
 ## License
 
-MIT
+MIT — see [LICENSE](./LICENSE).
